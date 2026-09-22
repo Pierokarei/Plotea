@@ -1,0 +1,10 @@
+# One line ending everywhere: the project is developed on Windows and built
+# on Linux and macOS runners, and a CRLF/LF flip would show up as a diff of
+# the whole file.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary
+*.xlsx binary
+*.qm binary

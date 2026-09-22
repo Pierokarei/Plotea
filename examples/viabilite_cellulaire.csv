@@ -1,0 +1,49 @@
+Traitement,Réplicat,Viabilité,Lignée
+Contrôle,1,100.01,HeLa
+Contrôle,2,102.69,U2OS
+Contrôle,3,97.53,HeLa
+Contrôle,4,91.98,U2OS
+Contrôle,5,95.91,HeLa
+Contrôle,6,91.08,U2OS
+Contrôle,7,100.54,HeLa
+Contrôle,8,112.06,U2OS
+Contrôle,9,95.57,HeLa
+Contrôle,10,94.42,U2OS
+Contrôle,11,104.41,HeLa
+Contrôle,12,103.21,U2OS
+Drogue A,1,83.16,HeLa
+Drogue A,2,71.76,U2OS
+Drogue A,3,81.68,HeLa
+Drogue A,4,89.65,U2OS
+Drogue A,5,67.21,HeLa
+Drogue A,6,76.97,U2OS
+Drogue A,7,61.09,HeLa
+Drogue A,8,67.82,U2OS
+Drogue A,9,61.74,HeLa
+Drogue A,10,79.41,U2OS
+Drogue A,11,68.06,HeLa
+Drogue A,12,84.98,U2OS
+Drogue B,1,62.57,HeLa
+Drogue B,2,59.13,U2OS
+Drogue B,3,35.83,HeLa
+Drogue B,4,55.61,U2OS
+Drogue B,5,60.51,HeLa
+Drogue B,6,62.13,U2OS
+Drogue B,7,45.7,HeLa
+Drogue B,8,56.22,U2OS
+Drogue B,9,51.21,HeLa
+Drogue B,10,52.91,U2OS
+Drogue B,11,71.61,HeLa
+Drogue B,12,52.92,U2OS
+Drogue A+B,1,37.74,HeLa
+Drogue A+B,2,45.08,U2OS
+Drogue A+B,3,33.33,HeLa
+Drogue A+B,4,37.11,U2OS
+Drogue A+B,5,38.88,HeLa
+Drogue A+B,6,38.51,U2OS
+Drogue A+B,7,28.2,HeLa
+Drogue A+B,8,38.61,U2OS
+Drogue A+B,9,48.87,HeLa
+Drogue A+B,10,25.62,U2OS
+Drogue A+B,11,44.88,HeLa
+Drogue A+B,12,38.95,U2OS
