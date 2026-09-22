@@ -30,7 +30,7 @@ jour.
 | **Ajustements** | linéaire, polynomial, exponentiel, logarithmique, puissance, Michaelis-Menten, Hill 4PL (dose-réponse), gaussienne, sigmoïde — avec R², erreurs types et bande de confiance 95 % |
 | **Figures composites** | plusieurs graphiques sur une même figure, grille au choix, lettres A/B/C automatiques, axes partageables |
 | **Transformations** | % du contrôle, normalisation 0-100, log10 / ln / log2, score z, soustraction de la ligne de base, rapport à une colonne, moyenne des réplicats |
-| **Projets** | fichiers `.plotea` contenant données + graphiques + figures composites, annuler/rétablir, styles réutilisables, export en lot |
+| **Projets** | fichiers `.plotea` contenant données + graphiques + figures composites, annuler/rétablir, styles réutilisables, export en lot, **copie de secours toutes les deux minutes** et récupération après incident, liste des projets récents |
 
 ### Au-delà de Prism
 

@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core import demo, plotting
+from ..core import demo, diagnostics, plotting
 from ..core import export as export_mod
 from ..core import project as project_mod
 from ..core.dataset import empty_dataset
@@ -52,6 +52,11 @@ from .widgets import refresh_icons, set_icon_color, tag_icon
 APP_NAME = "Plotea"
 VERSION = "1.0.0"
 
+#: How often the work in progress is copied beside the configuration. Two
+#: minutes is the most a power cut may cost: often enough to go unnoticed,
+#: rare enough that a large project is not written all day long.
+AUTOSAVE_MS = 120_000
+
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -72,6 +77,11 @@ class MainWindow(QMainWindow):
         self._render_timer.setSingleShot(True)
         self._render_timer.setInterval(120)
         self._render_timer.timeout.connect(self._render_now)
+
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.setInterval(AUTOSAVE_MS)
+        self._autosave_timer.timeout.connect(self.autosave)
+        self._autosave_warned = False
 
         self.setWindowTitle(APP_NAME)
         self.setWindowIcon(app_icon())
@@ -96,6 +106,7 @@ class MainWindow(QMainWindow):
         self._restore_layout()
 
         self._new_project(with_example=True)
+        self._autosave_timer.start()
 
     # ------------------------------------------------------------------
     # construction
@@ -230,7 +241,7 @@ class MainWindow(QMainWindow):
         return action
 
     def _build_actions(self):
-        self.a_new = self._act("Nouveau projet", self._new_project, "Ctrl+N")
+        self.a_new = self._act("Nouveau projet", self.new_project, "Ctrl+N")
         self.a_open = self._act("Ouvrir un projet...", self.open_project,
                                 "Ctrl+Shift+O", "open")
         self.a_import = self._act("Importer des données...", self.import_data,
@@ -296,6 +307,8 @@ class MainWindow(QMainWindow):
         m_file = mb.addMenu("&Fichier")
         m_file.addAction(self.a_new)
         m_file.addAction(self.a_open)
+        self.m_recent = m_file.addMenu("Projets récents")
+        self.m_recent.aboutToShow.connect(self._fill_recent)
         m_file.addSeparator()
         m_file.addAction(self.a_import)
         m_examples = m_file.addMenu("Jeux de données d'exemple")
@@ -414,24 +427,114 @@ class MainWindow(QMainWindow):
         self.schedule_render()
         self._update_history_actions()
 
+    # -- protection against losing work ---------------------------------
+    def autosave(self) -> bool:
+        """Copy the work in progress beside the configuration.
+
+        Only when something has changed, and without touching the project's
+        own file or its modified flag: this is a net, not a save.
+        """
+        if not self.project.dirty:
+            return False
+        try:
+            project_mod.write_recovery(self.project)
+        except Exception as exc:                 # disk full, folder gone...
+            if not self._autosave_warned:        # once, not every two minutes
+                self._autosave_warned = True
+                diagnostics.LOG.record(
+                    "Copie de secours impossible",
+                    f"{type(exc).__name__}: {exc}")
+                self.statusBar().showMessage(
+                    "Copie de secours impossible - voir Aide > Journal", 6000)
+            return False
+        self._autosave_warned = False
+        self.statusBar().showMessage("Copie de secours enregistrée", 2500)
+        return True
+
+    def _ask_to_keep_changes(self) -> bool:
+        """Offer to save before something replaces the current project.
+
+        Returns False when the user calls the whole thing off. Until now
+        Ctrl+N and Ouvrir discarded the work in progress without a word.
+        """
+        if not self.project.dirty:
+            return True
+        box = QMessageBox(self)
+        box.setWindowTitle(APP_NAME)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setText("Le projet a été modifié.")
+        box.setInformativeText(
+            "Voulez-vous l'enregistrer avant de continuer ?")
+        save = box.addButton("Enregistrer", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Continuer sans enregistrer",
+                      QMessageBox.ButtonRole.DestructiveRole)
+        cancel = box.addButton("Annuler", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(save)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is cancel:
+            return False
+        if clicked is save:
+            self.save_project()
+            if self.project.dirty:      # the save dialog was called off
+                return False
+        return True
+
+    def restore_recovery(self, info: dict) -> bool:
+        """Reopen the copy left behind by a session that ended badly."""
+        try:
+            project = Project.load(info["path"])
+        except Exception as exc:
+            diagnostics.LOG.record("Récupération impossible",
+                                   f"{type(exc).__name__}: {exc}")
+            return False
+        # The copy lives beside the configuration; the project still belongs
+        # to the file it came from, and was never saved there.
+        project.path = info.get("origin", "")
+        project.name = info.get("name") or project.name
+        project.dirty = True
+        self.project = project
+        if not self.project.plots:
+            self.project.add_plot(PlotSpec())
+        self._reload_all(0)
+        self._update_title()
+        self.statusBar().showMessage(
+            "Travail récupéré - enregistrez-le pour le conserver", 8000)
+        return True
+
+    def new_project(self):
+        if not self._ask_to_keep_changes():
+            return
+        self._new_project()
+        project_mod.clear_recovery()
+
     def open_project(self):
+        if not self._ask_to_keep_changes():
+            return
         path, _ = QFileDialog.getOpenFileName(
             self, "Ouvrir un projet", self.last_dir(),
             "Projet Plotea (*.plotea)")
         if not path:
             return
+        self.load_project(path)
+
+    def load_project(self, path: str) -> bool:
         self._remember_dir(path)
         try:
             self.project = Project.load(path)
         except Exception as exc:
             QMessageBox.critical(self, APP_NAME,
                                  f"Ouverture impossible :\n{exc}")
-            return
+            self._forget_project(path)
+            return False
         if not self.project.plots:
             self.project.add_plot(PlotSpec())
         self._reload_all(0)
         self._update_title()
+        self._remember_project(path)
+        project_mod.clear_recovery()
         self.statusBar().showMessage(f"Projet ouvert : {path}", 4000)
+        return True
 
     def save_project(self):
         if not self.project.path:
@@ -442,6 +545,8 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, APP_NAME, f"Échec :\n{exc}")
             return
         self._update_title()
+        self._remember_project(self.project.path)
+        project_mod.clear_recovery()      # the real file is now up to date
         self.statusBar().showMessage("Projet enregistré", 3000)
 
     def save_project_as(self):
@@ -834,6 +939,51 @@ class MainWindow(QMainWindow):
         self.resizeDocks([self.dock_stats], [210], Qt.Orientation.Vertical)
         self.statusBar().showMessage("Disposition réinitialisée", 3000)
 
+    #: How many projects the Fichier menu remembers.
+    RECENT_MAX = 8
+
+    def recent_projects(self) -> list:
+        """The most recently opened or saved projects, newest first."""
+        stored = self.settings.value("recentProjects", [], type=list) or []
+        return [p for p in stored if isinstance(p, str)]
+
+    def _remember_project(self, path: str):
+        if not path:
+            return
+        path = os.path.abspath(path)
+        recent = [p for p in self.recent_projects()
+                  if os.path.normcase(p) != os.path.normcase(path)]
+        recent.insert(0, path)
+        self.settings.setValue("recentProjects", recent[:self.RECENT_MAX])
+
+    def _forget_project(self, path: str):
+        """Drop a project the menu offered but that no longer opens."""
+        recent = [p for p in self.recent_projects()
+                  if os.path.normcase(p) != os.path.normcase(
+                      os.path.abspath(path))]
+        self.settings.setValue("recentProjects", recent)
+
+    def _fill_recent(self):
+        """Rebuilt on every opening: files come and go behind our back."""
+        self.m_recent.clear()
+        entries = [p for p in self.recent_projects() if os.path.exists(p)]
+        if not entries:
+            empty = self.m_recent.addAction("Aucun projet récent")
+            empty.setEnabled(False)
+            return
+        for path in entries:
+            action = self.m_recent.addAction(os.path.basename(path))
+            action.setToolTip(path)
+            action.triggered.connect(
+                lambda _=False, target=path: self._open_recent(target))
+        self.m_recent.addSeparator()
+        self.m_recent.addAction("Vider la liste").triggered.connect(
+            lambda: self.settings.setValue("recentProjects", []))
+
+    def _open_recent(self, path: str):
+        if self._ask_to_keep_changes():
+            self.load_project(path)
+
     def last_dir(self) -> str:
         """Folder of the last file opened or written, for the next dialog."""
         path = self.settings.value("lastDir", "", type=str)
@@ -1141,4 +1291,7 @@ class MainWindow(QMainWindow):
             if clicked is save:
                 self.save_project()
         self._save_layout()
+        # An orderly exit: whatever happens to the work, it was the user's
+        # call, so no copy is left to claim a crash on the next start.
+        project_mod.clear_recovery()
         event.accept()

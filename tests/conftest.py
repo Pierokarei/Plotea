@@ -20,6 +20,12 @@ sys.path.insert(0, ROOT)
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+# Preferences, generated glyphs and the backup copy go to a folder of our
+# own: a test run must not touch what the installed application uses, and
+# must not leave a copy behind that would claim a crash on the next start.
+os.environ["PLOTEA_CONFIG_DIR"] = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "_out", "config")
+
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_out")
 os.makedirs(OUT, exist_ok=True)
 EXAMPLES = os.path.join(ROOT, "examples")

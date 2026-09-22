@@ -68,6 +68,44 @@ def selftest_report(app: QApplication, window) -> list[str]:
     return lines
 
 
+def offer_recovery(window) -> bool:
+    """Offer the copy a session that ended badly left behind.
+
+    Only reached when one exists: a normal exit and every real save remove
+    it, so its mere presence means the previous run did not end on its own
+    terms. Closing the dialog decides nothing and keeps the copy.
+    """
+    from PyQt6.QtWidgets import QMessageBox
+
+    from .core import project as project_mod
+
+    info = project_mod.recovery_info()
+    if not info:
+        return False
+
+    when = (info.get("saved", "") or "").replace("T", " à ")
+    origin = info.get("origin") or "projet jamais enregistré"
+    box = QMessageBox(window)
+    box.setWindowTitle(APP_NAME)
+    box.setIcon(QMessageBox.Icon.Question)
+    box.setText("La session précédente ne s'est pas terminée normalement.")
+    box.setInformativeText(
+        f"Une copie de secours de « {info.get('name', 'Projet')} » a été "
+        f"enregistrée le {when}.\n{origin}\n\n"
+        "Voulez-vous la récupérer ?")
+    recover = box.addButton("Récupérer", QMessageBox.ButtonRole.AcceptRole)
+    box.addButton("Supprimer la copie",
+                  QMessageBox.ButtonRole.DestructiveRole)
+    box.setDefaultButton(recover)
+    box.exec()
+
+    if box.clickedButton() is recover:
+        return window.restore_recovery(info)
+    if box.clickedButton() is not None:       # "Supprimer la copie"
+        project_mod.clear_recovery()
+    return False                              # closed: decide next time
+
+
 def _excepthook(exc_type, exc, tb):
     """Keep the app alive when a slot raises: report instead of aborting."""
     traceback.print_exception(exc_type, exc, tb)
@@ -124,6 +162,8 @@ def main(argv: list[str] | None = None) -> int:
         window.close()
         print(f"{APP_NAME} {VERSION} démarré correctement")
         return 0
+
+    offer_recovery(window)
 
     for arg in argv[1:]:
         if arg.lower().endswith(".plotea"):

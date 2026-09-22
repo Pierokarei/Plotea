@@ -128,9 +128,12 @@ class Project:
             "panels": [p.to_dict() for p in self.panels],
         }
 
-    def save(self, path: str) -> str:
-        if not path.lower().endswith(EXTENSION):
-            path += EXTENSION
+    def write_to(self, path: str) -> str:
+        """Write the archive at `path` without claiming it as our own file.
+
+        Separate from save() because a backup copy must not make the project
+        believe it has been saved, nor move it to another file.
+        """
         meta = self.to_json()
         with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("project.json", json.dumps(meta, indent=2,
@@ -138,6 +141,12 @@ class Project:
             for entry, ds in zip(meta["datasets"], self.datasets):
                 zf.writestr(entry["file"],
                             ds.df.to_csv(index=False, encoding="utf-8"))
+        return path
+
+    def save(self, path: str) -> str:
+        if not path.lower().endswith(EXTENSION):
+            path += EXTENSION
+        self.write_to(path)
         self.path = path
         self.dirty = False
         return path
@@ -192,11 +201,76 @@ def apply_style(spec: PlotSpec, style: dict) -> PlotSpec:
 
 
 def config_dir() -> str:
-    base = (os.environ.get("APPDATA")
-            or os.path.expanduser("~/.config"))
-    path = os.path.join(base, "Plotea")
+    """Where preferences, presets and the backup copy live.
+
+    PLOTEA_CONFIG_DIR overrides it, which keeps a test run out of the real
+    folder and makes a portable installation possible.
+    """
+    path = os.environ.get("PLOTEA_CONFIG_DIR") or os.path.join(
+        os.environ.get("APPDATA") or os.path.expanduser("~/.config"),
+        "Plotea")
     os.makedirs(path, exist_ok=True)
     return path
+
+
+# --------------------------------------------------------------------------
+# Backup copy: what stands between a power cut and an afternoon of work
+# --------------------------------------------------------------------------
+RECOVERY_NAME = "recuperation" + EXTENSION
+RECOVERY_INFO = "recuperation.json"
+
+
+def recovery_path() -> str:
+    return os.path.join(config_dir(), RECOVERY_NAME)
+
+
+def write_recovery(project: Project) -> str:
+    """Snapshot `project` beside the configuration, atomically.
+
+    Written to a temporary name and moved into place, so an interruption
+    during the write leaves the previous copy intact rather than half of a
+    new one. The project keeps its own path and its modified flag: this is a
+    safety net, not a save.
+    """
+    target = recovery_path()
+    partial = target + ".part"
+    project.write_to(partial)
+    os.replace(partial, target)
+    with open(os.path.join(config_dir(), RECOVERY_INFO), "w",
+              encoding="utf-8") as fh:
+        json.dump({"name": project.name,
+                   "origin": project.path,
+                   "saved": datetime.now().isoformat(timespec="seconds")},
+                  fh, ensure_ascii=False, indent=2)
+    return target
+
+
+def recovery_info() -> dict | None:
+    """Describe a backup copy left behind, or None when there is none.
+
+    A copy only survives a session that ended badly: a normal exit, and every
+    real save, remove it.
+    """
+    path = recovery_path()
+    if not os.path.exists(path):
+        return None
+    info = {"name": "Projet", "origin": "", "saved": ""}
+    try:
+        with open(os.path.join(config_dir(), RECOVERY_INFO),
+                  encoding="utf-8") as fh:
+            info.update(json.load(fh))
+    except (OSError, ValueError):
+        pass                       # the archive alone is enough to recover
+    info["path"] = path
+    return info
+
+
+def clear_recovery():
+    for name in (RECOVERY_NAME, RECOVERY_INFO, RECOVERY_NAME + ".part"):
+        try:
+            os.remove(os.path.join(config_dir(), name))
+        except OSError:
+            pass
 
 
 def save_preset(name: str, style: dict):
