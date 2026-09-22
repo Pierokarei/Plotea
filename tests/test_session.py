@@ -41,14 +41,13 @@ def test_icon_files_exist_for_packaging():
         assert path and os.path.getsize(path) > 500, extension
 
 
-def test_window_carries_the_icon():
+def test_window_carries_the_icon(closer):
     win = MainWindow()
     assert not win.windowIcon().isNull()
-    win.project.dirty = False
-    win.close()
+    closer(win)
 
 
-def test_layout_survives_a_restart():
+def test_layout_survives_a_restart(closer):
     """isHidden, not isVisible: nothing is ever visible on a headless screen,
     and the virtual screen clamps window sizes."""
     first = MainWindow()
@@ -56,18 +55,16 @@ def test_layout_survives_a_restart():
     first.dock_stats.hide()
     first._save_layout()
     saved = bytes(first.saveState())
-    first.project.dirty = False
-    first.close()
+    closer(first)
 
     second = MainWindow()
     second._restore_layout()
     assert second.dock_stats.isHidden(), "l'etat des panneaux est perdu"
     assert bytes(second.saveState()) == saved, "disposition non restauree"
-    second.project.dirty = False
-    second.close()
+    closer(second)
 
 
-def test_reset_puts_the_panels_back():
+def test_reset_puts_the_panels_back(closer):
     win = MainWindow()
     win.dock_stats.hide()
     win.dock_inspector.setFloating(True)
@@ -75,11 +72,10 @@ def test_reset_puts_the_panels_back():
     assert not win.dock_stats.isHidden()
     assert not win.dock_inspector.isFloating()
     assert win.settings.value("windowState") is None
-    win.project.dirty = False
-    win.close()
+    closer(win)
 
 
-def test_last_folder_is_remembered():
+def test_last_folder_is_remembered(closer):
     win = MainWindow()
     target = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_out")
     win._remember_dir(os.path.join(target, "figure.png"))
@@ -88,26 +84,23 @@ def test_last_folder_is_remembered():
     # a folder that no longer exists must not break the next dialog
     win.settings.setValue("lastDir", os.path.join(target, "disparu"))
     assert os.path.isdir(win.last_dir()), win.last_dir()
-    win.project.dirty = False
-    win.close()
+    closer(win)
 
 
-def test_corrupt_settings_do_not_block_startup():
+def test_corrupt_settings_do_not_block_startup(closer):
     settings = QSettings("Plotea", "Plotea")
     settings.setValue("geometry", "ceci n'est pas une geometrie")
     settings.setValue("windowState", 42)
     win = MainWindow()
     win._restore_layout()          # must swallow it and carry on
     assert win.isEnabled()
-    win.project.dirty = False
-    win.close()
+    closer(win)
 
 
-def test_layout_saved_on_close():
+def test_layout_saved_on_close(closer):
     win = MainWindow()
     win.resize(1100, 720)
-    win.project.dirty = False
-    win.close()                    # closeEvent must persist the layout
+    closer(win)                    # closeEvent must persist the layout
     assert QSettings("Plotea", "Plotea").value("geometry") is not None
 
 
