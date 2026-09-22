@@ -46,14 +46,31 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
           MPLBACKEND: Agg
-        run: pytest tests -q --durations=10
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest tests -q --durations=10 2>&1 | tee pytest.log
 
-      - name: Figures produites
+      # GitHub demande maintenant une connexion pour lire les journaux, y
+      # compris sur un depot public. La fin de la sortie est donc republiee
+      # en annotation, qui reste lisible sans compte et via l'API.
+      - name: Detail de l'echec
+        if: failure()
+        shell: bash
+        run: |
+          test -f pytest.log || exit 0
+          detail=$(tail -n 40 pytest.log | tr -d '\r' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::error title=pytest ${{ matrix.os }} py${{ matrix.python }}::$detail"
+
+
+      - name: Sorties de test
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: sorties-${{ matrix.os }}-${{ matrix.python }}
-          path: tests/_out/
+          path: |
+            tests/_out/
+            pytest.log
           retention-days: 5
 
   build:
