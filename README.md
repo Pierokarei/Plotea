@@ -1,8 +1,16 @@
 # Plotea
 
+[![Tests](https://github.com/Pierokarei/Plotea/actions/workflows/tests.yml/badge.svg)](https://github.com/Pierokarei/Plotea/actions/workflows/tests.yml)
+
 Figures scientifiques de qualité publication, libres et gratuites — une
 alternative ouverte à GraphPad Prism. Interface PyQt6, moteur matplotlib,
-statistiques SciPy. Fonctionne sous **Linux, macOS et Windows**.
+statistiques SciPy.
+
+La suite de tests est exécutée à chaque commit sous **Linux, macOS et
+Windows**, en Python 3.11 et 3.13. Les binaires autonomes des trois systèmes
+se construisent depuis l'onglet Actions (workflow *Tests*, bouton *Run
+workflow*) ; seul celui de Windows a été lancé sur une vraie machine à ce
+jour.
 
 ![Plotea](docs/screenshot.png)
 
