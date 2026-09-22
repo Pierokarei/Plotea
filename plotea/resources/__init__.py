@@ -9,7 +9,7 @@ import os
 import re
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import (QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF)
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

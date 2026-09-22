@@ -12,7 +12,8 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 
-from . import diagnostics, fitting, stats as st
+from . import diagnostics, fitting
+from . import stats as st
 from .plotspec import PlotSpec
 from .themes import HATCHES, Theme, color_cycle, get_theme
 

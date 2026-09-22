@@ -12,9 +12,8 @@ from dataclasses import asdict, dataclass, field
 import matplotlib as mpl
 
 from . import plotting
-from .themes import MM, get_theme
-
 from .enums import PANEL_FIELDS, PANEL_LETTERS, SPAN
+from .themes import MM, get_theme
 
 LETTER_STYLES = PANEL_LETTERS.keys()
 SPANS = SPAN.keys()

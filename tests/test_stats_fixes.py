@@ -11,10 +11,9 @@ import pandas as pd
 from matplotlib.figure import Figure
 from scipy import stats as sps
 
-
-from plotea.core import demo, plotting  # noqa: E402
-from plotea.core.plotspec import PlotSpec  # noqa: E402
-from plotea.core.themes import get_theme  # noqa: E402
+from plotea.core import demo, plotting
+from plotea.core.plotspec import PlotSpec
+from plotea.core.themes import get_theme
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_out")
 os.makedirs(OUT, exist_ok=True)
@@ -67,8 +66,8 @@ def test_grouped_matches_manual():
     for comp in info.comparisons:
         cat, sub_a = comp.a.split(" / ")
         _, sub_b = comp.b.split(" / ")
-        def pick(sub):
-            rows = two.df[(two.df["Temps"] == cat)
+        def pick(sub, moment=cat):
+            rows = two.df[(two.df["Temps"] == moment)
                           & (two.df["Génotype"] == sub)]
             return rows["Activité"].values
 

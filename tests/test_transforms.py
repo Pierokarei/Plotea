@@ -3,10 +3,8 @@
 import numpy as np
 import pandas as pd
 
-
-from plotea.core import demo, transforms  # noqa: E402
-from plotea.ui.dialogs import TransformDialog  # noqa: E402
-
+from plotea.core import demo, transforms
+from plotea.ui.dialogs import TransformDialog
 
 viab = demo.viability()
 P = transforms.Params

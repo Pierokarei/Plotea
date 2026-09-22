@@ -2,12 +2,10 @@
 import os
 import sys
 
+from PyQt6.QtCore import QSettings, QSize
 
-from PyQt6.QtCore import QSettings, QSize  # noqa: E402
-
-from plotea import resources  # noqa: E402
-from plotea.ui.main_window import MainWindow  # noqa: E402
-
+from plotea import resources
+from plotea.ui.main_window import MainWindow
 
 # a throwaway settings scope: never touch the real preferences
 QSettings.setDefaultFormat(QSettings.Format.IniFormat)

@@ -6,13 +6,18 @@ import numpy as np
 import pandas as pd
 from matplotlib.figure import Figure
 
-
-from plotea.core import diagnostics, enums, fitting, plotting, stats  # noqa: E402
-from plotea.core import transforms  # noqa: E402
-from plotea.core.panel import Panel  # noqa: E402
-from plotea.core.plotspec import PlotSpec  # noqa: E402
-from plotea.core.project import Project  # noqa: E402
-from plotea.core.dataset import Dataset  # noqa: E402
+from plotea.core import (
+    diagnostics,
+    enums,
+    fitting,
+    plotting,
+    stats,
+    transforms,
+)
+from plotea.core.dataset import Dataset
+from plotea.core.panel import Panel
+from plotea.core.plotspec import PlotSpec
+from plotea.core.project import Project
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_out")
 os.makedirs(OUT, exist_ok=True)

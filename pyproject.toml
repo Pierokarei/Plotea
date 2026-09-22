@@ -51,6 +51,21 @@ plotea = ["resources/*.ico", "resources/*.png", "resources/*.icns"]
 line-length = 79
 target-version = "py310"
 
+# Spelled out on purpose: ruff changes its default set from one release to
+# the next, and the CI installs the latest. Without this the same code lints
+# clean on one machine and fails on another, which is what happened on the
+# very first run.
+[tool.ruff.lint]
+select = [
+    "E4",       # imports: placement and duplicates
+    "E7",       # statement-level mistakes
+    "E9",       # syntax and runtime errors
+    "F",        # pyflakes: unused names, undefined names
+    "I",        # import order
+    "W",        # trailing whitespace and friends
+    "RUF100",   # noqa directives that no longer suppress anything
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

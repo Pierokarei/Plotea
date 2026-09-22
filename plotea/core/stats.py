@@ -16,8 +16,7 @@ try:
 except Exception:                                     # pragma: no cover
     HAVE_SCIPY = False
 
-from .enums import (CORRECTION, ERROR_TYPE, STATS_FORMAT, STATS_MODE,
-                    STATS_TEST)
+from .enums import CORRECTION, ERROR_TYPE, STATS_FORMAT, STATS_MODE, STATS_TEST
 
 TESTS = STATS_TEST.keys()
 CORRECTIONS = CORRECTION.keys()

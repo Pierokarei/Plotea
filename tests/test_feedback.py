@@ -1,8 +1,13 @@
 """Issues reported from real use."""
 import pytest
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QApplication, QMessageBox, QPushButton,
-                             QToolBar, QToolButton)
+from PyQt6.QtWidgets import (
+    QApplication,
+    QMessageBox,
+    QPushButton,
+    QToolBar,
+    QToolButton,
+)
 
 app = QApplication.instance()
 
@@ -352,6 +357,7 @@ def test_the_theme_picker_left_the_toolbar(shared_window):
 def test_composite_and_blank_table_have_different_icons(shared_window):
     """Two neighbouring buttons drawn with the same glyph are unreadable."""
     from PyQt6.QtCore import QSize
+
     from plotea.ui.widgets import make_icon
 
     win = shared_window
@@ -411,6 +417,7 @@ def test_the_dropdown_marker_is_drawn(shared_window):
 # --------------------------------------------------------------------------
 def icon_image(name: str):
     from PyQt6.QtCore import QSize
+
     from plotea.ui.widgets import make_icon
 
     return make_icon(name, "#1C2430", 17).pixmap(QSize(17, 17)).toImage()

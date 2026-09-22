@@ -10,6 +10,7 @@ import os
 import sys
 
 import matplotlib
+
 matplotlib.use("Agg")
 
 import pytest
@@ -23,8 +24,8 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_out")
 os.makedirs(OUT, exist_ok=True)
 EXAMPLES = os.path.join(ROOT, "examples")
 
-from PyQt6.QtCore import QSettings          # noqa: E402
-from PyQt6.QtWidgets import QApplication    # noqa: E402
+from PyQt6.QtCore import QSettings  # noqa: E402
+from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 # Preferences must never leak into the real ones while testing.
 QSettings.setDefaultFormat(QSettings.Format.IniFormat)
@@ -35,7 +36,7 @@ app = QApplication.instance() or QApplication([])
 
 # Same language setup as the real application, so the tests see the dialogs
 # people actually get.
-from plotea.app import install_french          # noqa: E402
+from plotea.app import install_french  # noqa: E402
 
 _translators = install_french(app)
 

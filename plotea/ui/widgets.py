@@ -1,15 +1,44 @@
 """Reusable widgets: vector icons, collapsible sections, colour picker, etc."""
 from __future__ import annotations
 
-from PyQt6.QtCore import (QEvent, QObject, QPointF, QRect, QRectF, QSize, Qt,
-                          pyqtSignal)
-from PyQt6.QtGui import (QColor, QFont, QIcon, QPainter, QPainterPath, QPen,
-                         QPixmap, QPolygonF)
-from PyQt6.QtWidgets import (QCheckBox, QColorDialog, QComboBox, QFormLayout,
-                             QFrame, QHBoxLayout, QHeaderView, QLabel,
-                             QListWidget, QListWidgetItem, QPushButton,
-                             QSizePolicy, QToolButton, QToolTip, QVBoxLayout,
-                             QWidget)
+from PyQt6.QtCore import (
+    QEvent,
+    QObject,
+    QPointF,
+    QRect,
+    QRectF,
+    QSize,
+    Qt,
+    pyqtSignal,
+)
+from PyQt6.QtGui import (
+    QColor,
+    QFont,
+    QIcon,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+    QPolygonF,
+)
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QColorDialog,
+    QComboBox,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSizePolicy,
+    QToolButton,
+    QToolTip,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 # --------------------------------------------------------------------------

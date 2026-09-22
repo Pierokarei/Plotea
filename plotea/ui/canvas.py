@@ -6,16 +6,26 @@ stays sharp and matches what the exported file will look like.
 from __future__ import annotations
 
 import matplotlib
+
 matplotlib.use("QtAgg")
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QGuiApplication, QImage
-from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QScrollArea,
-                             QSizePolicy, QToolButton, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QScrollArea,
+    QSizePolicy,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
-from ..core import export, panel as panel_mod, plotting
+from ..core import export, plotting
+from ..core import panel as panel_mod
 from ..core.plotspec import PlotSpec
 from ..core.themes import get_theme
 

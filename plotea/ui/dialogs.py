@@ -5,16 +5,32 @@ import os
 
 import pandas as pd
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
-                             QDialogButtonBox, QDoubleSpinBox, QFileDialog,
-                             QFormLayout, QHBoxLayout, QHeaderView, QLabel,
-                             QLineEdit, QMessageBox, QPlainTextEdit,
-                             QPushButton, QSpinBox, QTableWidget,
-                             QTableWidgetItem, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..core import dataset as ds_mod
-from ..core import transforms
 from ..core import export as export_mod
+from ..core import transforms
 from ..core.themes import MM
 from .widgets import CheckList
 

@@ -2,9 +2,19 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QLabel,
-                             QLineEdit, QListWidget, QPushButton, QScrollArea,
-                             QSpinBox, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..core import enums
 from ..core.panel import Panel

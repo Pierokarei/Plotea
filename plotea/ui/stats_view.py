@@ -6,11 +6,22 @@ import math
 import pandas as pd
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont
-from PyQt6.QtWidgets import (QAbstractItemView, QApplication, QFileDialog,
-                             QHBoxLayout, QHeaderView, QLabel, QPlainTextEdit,
-                             QPushButton, QSizePolicy, QTableWidget,
-                             QTableWidgetItem, QTabWidget, QVBoxLayout,
-                             QWidget)
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QPlainTextEdit,
+    QPushButton,
+    QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 def _table() -> QTableWidget:

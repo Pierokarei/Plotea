@@ -2,8 +2,6 @@
 import os
 
 from matplotlib.figure import Figure
-
-
 from PyQt6.QtWidgets import QApplication
 
 app = QApplication.instance()

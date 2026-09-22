@@ -16,9 +16,9 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtWidgets import QApplication  # noqa: E402
+from PyQt6.QtWidgets import QApplication
 
-from plotea.resources import HERE, ICON_SIZES, logo_pixmap  # noqa: E402
+from plotea.resources import HERE, ICON_SIZES, logo_pixmap
 
 
 def write_pngs(folder: str) -> dict[int, str]:

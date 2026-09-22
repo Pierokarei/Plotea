@@ -13,8 +13,8 @@ import numpy as np
 from .enums import FIT_MODEL
 
 try:
-    from scipy.optimize import curve_fit
     from scipy import stats as sps
+    from scipy.optimize import curve_fit
     HAVE_SCIPY = True
 except Exception:                                     # pragma: no cover
     HAVE_SCIPY = False

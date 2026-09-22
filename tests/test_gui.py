@@ -1,7 +1,6 @@
 """Offscreen GUI smoke test: build the window and drive the main workflows."""
 import os
 
-
 from PyQt6.QtWidgets import QApplication
 
 app = QApplication.instance()

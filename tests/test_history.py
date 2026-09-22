@@ -7,7 +7,6 @@ app = QApplication.instance()
 
 from plotea.ui.main_window import MainWindow  # noqa: E402
 
-
 win = MainWindow()
 win.show()
 app.processEvents()

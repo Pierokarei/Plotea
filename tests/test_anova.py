@@ -1,12 +1,10 @@
 """Two-way ANOVA and family-wide test selection."""
 
 import numpy as np
-
 from matplotlib.figure import Figure
 
-
-from plotea.core import demo, plotting, stats  # noqa: E402
-from plotea.core.plotspec import PlotSpec  # noqa: E402
+from plotea.core import demo, plotting, stats
+from plotea.core.plotspec import PlotSpec
 
 
 def test_balanced_matches_hand_computation():

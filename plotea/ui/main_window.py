@@ -5,13 +5,28 @@ import os
 
 from PyQt6.QtCore import QSettings, QSize, Qt, QTimer
 from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import (QAbstractButton, QApplication, QComboBox,
-                             QDockWidget, QFileDialog, QInputDialog, QLabel,
-                             QMainWindow, QMenu, QMessageBox, QStackedWidget,
-                             QTabBar, QToolBar, QToolButton, QVBoxLayout,
-                             QWidget)
+from PyQt6.QtWidgets import (
+    QAbstractButton,
+    QApplication,
+    QComboBox,
+    QDockWidget,
+    QFileDialog,
+    QInputDialog,
+    QLabel,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QStackedWidget,
+    QTabBar,
+    QToolBar,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
-from ..core import demo, export as export_mod, plotting, project as project_mod
+from ..core import demo, plotting
+from ..core import export as export_mod
+from ..core import project as project_mod
 from ..core.dataset import empty_dataset
 from ..core.history import History, Snapshot
 from ..core.panel import Panel
@@ -21,8 +36,13 @@ from ..core.themes import THEMES
 from ..resources import app_icon, write_dock_icons
 from .canvas import PlotCanvas
 from .data_view import DataPanel
-from .dialogs import (AboutDialog, ExportDialog, ImportDialog, LogDialog,
-                      TransformDialog)
+from .dialogs import (
+    AboutDialog,
+    ExportDialog,
+    ImportDialog,
+    LogDialog,
+    TransformDialog,
+)
 from .inspector import Inspector
 from .panel_editor import PanelEditor
 from .stats_view import StatsPanel

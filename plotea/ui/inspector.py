@@ -3,18 +3,39 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDoubleValidator
-from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox,
-                             QDoubleSpinBox, QGridLayout, QHBoxLayout, QLabel,
-                             QLineEdit, QListWidget, QPushButton, QScrollArea,
-                             QSizePolicy, QSpinBox, QToolButton, QVBoxLayout,
-                             QWidget)
+from PyQt6.QtWidgets import (
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSpinBox,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..core import enums
 from ..core.plotspec import PLOT_TYPES, PlotSpec
 from ..core.stats import PAIRED_TESTS
 from ..core.themes import LINESTYLES, MARKERS, PALETTES, THEMES
-from .widgets import (CheckList, CollapsibleSection, ColorButton, PaletteCombo,
-                      PLOT_ICONS, hint, row, tag_icon)
+from .widgets import (
+    PLOT_ICONS,
+    CheckList,
+    CollapsibleSection,
+    ColorButton,
+    PaletteCombo,
+    hint,
+    row,
+    tag_icon,
+)
 
 
 class OptionalFloat(QLineEdit):

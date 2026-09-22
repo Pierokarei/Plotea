@@ -5,10 +5,22 @@ import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QColor, QFont, QKeySequence
-from PyQt6.QtWidgets import (QAbstractItemView, QApplication, QHBoxLayout,
-                             QHeaderView, QInputDialog, QLabel, QListWidget,
-                             QMenu, QMessageBox, QSplitter, QTableView,
-                             QToolButton, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLabel,
+    QListWidget,
+    QMenu,
+    QMessageBox,
+    QSplitter,
+    QTableView,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..core.dataset import Dataset
 from .widgets import follow_sections, tag_icon
@@ -24,10 +36,11 @@ class DataFrameModel(QAbstractTableModel):
         self._df = df if df is not None else pd.DataFrame()
 
     # -- required -----------------------------------------------------------
-    def rowCount(self, parent=QModelIndex()) -> int:  # noqa: B008 (Qt API)
+    # Le QModelIndex() par defaut vient de l'API Qt, pas d'une negligence.
+    def rowCount(self, parent=QModelIndex()) -> int:
         return 0 if parent.isValid() else len(self._df.index)
 
-    def columnCount(self, parent=QModelIndex()) -> int:  # noqa: B008
+    def columnCount(self, parent=QModelIndex()) -> int:
         return 0 if parent.isValid() else len(self._df.columns)
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):

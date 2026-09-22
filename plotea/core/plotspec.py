@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 
-from .enums import SPEC_FIELDS, PLOT_TYPE
+from .enums import PLOT_TYPE, SPEC_FIELDS
 
 #: Kept for convenience: plot type key -> label shown in the interface.
 PLOT_TYPES = {choice.key: choice.label for choice in PLOT_TYPE}
