@@ -283,11 +283,13 @@ def test_analyses_buttons_keep_their_label(shared_window):
 
 
 def test_plot_type_cards_are_identical(shared_window):
-    """Six tiles, one size."""
+    """One tile per plot type, all the same size."""
+    from plotea.core import enums
+
     win = shared_window
     app.processEvents()
     buttons = win.inspector.type_buttons.buttons()
-    assert len(buttons) == 6
+    assert len(buttons) == len(enums.PLOT_TYPE.keys())
     heights = {b.height() for b in buttons}
     assert len(heights) == 1, heights
     widths = [b.width() for b in buttons]

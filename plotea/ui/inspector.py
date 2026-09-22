@@ -243,6 +243,7 @@ class Inspector(QWidget):
     CARD_LABELS = {
         "line": "Courbe", "scatter": "Nuage", "histogram": "Histogramme",
         "box": "Boxplot", "violin": "Violon", "bar": "Barres",
+        "survival": "Survie",
     }
     CARD_HEIGHT = 62
 
@@ -317,7 +318,15 @@ class Inspector(QWidget):
         sec.form.addRow(self.lbl_x, self.cmb_x)
 
         self.lst_y = self._bind(CheckList(), "y")
-        sec.add_row("Valeurs Y", self.lst_y)
+        self.r_y = sec.add_row("Valeurs Y", self.lst_y)
+
+        self.cmb_event = self._bind(QComboBox(), "event_col")
+        self.r_event = sec.add_row("Événement (1/0)", self.cmb_event)
+        self.hint_event = hint(
+            "Colonne valant 1 quand l'événement est survenu et 0 quand le "
+            "suivi s'est arrêté avant (censure). Sans elle, tout le monde "
+            "est compté comme ayant eu l'événement.")
+        sec.add_widget(self.hint_event)
 
         self.cmb_group = self._bind(QComboBox(), "group")
         sec.add_row("Grouper par", self.cmb_group)
@@ -652,6 +661,15 @@ class Inspector(QWidget):
                                     "horizontal")
         self.r_barw = sec.add_row("Largeur barres", self.spn_barw)
         self.r_baredge = sec.add_widget(row(self.chk_baredge, self.chk_horiz))
+        self._build_survival_rows(sec)
+
+    def _build_survival_rows(self, sec):
+        self.chk_surv_ci = self._bind(
+            QCheckBox("Bande de confiance 95 %"), "survival_ci")
+        self.r_surv_ci = sec.add_row("Incertitude", self.chk_surv_ci)
+        self.chk_censors = self._bind(
+            QCheckBox("Marquer les censures"), "show_censors")
+        self.r_censors = sec.add_row("Censures", self.chk_censors)
 
     def _build_fit(self):
         sec = self._add(CollapsibleSection("Ajustement de courbe", False))
@@ -708,7 +726,9 @@ class Inspector(QWidget):
         sec.add_row("Écart des barres", self.spn_gap)
         sec.add_widget(hint(
             "Auto choisit t de Student / Welch / Mann-Whitney selon la "
-            "normalité (Shapiro) et l'egalite des variances (Levene)."))
+            "normalité (Shapiro) et l'egalite des variances (Levene). "
+            "Dunnett exige un groupe contrôle ; l'ANOVA à mesures répétées "
+            "exige une colonne d'appariement."))
 
     def set_group_labels(self, labels: list[str]):
         """Feed the control-group combo after each render."""
@@ -730,9 +750,16 @@ class Inspector(QWidget):
         xy = t in ("line", "scatter")
         cat = t in ("bar", "box", "violin")
         hist = t == "histogram"
+        surv = t == "survival"
 
-        self.lbl_x.setVisible(xy)
-        self.cmb_x.setVisible(xy)
+        self.lbl_x.setVisible(xy or surv)
+        self.lbl_x.setText("Temps de suivi" if surv else "Axe X")
+        self.cmb_x.setVisible(xy or surv)
+        self._set_row_visible(self.r_y, not surv)
+        self._set_row_visible(self.r_event, surv)
+        self.hint_event.setVisible(surv)
+        for widget in (self.r_surv_ci, self.r_censors):
+            self._set_row_visible(widget, surv)
         self.cmb_subgroup.setVisible(t == "bar")
         for widget in (self.r_err_cols, self.hint_err):
             widget.setVisible(xy)
@@ -740,7 +767,12 @@ class Inspector(QWidget):
             if label is not None:
                 label.setVisible(xy)
         self.sec_fit.setVisible(xy)
-        self.sec_stats.setVisible(cat)
+        self.sec_stats.setVisible(cat or surv)
+        # on a survival plot the only statistic is the log-rank, so the test
+        # pickers have nothing to offer
+        for widget in (self.cmb_test, self.cmb_mode, self.cmb_control,
+                       self.cmb_format, self.chk_hide_ns, self.spn_gap):
+            widget.setEnabled(not surv)
 
         for w in (self.r_bins_auto, self.r_bins, self.r_hstat, self.r_kde,
                   self.r_cum):

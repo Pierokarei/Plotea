@@ -90,6 +90,25 @@ def two_factor(seed: int = 15) -> Dataset:
     return Dataset("Plan à deux facteurs", pd.DataFrame(rows))
 
 
+def survival(seed: int = 21) -> Dataset:
+    """A two-arm trial with censoring: the shape Kaplan-Meier is made for.
+
+    A third of the subjects leave the study before the event, at a time that
+    says nothing about their outcome - which is what censoring means.
+    """
+    rng = np.random.default_rng(seed)
+    rows = []
+    for arm, median in {"Traitement": 30.0, "Placebo": 10.0}.items():
+        for _ in range(40):
+            event_time = float(rng.exponential(median / np.log(2)))
+            leaves = float(rng.uniform(14, 40))     # end of follow-up
+            observed = min(event_time, leaves)
+            rows.append({"Bras": arm,
+                         "Temps (mois)": round(min(observed, 36.0), 2),
+                         "Événement": int(event_time <= min(leaves, 36.0))})
+    return Dataset("Essai de survie", pd.DataFrame(rows))
+
+
 EXAMPLES = {
     "Viabilité cellulaire (barres, stats)": viability,
     "Courbe de croissance (courbes + SD)": growth,
@@ -97,6 +116,7 @@ EXAMPLES = {
     "Expression génique (violin/histogramme)": expression,
     "Corrélation (nuage + régression)": correlation,
     "Plan à deux facteurs (barres groupées)": two_factor,
+    "Essai de survie (Kaplan-Meier)": survival,
 }
 
 

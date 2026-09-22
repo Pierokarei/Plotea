@@ -39,6 +39,7 @@ class PlotSpec:
     group: str = ""                   # long format: grouping column
     subgroup: str = ""                # second factor -> grouped bars/boxes
     error_cols: list[str] = field(default_factory=list)  # explicit error cols
+    event_col: str = ""               # survival: 1 = event, 0 = censored
 
     # -- style -------------------------------------------------------------
     theme: str = "Nature"
@@ -105,6 +106,9 @@ class PlotSpec:
     violin_inner: str = "box"
     violin_bw: float = 0.0            # 0 -> scott
     violin_side: str = "both"
+
+    survival_ci: bool = False         # 95 % band around the curve
+    show_censors: bool = True         # ticks where follow-up stopped
 
     bar_width: float = 0.7
     bar_edge: bool = True
@@ -173,6 +177,10 @@ class PlotSpec:
     @property
     def is_xy(self) -> bool:
         return self.plot_type in ("line", "scatter")
+
+    @property
+    def is_survival(self) -> bool:
+        return self.plot_type == "survival"
 
     def series_names(self) -> list[str]:
         return list(self.y)

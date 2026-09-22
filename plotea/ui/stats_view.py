@@ -84,10 +84,12 @@ class StatsPanel(QWidget):
         self.fits.setFont(QFont("Consolas" if hasattr(QFont, "Monospace")
                                 else "monospace", 10))
         self.anova = _table()
+        self.outliers = _table()
         self.tabs.addTab(self.desc, "Descriptives")
         self.tabs.addTab(self.tests, "Comparaisons")
         self.tabs.addTab(self.anova, "ANOVA 2 facteurs")
         self.tabs.addTab(self.fits, "Ajustements")
+        self.tabs.addTab(self.outliers, "Aberrantes")
 
         self.header = QLabel("Aucune analyse")
         self.header.setProperty("hint", True)
@@ -119,6 +121,7 @@ class StatsPanel(QWidget):
         self._desc_rows: list[dict] = []
         self._test_rows: list[dict] = []
         self._anova_rows: list[dict] = []
+        self._outlier_rows: list[dict] = []
         self.tabs.setTabVisible(2, False)
 
     # ------------------------------------------------------------------
@@ -140,7 +143,13 @@ class StatsPanel(QWidget):
 
         _fill(self.anova, info.anova, highlight="p")
         self._anova_rows = list(info.anova)
-        self.tabs.setTabVisible(2, bool(info.anova))
+        anova_tab = self.tabs.indexOf(self.anova)
+        self.tabs.setTabVisible(anova_tab, bool(info.anova))
+        self.tabs.setTabText(anova_tab, info.anova_title or "ANOVA")
+        _fill(self.outliers, info.outliers, highlight="p")
+        self._outlier_rows = list(info.outliers)
+        self.tabs.setTabVisible(self.tabs.indexOf(self.outliers),
+                                bool(info.outliers))
 
         head = []
         if info.anova:
@@ -177,11 +186,15 @@ class StatsPanel(QWidget):
 
     # ------------------------------------------------------------------
     def _current_rows(self) -> list[dict]:
-        return {0: self._desc_rows, 1: self._test_rows,
-                2: self._anova_rows}.get(self.tabs.currentIndex(), [])
+        """Rows of the tab on screen, found by widget: tabs get inserted."""
+        return {id(self.desc): self._desc_rows,
+                id(self.tests): self._test_rows,
+                id(self.anova): self._anova_rows,
+                id(self.outliers): self._outlier_rows}.get(
+                    id(self.tabs.currentWidget()), [])
 
     def copy_current(self):
-        if self.tabs.currentIndex() == 3:
+        if self.tabs.currentWidget() is self.fits:
             QApplication.clipboard().setText(self.fits.toPlainText())
             return
         rows = self._current_rows()

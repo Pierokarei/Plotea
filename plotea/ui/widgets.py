@@ -171,6 +171,13 @@ def make_icon(name: str, color: str = "", size: int = 22) -> QIcon:
         p.drawRoundedRect(QRectF(m, m, s - 2 * m, s - 2 * m), 3, 3)
         p.drawLine(QPointF(m, s * 0.40), QPointF(s - m, s * 0.40))
         p.drawLine(QPointF(s * 0.44, m), QPointF(s * 0.44, s - m))
+    elif name == "survival":
+        # a curve that only ever goes down, with one censoring tick
+        p.drawPolyline(QPolygonF([
+            QPointF(m, m * 1.4), QPointF(s * 0.34, m * 1.4),
+            QPointF(s * 0.34, s * 0.48), QPointF(s * 0.58, s * 0.48),
+            QPointF(s * 0.58, s * 0.74), QPointF(s - m, s * 0.74)]))
+        p.drawLine(QPointF(s * 0.46, s * 0.40), QPointF(s * 0.46, s * 0.56))
     elif name == "composite":
         # Four separate tiles with the first one filled: a figure made of
         # panels, and nothing like the single framed grid of "table".
@@ -208,7 +215,8 @@ def make_icon(name: str, color: str = "", size: int = 22) -> QIcon:
 
 
 PLOT_ICONS = {"line": "line", "scatter": "scatter", "histogram": "histogram",
-              "box": "box", "violin": "violin", "bar": "bar"}
+              "box": "box", "violin": "violin", "bar": "bar",
+              "survival": "survival"}
 
 
 def tag_icon(target, name: str):

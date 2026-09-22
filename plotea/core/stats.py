@@ -22,7 +22,10 @@ TESTS = STATS_TEST.keys()
 CORRECTIONS = CORRECTION.keys()
 
 #: Tests that compare the same subjects twice; they need a pairing key.
-PAIRED_TESTS = {"paired_t", "wilcoxon"}
+PAIRED_TESTS = {"paired_t", "wilcoxon", "rm_anova"}
+
+#: Tests that only mean something against a designated control group.
+CONTROL_TESTS = {"dunnett"}
 
 
 @dataclass
@@ -280,6 +283,33 @@ def pairwise(groups: dict[str, np.ndarray], test: str = "auto",
     else:
         pairs = list(itertools.combinations(keys, 2))
 
+    # Dunnett compares every group with one control and controls the
+    # family-wise error rate itself, which is why it beats "all pairs then
+    # Bonferroni" when the control is the only comparison of interest.
+    if test == "dunnett":
+        if control not in clean:
+            return []
+        others = [k for k in keys if k != control]
+        if not others:
+            return []
+        try:
+            # SciPy integrates the multivariate t by Monte Carlo, so the
+            # p-values wobble from one call to the next. A fixed seed keeps
+            # the same data giving the same stars on every render.
+            res = sps.dunnett(*[clean[k] for k in others],
+                              control=clean[control],
+                              random_state=np.random.default_rng(12345))
+        except Exception:
+            return []
+        out = []
+        for name, stat, p in zip(others, np.atleast_1d(res.statistic),
+                                 np.atleast_1d(res.pvalue)):
+            out.append(Comparison(control, name, float(stat), float(p),
+                                  float(p), "Dunnett", clean[control].size,
+                                  clean[name].size,
+                                  cohens_d(clean[control], clean[name])))
+        return out
+
     # Tukey HSD handles its own family-wise error rate
     if test == "anova_tukey" and len(keys) > 2:
         try:
@@ -294,6 +324,9 @@ def pairwise(groups: dict[str, np.ndarray], test: str = "auto",
             return out
         except Exception:
             pass
+
+    if test == "rm_anova":
+        test = "paired_t"        # the omnibus is elsewhere; pairs are paired t
 
     raw = []
     for a, b in pairs:
@@ -401,6 +434,318 @@ def two_way_anova(cells: dict, factor_a: str = "Facteur A",
     return rows, ""
 
 
+def complete_cases(paired: dict) -> tuple[list[str], list[str], np.ndarray]:
+    """Subjects measured in every condition, as a subjects x conditions grid.
+
+    A within-subject design has nothing to say about a subject seen in only
+    half the conditions, and averaging over the ones it did attend would
+    silently turn it into a between-subject comparison.
+    """
+    conditions = list(paired)
+    if len(conditions) < 2:
+        return conditions, [], np.zeros((0, 0))
+    subjects = [s for s in paired[conditions[0]]
+                if all(s in paired[c] for c in conditions)]
+    kept, rows = [], []
+    for subject in subjects:
+        values = [float(paired[c][subject]) for c in conditions]
+        if all(np.isfinite(v) for v in values):
+            kept.append(str(subject))
+            rows.append(values)
+    grid = np.asarray(rows, dtype=float) if rows else np.zeros((0,
+                                                                len(conditions)))
+    return conditions, kept, grid
+
+
+def greenhouse_geisser(grid: np.ndarray) -> float:
+    """Sphericity correction factor, in [1/(k-1), 1].
+
+    A repeated-measures ANOVA assumes every pair of conditions differs with
+    the same variance. When that fails, the F test is too generous; epsilon
+    shrinks the degrees of freedom by how far the data depart from it.
+    """
+    n, k = grid.shape
+    if k < 3 or n < 2:
+        return 1.0                      # with two conditions there is nothing
+    cov = np.cov(grid, rowvar=False)     # k x k
+    mean_all = float(cov.mean())
+    mean_diag = float(np.mean(np.diag(cov)))
+    row_means = cov.mean(axis=1)
+    numerator = (k ** 2) * (mean_diag - mean_all) ** 2
+    denominator = (k - 1) * (float(np.sum(cov ** 2))
+                             - 2 * k * float(np.sum(row_means ** 2))
+                             + (k ** 2) * mean_all ** 2)
+    if denominator <= 0:
+        return 1.0
+    return float(min(1.0, max(1.0 / (k - 1), numerator / denominator)))
+
+
+def repeated_measures_anova(paired: dict) -> tuple[list[dict], str]:
+    """One-way ANOVA for a within-subject design.
+
+    Each subject is its own control, so the variability between subjects is
+    taken out of the error term instead of hiding the effect. Returns
+    (table, message); the table is empty when the design cannot support it.
+    """
+    if not HAVE_SCIPY:
+        return [], "SciPy est requis."
+    conditions, subjects, grid = complete_cases(paired)
+    if len(conditions) < 2:
+        return [], "Deux conditions au minimum sont nécessaires."
+    n, k = grid.shape
+    if n < 2:
+        return [], ("Aucun sujet mesuré dans toutes les conditions : "
+                    "une ANOVA à mesures répétées est impossible.")
+
+    grand = float(grid.mean())
+    ss_cond = n * float(np.sum((grid.mean(axis=0) - grand) ** 2))
+    ss_subj = k * float(np.sum((grid.mean(axis=1) - grand) ** 2))
+    ss_total = float(np.sum((grid - grand) ** 2))
+    ss_error = max(ss_total - ss_cond - ss_subj, 0.0)
+    df_cond, df_subj = k - 1, n - 1
+    df_error = df_cond * df_subj
+    if df_error < 1 or ss_error <= 0:
+        return [], "Pas assez de sujets pour estimer l'erreur."
+
+    ms_cond, ms_error = ss_cond / df_cond, ss_error / df_error
+    f = ms_cond / ms_error
+    p = float(sps.f.sf(f, df_cond, df_error))
+    epsilon = greenhouse_geisser(grid)
+    p_gg = float(sps.f.sf(f, df_cond * epsilon, df_error * epsilon))
+
+    rows = [
+        {"Source": "Conditions", "SS": ss_cond, "ddl": df_cond, "MS": ms_cond,
+         "F": f, "p": p, "eta2 partiel": ss_cond / (ss_cond + ss_error)},
+        {"Source": "Sujets", "SS": ss_subj, "ddl": df_subj,
+         "MS": ss_subj / df_subj, "F": float("nan"), "p": float("nan"),
+         "eta2 partiel": float("nan")},
+        {"Source": "Résidus", "SS": ss_error, "ddl": df_error, "MS": ms_error,
+         "F": float("nan"), "p": float("nan"), "eta2 partiel": float("nan")},
+    ]
+    message = (f"{n} sujets complets sur {k} conditions - "
+               f"Greenhouse-Geisser epsilon = {epsilon:.3f}, "
+               f"p corrigé = {p_to_text(p_gg)}")
+    return rows, message
+
+
+# --------------------------------------------------------------------------
+# Survival
+# --------------------------------------------------------------------------
+def _survival_input(times, events):
+    """Clean (time, event) pairs, sorted by time. event: 1 seen, 0 censored."""
+    t = np.asarray(times, dtype=float)
+    if events is None:
+        e = np.ones_like(t)
+    else:
+        e = np.asarray(events, dtype=float)
+        if e.size != t.size:
+            e = np.ones_like(t)
+    ok = np.isfinite(t) & np.isfinite(e) & (t >= 0)
+    t, e = t[ok], e[ok]
+    order = np.argsort(t, kind="stable")
+    return t[order], (e[order] > 0).astype(int)
+
+
+def kaplan_meier(times, events=None, alpha: float = 0.05) -> dict:
+    """Survival curve for right-censored data.
+
+    A censored subject - lost to follow-up, or still alive when the study
+    ended - is not a survivor and not a death: it leaves the population at
+    risk without an event, which is exactly what this estimator does with it
+    and what a simple proportion cannot.
+
+    The confidence band uses Greenwood's variance on the log(-log) scale, so
+    it never escapes [0, 1] near the ends of the curve.
+    """
+    t, e = _survival_input(times, events)
+    out = {"time": [0.0], "survival": [1.0], "lower": [1.0], "upper": [1.0],
+           "censored_time": [], "censored_survival": [],
+           "n": int(t.size), "events": int(e.sum()),
+           "censored": int(t.size - e.sum()), "median": float("nan")}
+    if t.size == 0:
+        return out
+
+    at_risk = t.size
+    surv = 1.0
+    cumulative = 0.0           # sum of d / (n (n - d)) for Greenwood
+    z = float(sps.norm.ppf(1 - alpha / 2)) if HAVE_SCIPY else 1.959964
+    for moment in np.unique(t):
+        here = t == moment
+        deaths = int(e[here].sum())
+        censored_here = int(here.sum() - deaths)
+        if deaths:
+            surv *= 1.0 - deaths / at_risk
+            if at_risk > deaths:
+                cumulative += deaths / (at_risk * (at_risk - deaths))
+            out["time"].append(float(moment))
+            out["survival"].append(float(surv))
+            if 0.0 < surv < 1.0 and cumulative > 0:
+                spread = z * np.sqrt(cumulative) / abs(np.log(surv))
+                out["lower"].append(float(surv ** np.exp(spread)))
+                out["upper"].append(float(surv ** np.exp(-spread)))
+            else:
+                out["lower"].append(float(surv))
+                out["upper"].append(float(surv))
+        if censored_here:
+            out["censored_time"].append(float(moment))
+            out["censored_survival"].append(float(surv))
+        at_risk -= int(here.sum())
+        if at_risk <= 0:
+            break
+
+    # Carry the curve to the end of follow-up: after the last event it is
+    # flat, and stopping earlier leaves the censoring marks hanging in the
+    # air beyond the line they belong to.
+    last = float(t[-1])
+    if last > out["time"][-1]:
+        out["time"].append(last)
+        for key in ("survival", "lower", "upper"):
+            out[key].append(out[key][-1])
+
+    survival = np.asarray(out["survival"])
+    reached = np.nonzero(survival <= 0.5)[0]
+    if reached.size:
+        out["median"] = float(out["time"][int(reached[0])])
+    return out
+
+
+def logrank(curves: dict) -> tuple[float, float, int]:
+    """Mantel-Cox test across k groups: (chi2, p, degrees of freedom).
+
+    At every time where something happens, each group is credited with the
+    deaths it would have had if survival were the same everywhere; the test
+    asks whether the gap between observed and expected is more than chance.
+    """
+    if not HAVE_SCIPY:
+        return (float("nan"), float("nan"), 0)
+    groups = {}
+    for name, (times, events) in curves.items():
+        t, e = _survival_input(times, events)
+        if t.size:
+            groups[name] = (t, e)
+    k = len(groups)
+    if k < 2:
+        return (float("nan"), float("nan"), 0)
+
+    moments = np.unique(np.concatenate([t for t, _ in groups.values()]))
+    names = list(groups)
+    observed = np.zeros(k)
+    expected = np.zeros(k)
+    variance = np.zeros((k, k))
+    for moment in moments:
+        at_risk = np.array([float(np.sum(t >= moment))
+                            for t, _ in groups.values()])
+        deaths = np.array([float(np.sum((t == moment) & (e == 1)))
+                           for t, e in groups.values()])
+        total_risk = at_risk.sum()
+        total_deaths = deaths.sum()
+        if total_deaths == 0 or total_risk <= 1:
+            continue
+        share = at_risk / total_risk
+        observed += deaths
+        expected += total_deaths * share
+        factor = (total_deaths * (total_risk - total_deaths)
+                  / (total_risk - 1))
+        variance += factor * (np.diag(share) - np.outer(share, share))
+
+    difference = (observed - expected)[:-1]        # one group is redundant
+    reduced = variance[:-1, :-1]
+    try:
+        chi2 = float(difference @ np.linalg.pinv(reduced) @ difference)
+    except Exception:
+        return (float("nan"), float("nan"), 0)
+    df = k - 1
+    p = float(sps.chi2.sf(chi2, df)) if np.isfinite(chi2) else float("nan")
+    del names
+    return (chi2, p, df)
+
+
+def logrank_pairs(curves: dict, correction: str = "holm") -> list[Comparison]:
+    """Log-rank on every pair of groups, corrected for multiplicity."""
+    names = list(curves)
+    raw = []
+    for a, b in itertools.combinations(names, 2):
+        chi2, p, _ = logrank({a: curves[a], b: curves[b]})
+        if not np.isfinite(p):
+            continue
+        n_a = len(_survival_input(*curves[a])[0])
+        n_b = len(_survival_input(*curves[b])[0])
+        raw.append(Comparison(a, b, chi2, p, p, "Log-rank", n_a, n_b))
+    for comp, adjusted in zip(raw, adjust([c.p for c in raw], correction)):
+        comp.p_adj = adjusted
+    return raw
+
+
+def describe_survival(curves: dict) -> list[dict]:
+    """One row per group: numbers at risk, events, censored, median survival."""
+    rows = []
+    for name, (times, events) in curves.items():
+        km = kaplan_meier(times, events)
+        rows.append({"Groupe": name, "n": km["n"], "Événements": km["events"],
+                     "Censurés": km["censored"],
+                     "Survie médiane": km["median"],
+                     "Survie finale": km["survival"][-1] if km["survival"]
+                     else float("nan")})
+    return rows
+
+
+# --------------------------------------------------------------------------
+# Outliers
+# --------------------------------------------------------------------------
+def grubbs(values, alpha: float = 0.05) -> list[dict]:
+    """Points Grubbs' test flags, one at a time until none is left.
+
+    The test assumes the rest of the sample is normal and looks for a single
+    outlier, so it is applied again after each removal. Flagging is all it
+    does: dropping a measurement is a decision for whoever took it.
+    """
+    arr = np.asarray(values, dtype=float)
+    keep = np.arange(arr.size)[np.isfinite(arr)]
+    flagged = []
+    if not HAVE_SCIPY:
+        return flagged
+    # Repeating the test on what is left can run away: each removal shrinks
+    # the spread and makes the next point look extreme in turn. A tenth of
+    # the sample is as far as it goes.
+    budget = max(1, int(0.1 * keep.size))
+    while keep.size >= 3 and len(flagged) < budget:
+        sample = arr[keep]
+        sd = float(sample.std(ddof=1))
+        if sd <= 0:
+            break
+        deviations = np.abs(sample - sample.mean())
+        worst = int(np.argmax(deviations))
+        n = sample.size
+        g = float(deviations[worst] / sd)
+        critical = float(sps.t.ppf(1 - alpha / (2 * n), n - 2))
+        limit = ((n - 1) / np.sqrt(n)
+                 * np.sqrt(critical ** 2 / (n - 2 + critical ** 2)))
+        if g <= limit:
+            break
+        denominator = (n - 1) ** 2 - n * g ** 2
+        if denominator <= 0:
+            p = 0.0
+        else:
+            t_obs = np.sqrt(n * (n - 2) * g ** 2 / denominator)
+            p = float(min(1.0, n * 2 * sps.t.sf(t_obs, n - 2)))
+        flagged.append({"index": int(keep[worst]),
+                        "value": float(sample[worst]),
+                        "G": g, "seuil": float(limit), "p": p})
+        keep = np.delete(keep, worst)
+    return flagged
+
+
+def outliers(groups: dict, alpha: float = 0.05) -> list[dict]:
+    """Grubbs applied group by group, as a table for the Analyses panel."""
+    rows = []
+    for name, values in groups.items():
+        for hit in grubbs(values, alpha):
+            rows.append({"Groupe": name, "Valeur": hit["value"],
+                         "Rang dans le groupe": hit["index"] + 1,
+                         "G": hit["G"], "Seuil": hit["seuil"], "p": hit["p"]})
+    return rows
+
+
 def describe(groups: dict[str, np.ndarray]) -> list[dict]:
     """Descriptive table used by the Stats panel."""
     rows = []
@@ -429,6 +774,7 @@ TEST_LABELS = {
     "student": "t de Student", "welch": "t de Welch",
     "paired_t": "t apparié", "mannwhitney": "Mann-Whitney",
     "wilcoxon": "Wilcoxon apparié", "tukey": "Tukey HSD",
+    "dunnett": "Dunnett", "rm_anova": "ANOVA à mesures répétées",
 }
 
 

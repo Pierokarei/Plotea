@@ -96,6 +96,7 @@ PLOT_TYPE = Enum("plot_type", [
     ("box", "Boxplot"),
     ("violin", "Violin plot"),
     ("bar", "Barres + erreurs"),
+    ("survival", "Survie (Kaplan-Meier)"),
 ])
 
 ERROR_TYPE = Enum("error_type", [
@@ -143,6 +144,8 @@ STATS_TEST = Enum("stats_test", [
     ("wilcoxon", "Wilcoxon apparié"),
     ("anova_tukey", "ANOVA + Tukey"),
     ("kruskal_dunn", "Kruskal-Wallis + Dunn"),
+    ("dunnett", "Dunnett (vs contrôle)"),
+    ("rm_anova", "ANOVA à mesures répétées"),
 ])
 
 STATS_MODE = Enum("stats_mode", [

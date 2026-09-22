@@ -35,8 +35,10 @@ class RenderInfo:
     series: list = field(default_factory=list)
     stat_groups: dict = field(default_factory=dict)
     stat_pairs: list | None = None                  # restrict comparisons
-    anova: list = field(default_factory=list)       # two-way table
+    anova: list = field(default_factory=list)       # two-way or within-subject
     anova_message: str = ""
+    anova_title: str = "ANOVA 2 facteurs"
+    outliers: list = field(default_factory=list)    # Grubbs, group by group
 
 
 # --------------------------------------------------------------------------
@@ -769,6 +771,66 @@ def draw_xy(ax, df, spec, theme, info):
     return {}, {}
 
 
+def draw_survival(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
+                  info: RenderInfo):
+    """Kaplan-Meier curves, one per group, with the censoring marks.
+
+    The X column holds the follow-up time and the event column says whether
+    that time ended in the event (1) or in censoring (0). Without an event
+    column every subject is treated as having had the event, which is what a
+    naive survival curve does.
+    """
+    time_col = spec.x or (spec.y[0] if spec.y else "")
+    if time_col not in df.columns:
+        info.warnings.append(
+            "Survie : choisissez la colonne de temps de suivi (axe X).")
+        return _no_data(ax)
+
+    event_col = spec.event_col if spec.event_col in df.columns else ""
+    if not event_col:
+        info.warnings.append(
+            "Aucune colonne d'événement : toutes les observations sont "
+            "comptées comme des événements, sans censure.")
+
+    curves = {}
+    if spec.group and spec.group in df.columns:
+        for label, sub in df.groupby(spec.group, sort=False):
+            curves[str(label)] = (_num(sub[time_col]),
+                                  _num(sub[event_col]) if event_col else None)
+    else:
+        curves["Ensemble"] = (_num(df[time_col]),
+                              _num(df[event_col]) if event_col else None)
+
+    labels = list(curves)
+    colors = _colors(spec, theme, labels)
+    width = spec.line_width or theme.linewidth
+    for (name, (times, events)), color in zip(curves.items(), colors):
+        km = st.kaplan_meier(times, events)
+        ax.step(km["time"], km["survival"], where="post", color=color,
+                lw=width, label=name, alpha=spec.alpha)
+        if spec.survival_ci:
+            ax.fill_between(km["time"], km["lower"], km["upper"], step="post",
+                            color=color, alpha=spec.fill_alpha, lw=0)
+        if spec.show_censors and km["censored_time"]:
+            ax.plot(km["censored_time"], km["censored_survival"], "|",
+                    color=color, ms=max(4.0, width * 4),
+                    mew=max(0.8, width * 0.9), linestyle="none")
+
+    ax.set_ylim(0, 1.04)
+    ax.set_xlabel(spec.xlabel or str(time_col))
+    ax.set_ylabel(spec.ylabel or "Survie")
+    info.series = labels
+    info.groups = labels
+    info.stat_groups = {}
+    info.descriptives = st.describe_survival(curves)
+    if len(curves) >= 2 and spec.stats_enabled:
+        chi2, p, _ = st.logrank(curves)
+        info.omnibus = ("Log-rank", chi2, p)
+        if len(curves) > 2:
+            info.comparisons = st.logrank_pairs(curves, spec.stats_correction)
+    return {}, {}
+
+
 # --------------------------------------------------------------------------
 # Main entry point
 # --------------------------------------------------------------------------
@@ -779,6 +841,7 @@ DRAWERS = {
     "histogram": draw_histogram,
     "line": draw_xy,
     "scatter": draw_xy,
+    "survival": draw_survival,
 }
 
 
@@ -837,6 +900,9 @@ def draw_into(ax, spec: PlotSpec, df: pd.DataFrame,
         groups = info.stat_groups or extract_groups(df, spec)
         info.groups = list(groups)
         info.descriptives = st.describe(groups)
+        # Flagging outliers is descriptive, not inferential: it does not wait
+        # for the comparisons to be switched on, and it never drops a point.
+        info.outliers = st.outliers(groups)
         if spec.stats_enabled and positions:
             _run_statistics(ax, groups, positions, tops, spec, theme, df, info)
 
@@ -858,6 +924,18 @@ def draw_into(ax, spec: PlotSpec, df: pd.DataFrame,
 def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
                     df: pd.DataFrame, info: RenderInfo):
     """Compare the groups and draw the brackets, or explain why it cannot."""
+    if spec.stats_test in st.CONTROL_TESTS:
+        if spec.stats_mode != "vs_control" or spec.stats_control not in groups:
+            info.warnings.append(
+                "Dunnett compare chaque groupe au contrôle : choisissez "
+                "« vs contrôle » et le groupe de référence.")
+            return
+        if info.stat_pairs is not None:
+            info.warnings.append(
+                "Dunnett indisponible sur des barres groupées à deux "
+                "facteurs.")
+            return
+
     paired = None
     if spec.stats_test in st.PAIRED_TESTS:
         if info.stat_pairs is not None:
@@ -872,7 +950,17 @@ def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
                 "(sujet, patient, réplicat) dans la section Statistiques.")
             return
 
-    if len(groups) > 2 and info.stat_pairs is None:
+    if spec.stats_test == "rm_anova":
+        rows, message = st.repeated_measures_anova(paired)
+        info.anova, info.anova_message = rows, message
+        info.anova_title = "ANOVA à mesures répétées"
+        if rows:
+            effect = rows[0]
+            info.omnibus = ("ANOVA à mesures répétées", effect["F"],
+                            effect["p"])
+        elif message:
+            info.warnings.append(message)
+    elif len(groups) > 2 and info.stat_pairs is None:
         info.omnibus = st.omnibus(groups)
     comps = st.pairwise(groups, spec.stats_test, spec.stats_correction,
                         spec.stats_mode, spec.stats_control,
