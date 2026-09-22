@@ -41,6 +41,12 @@ plotea-gui = "plotea.app:main"
 [tool.setuptools.packages.find]
 include = ["plotea*"]
 
+# The icons are generated files, but they must travel with the package: a
+# wheel built without them installs an application whose desktop entry and
+# window icon have nothing to point at.
+[tool.setuptools.package-data]
+plotea = ["resources/*.ico", "resources/*.png", "resources/*.icns"]
+
 [tool.ruff]
 line-length = 79
 target-version = "py310"
