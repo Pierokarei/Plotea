@@ -281,3 +281,24 @@ def test_declining_removes_the_copy(window, tmp_path, monkeypatch):
                         click_button("Supprimer la copie"))
     assert offer_recovery(window) is False
     assert project_mod.recovery_info() is None
+
+
+def test_the_timer_actually_writes(window):
+    """Not just connected in principle: let it fire and check the file.
+
+    The interval is lowered for the test only; what matters is that the
+    timeout reaches autosave and that autosave reaches the disk.
+    """
+    from PyQt6.QtCore import QEventLoop, QTimer
+
+    project_mod.clear_recovery()
+    window.project.dirty = True
+    window._autosave_timer.setInterval(120)
+
+    loop = QEventLoop()
+    QTimer.singleShot(1200, loop.quit)
+    loop.exec()
+
+    window._autosave_timer.setInterval(120_000)
+    assert project_mod.recovery_info() is not None, "le minuteur n'a rien ecrit"
+    project_mod.clear_recovery()
