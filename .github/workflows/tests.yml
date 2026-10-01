@@ -46,10 +46,16 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
           MPLBACKEND: Agg
+          # La couverture ne tourne que sur un job : elle double la duree et
+          # le chiffre est le meme partout. Le seuil est juste sous la valeur
+          # du jour, donc il ne tombe que sur une vraie regression.
+          COV: ${{ (matrix.os == 'ubuntu-latest' && matrix.python == '3.13')
+                   && '--cov=plotea --cov-report=term-missing:skip-covered --cov-fail-under=80'
+                   || '' }}
         shell: bash
         run: |
           set -o pipefail
-          pytest tests -q --durations=10 2>&1 | tee pytest.log
+          pytest tests -q --durations=10 $COV 2>&1 | tee pytest.log
 
       # GitHub demande maintenant une connexion pour lire les journaux, y
       # compris sur un depot public. La fin de la sortie est donc republiee

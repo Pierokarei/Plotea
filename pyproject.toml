@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "ruff>=0.1", "pyinstaller>=6"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.1", "pyinstaller>=6"]
 
 [project.scripts]
 plotea = "plotea.app:main"
@@ -64,6 +64,20 @@ select = [
     "I",        # import order
     "W",        # trailing whitespace and friends
     "RUF100",   # noqa directives that no longer suppress anything
+]
+
+[tool.coverage.run]
+source = ["plotea"]
+branch = false
+
+[tool.coverage.report]
+# Lines that exist so the application survives something, and that a test
+# suite cannot reach without breaking the machine it runs on.
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
 ]
 
 [tool.pytest.ini_options]
