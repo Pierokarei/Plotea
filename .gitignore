@@ -15,3 +15,8 @@ tools/__pycache__/
 # debris left by a launch from the terminal
 launch_out.txt
 launch_err.txt
+
+# coverage data
+.coverage
+coverage.xml
+htmlcov/

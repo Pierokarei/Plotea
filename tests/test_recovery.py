@@ -96,7 +96,7 @@ def test_autosave_survives_a_broken_folder(window, monkeypatch):
     monkeypatch.setattr(project_mod, "write_recovery", refuse)
     window.project.dirty = True
     assert window.autosave() is False          # reported, not raised
-    assert window._autosave_warned is True
+    assert window.files._autosave_warned is True
 
 
 def test_the_timer_runs(window):
@@ -145,8 +145,11 @@ def test_saving_drops_the_copy(window, tmp_path):
 # The two paths that used to discard without asking
 # --------------------------------------------------------------------------
 def test_new_project_asks_first(window, monkeypatch):
+    """Patched where the question is actually asked, not on the window: the
+    window only forwards, and a guard that is bypassed is no guard."""
+    files = type(window.files)
     asked = []
-    monkeypatch.setattr(type(window), "_ask_to_keep_changes",
+    monkeypatch.setattr(files, "ask_to_keep_changes",
                         lambda self: asked.append(True) or False)
     window.project.name = "A garder"
     window.new_project()
@@ -155,10 +158,10 @@ def test_new_project_asks_first(window, monkeypatch):
 
 
 def test_open_asks_first(window, monkeypatch):
-    monkeypatch.setattr(type(window), "_ask_to_keep_changes",
-                        lambda self: False)
+    files = type(window.files)
+    monkeypatch.setattr(files, "ask_to_keep_changes", lambda self: False)
     called = []
-    monkeypatch.setattr(type(window), "load_project",
+    monkeypatch.setattr(files, "load",
                         lambda self, path: called.append(path))
     window.open_project()
     assert not called, "un projet a ete ouvert malgre le refus"

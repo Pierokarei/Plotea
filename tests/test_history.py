@@ -5,6 +5,9 @@ from PyQt6.QtWidgets import QApplication
 
 app = QApplication.instance()
 
+import pytest  # noqa: E402
+from conftest import dispose  # noqa: E402
+
 from plotea.ui.main_window import MainWindow  # noqa: E402
 
 win = MainWindow()
@@ -125,3 +128,14 @@ def test_opening_a_project_clears_history():
     win._reload_all(0)
     assert not win.history.can_undo()
     assert not win.a_undo.isEnabled()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _release_the_window():
+    """Hand this module's window back when the file is done.
+
+    A window kept in a module global stays alive for the whole session, and
+    every setStyleSheet of every later window repolishes its widgets too.
+    """
+    yield
+    dispose(win)

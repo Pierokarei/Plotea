@@ -30,7 +30,7 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_out")
 os.makedirs(OUT, exist_ok=True)
 EXAMPLES = os.path.join(ROOT, "examples")
 
-from PyQt6.QtCore import QSettings  # noqa: E402
+from PyQt6.QtCore import QEvent, QSettings  # noqa: E402
 from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 # Preferences must never leak into the real ones while testing.
@@ -84,11 +84,19 @@ def dispose(win):
     window's setStyleSheet - which walks every widget of the application. That
     is the segmentation fault the CI caught on macOS and on Windows, on a
     different job each run, while this machine never saw it once.
+
+    processEvents alone does not deliver deferred deletions: outside a
+    running event loop nobody does. Without the explicit delivery below each
+    window left some eight hundred widgets behind, every later setStyleSheet
+    walked them all, and building the fifteenth window of a test file took a
+    minute instead of two seconds.
     """
     win.project.dirty = False
     win.close()
     win.setParent(None)
     win.deleteLater()
+    app.processEvents()
+    app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     app.processEvents()
 
 
@@ -106,6 +114,7 @@ def _tidy_up_at_the_end():
         widget.hide()
         widget.deleteLater()
     app.processEvents()
+    app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
 
 @pytest.fixture

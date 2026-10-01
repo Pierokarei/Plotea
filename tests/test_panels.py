@@ -6,6 +6,9 @@ from PyQt6.QtWidgets import QApplication
 
 app = QApplication.instance()
 
+import pytest  # noqa: E402
+from conftest import dispose  # noqa: E402
+
 from plotea.core import demo  # noqa: E402
 from plotea.core.panel import Panel, letter_for, render_panel  # noqa: E402
 from plotea.core.plotspec import PlotSpec  # noqa: E402
@@ -189,3 +192,14 @@ def test_panel_deletion_works():
     win.delete_plot()
     assert len(win.project.panels) == count - 1
     assert len(win.project.plots) >= 1
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _release_the_window():
+    """Hand this module's window back when the file is done.
+
+    A window kept in a module global stays alive for the whole session, and
+    every setStyleSheet of every later window repolishes its widgets too.
+    """
+    yield
+    dispose(win)

@@ -24,11 +24,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core import demo, diagnostics, plotting
+from ..core import demo, plotting
 from ..core import export as export_mod
 from ..core import project as project_mod
 from ..core.dataset import empty_dataset
-from ..core.history import History, Snapshot
+from ..core.history import Snapshot
 from ..core.panel import Panel
 from ..core.plotspec import PlotSpec
 from ..core.project import Project, config_dir
@@ -43,8 +43,11 @@ from .dialogs import (
     LogDialog,
     TransformDialog,
 )
+from .editing import EditHistory
 from .inspector import Inspector
 from .panel_editor import PanelEditor
+from .projects import ProjectFiles
+from .session import SessionMemory
 from .stats_view import StatsPanel
 from .style import build_qss, palette_colors
 from .widgets import refresh_icons, set_icon_color, tag_icon
@@ -61,17 +64,12 @@ AUTOSAVE_MS = 120_000
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.settings = QSettings("Plotea", "Plotea")
+        self.memory = SessionMemory(QSettings("Plotea", "Plotea"))
+        self.settings = self.memory.settings      # still used by the tests
         self.project = Project()
-        self.dark = self.settings.value("dark", False, type=bool)
-        self.history = History()
-        self._burst_base: Snapshot | None = None
-        self._burst_label = ""
-        self._restoring = False
-        self._burst_timer = QTimer(self)
-        self._burst_timer.setSingleShot(True)
-        self._burst_timer.setInterval(700)
-        self._burst_timer.timeout.connect(self._commit_burst)
+        self.dark = self.memory.dark()
+        self.edits = EditHistory(self)
+        self.files = ProjectFiles(self, APP_NAME)
 
         self._render_timer = QTimer(self)
         self._render_timer.setSingleShot(True)
@@ -401,170 +399,45 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # project lifecycle
     # ------------------------------------------------------------------
+    # -- project lifecycle (the work itself lives in ProjectFiles) ------
     def _new_project(self, with_example: bool = False):
-        self.project = Project()
-        if with_example:
-            self.project.add_dataset(demo.viability())
-            spec = PlotSpec(name="Graphique 1", plot_type="bar",
-                            dataset=self.project.datasets[0].name,
-                            group="Traitement", y=["Viabilité"],
-                            ylabel="Viabilité (%)", stats_enabled=True,
-                            title="Effet des traitements")
-            self.project.add_plot(spec)
-        else:
-            self.project.add_dataset(empty_dataset())
-            self.project.add_plot(PlotSpec(
-                name="Graphique 1", dataset=self.project.datasets[0].name))
-        self._reload_all(select_plot=0)
-        self._update_title()
+        self.files.start_new(with_example)
+
+    def new_project(self):
+        self.files.new_project()
+
+    def open_project(self):
+        self.files.open_dialog()
+
+    def load_project(self, path: str) -> bool:
+        return self.files.load(path)
+
+    def save_project(self):
+        self.files.save()
+
+    def save_project_as(self):
+        self.files.save_as()
+
+    def autosave(self) -> bool:
+        return self.files.autosave()
+
+    def _ask_to_keep_changes(self) -> bool:
+        return self.files.ask_to_keep_changes()
+
+    def restore_recovery(self, info: dict) -> bool:
+        return self.files.restore_recovery(info)
+
+    def _update_title(self):
+        self.files.update_title()
 
     def _reload_all(self, select_plot: int = 0):
-        self.history.clear()
-        self._burst_base = None
+        """Rebuild every panel around the project that is now in place."""
+        self.edits.clear()
         self.data_panel.set_datasets(self.project.datasets, 0)
         self._sync_tabs(select_plot)
         self._sync_inspector()
         self.schedule_render()
         self._update_history_actions()
-
-    # -- protection against losing work ---------------------------------
-    def autosave(self) -> bool:
-        """Copy the work in progress beside the configuration.
-
-        Only when something has changed, and without touching the project's
-        own file or its modified flag: this is a net, not a save.
-        """
-        if not self.project.dirty:
-            return False
-        try:
-            project_mod.write_recovery(self.project)
-        except Exception as exc:                 # disk full, folder gone...
-            if not self._autosave_warned:        # once, not every two minutes
-                self._autosave_warned = True
-                diagnostics.LOG.record(
-                    "Copie de secours impossible",
-                    f"{type(exc).__name__}: {exc}")
-                self.statusBar().showMessage(
-                    "Copie de secours impossible - voir Aide > Journal", 6000)
-            return False
-        self._autosave_warned = False
-        self.statusBar().showMessage("Copie de secours enregistrée", 2500)
-        return True
-
-    def _ask_to_keep_changes(self) -> bool:
-        """Offer to save before something replaces the current project.
-
-        Returns False when the user calls the whole thing off. Until now
-        Ctrl+N and Ouvrir discarded the work in progress without a word.
-        """
-        if not self.project.dirty:
-            return True
-        box = QMessageBox(self)
-        box.setWindowTitle(APP_NAME)
-        box.setIcon(QMessageBox.Icon.Question)
-        box.setText("Le projet a été modifié.")
-        box.setInformativeText(
-            "Voulez-vous l'enregistrer avant de continuer ?")
-        save = box.addButton("Enregistrer", QMessageBox.ButtonRole.AcceptRole)
-        box.addButton("Continuer sans enregistrer",
-                      QMessageBox.ButtonRole.DestructiveRole)
-        cancel = box.addButton("Annuler", QMessageBox.ButtonRole.RejectRole)
-        box.setDefaultButton(save)
-        box.exec()
-        clicked = box.clickedButton()
-        if clicked is cancel:
-            return False
-        if clicked is save:
-            self.save_project()
-            if self.project.dirty:      # the save dialog was called off
-                return False
-        return True
-
-    def restore_recovery(self, info: dict) -> bool:
-        """Reopen the copy left behind by a session that ended badly."""
-        try:
-            project = Project.load(info["path"])
-        except Exception as exc:
-            diagnostics.LOG.record("Récupération impossible",
-                                   f"{type(exc).__name__}: {exc}")
-            return False
-        # The copy lives beside the configuration; the project still belongs
-        # to the file it came from, and was never saved there.
-        project.path = info.get("origin", "")
-        project.name = info.get("name") or project.name
-        project.dirty = True
-        self.project = project
-        if not self.project.plots:
-            self.project.add_plot(PlotSpec())
-        self._reload_all(0)
-        self._update_title()
-        self.statusBar().showMessage(
-            "Travail récupéré - enregistrez-le pour le conserver", 8000)
-        return True
-
-    def new_project(self):
-        if not self._ask_to_keep_changes():
-            return
-        self._new_project()
-        project_mod.clear_recovery()
-
-    def open_project(self):
-        if not self._ask_to_keep_changes():
-            return
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Ouvrir un projet", self.last_dir(),
-            "Projet Plotea (*.plotea)")
-        if not path:
-            return
-        self.load_project(path)
-
-    def load_project(self, path: str) -> bool:
-        self._remember_dir(path)
-        try:
-            self.project = Project.load(path)
-        except Exception as exc:
-            QMessageBox.critical(self, APP_NAME,
-                                 f"Ouverture impossible :\n{exc}")
-            self._forget_project(path)
-            return False
-        if not self.project.plots:
-            self.project.add_plot(PlotSpec())
-        self._reload_all(0)
-        self._update_title()
-        self._remember_project(path)
-        project_mod.clear_recovery()
-        self.statusBar().showMessage(f"Projet ouvert : {path}", 4000)
-        return True
-
-    def save_project(self):
-        if not self.project.path:
-            return self.save_project_as()
-        try:
-            self.project.save(self.project.path)
-        except Exception as exc:
-            QMessageBox.critical(self, APP_NAME, f"Échec :\n{exc}")
-            return
-        self._update_title()
-        self._remember_project(self.project.path)
-        project_mod.clear_recovery()      # the real file is now up to date
-        self.statusBar().showMessage("Projet enregistré", 3000)
-
-    def save_project_as(self):
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Enregistrer le projet",
-            os.path.join(self.last_dir(), self.project.name + ".plotea"),
-            "Projet Plotea (*.plotea)")
-        if not path:
-            return
-        self._remember_dir(path)
-        self.project.name = os.path.splitext(os.path.basename(path))[0]
-        self.project.path = path
-        self.save_project()
-
-    def _update_title(self):
-        mark = "*" if self.project.dirty else ""
-        name = self.project.path or self.project.name
-        self.setWindowTitle(f"{APP_NAME} - {os.path.basename(name)}{mark}")
 
     # ------------------------------------------------------------------
     # data
@@ -905,25 +778,21 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     def _restore_layout(self):
         """Put the window and its docks back where they were left."""
-        geometry = self.settings.value("geometry")
-        state = self.settings.value("windowState")
+        geometry, state = self.memory.layout()
         try:
             if geometry is not None:
                 self.restoreGeometry(geometry)
             if state is not None:
                 self.restoreState(state)
         except Exception:            # a settings file from another version
-            self.settings.remove("geometry")
-            self.settings.remove("windowState")
+            self.memory.forget_layout()
 
     def _save_layout(self):
-        self.settings.setValue("geometry", self.saveGeometry())
-        self.settings.setValue("windowState", self.saveState())
+        self.memory.remember_layout(self.saveGeometry(), self.saveState())
 
     def reset_layout(self):
         """Bring the panels back, for a layout dragged into a corner."""
-        self.settings.remove("geometry")
-        self.settings.remove("windowState")
+        self.memory.forget_layout()
         for dock, area in ((self.dock_data,
                             Qt.DockWidgetArea.LeftDockWidgetArea),
                            (self.dock_inspector,
@@ -939,34 +808,22 @@ class MainWindow(QMainWindow):
         self.resizeDocks([self.dock_stats], [210], Qt.Orientation.Vertical)
         self.statusBar().showMessage("Disposition réinitialisée", 3000)
 
-    #: How many projects the Fichier menu remembers.
-    RECENT_MAX = 8
+    #: Kept on the window: the menu and the tests both ask for it here.
+    RECENT_MAX = SessionMemory.RECENT_MAX
 
     def recent_projects(self) -> list:
-        """The most recently opened or saved projects, newest first."""
-        stored = self.settings.value("recentProjects", [], type=list) or []
-        return [p for p in stored if isinstance(p, str)]
+        return self.memory.recent_projects()
 
     def _remember_project(self, path: str):
-        if not path:
-            return
-        path = os.path.abspath(path)
-        recent = [p for p in self.recent_projects()
-                  if os.path.normcase(p) != os.path.normcase(path)]
-        recent.insert(0, path)
-        self.settings.setValue("recentProjects", recent[:self.RECENT_MAX])
+        self.memory.remember_project(path)
 
     def _forget_project(self, path: str):
-        """Drop a project the menu offered but that no longer opens."""
-        recent = [p for p in self.recent_projects()
-                  if os.path.normcase(p) != os.path.normcase(
-                      os.path.abspath(path))]
-        self.settings.setValue("recentProjects", recent)
+        self.memory.forget_project(path)
 
     def _fill_recent(self):
         """Rebuilt on every opening: files come and go behind our back."""
         self.m_recent.clear()
-        entries = [p for p in self.recent_projects() if os.path.exists(p)]
+        entries = self.memory.existing_projects()
         if not entries:
             empty = self.m_recent.addAction("Aucun projet récent")
             empty.setEnabled(False)
@@ -978,106 +835,48 @@ class MainWindow(QMainWindow):
                 lambda _=False, target=path: self._open_recent(target))
         self.m_recent.addSeparator()
         self.m_recent.addAction("Vider la liste").triggered.connect(
-            lambda: self.settings.setValue("recentProjects", []))
+            self.memory.clear_projects)
 
     def _open_recent(self, path: str):
         if self._ask_to_keep_changes():
             self.load_project(path)
 
     def last_dir(self) -> str:
-        """Folder of the last file opened or written, for the next dialog."""
-        path = self.settings.value("lastDir", "", type=str)
-        return path if path and os.path.isdir(path) else os.path.expanduser("~")
+        return self.memory.last_dir()
 
     def _remember_dir(self, path: str):
-        folder = path if os.path.isdir(path) else os.path.dirname(path)
-        if folder:
-            self.settings.setValue("lastDir", folder)
+        self.memory.remember_dir(path)
 
     # ------------------------------------------------------------------
-    # undo / redo
+    # undo / redo  (the work itself lives in EditHistory)
     # ------------------------------------------------------------------
+    @property
+    def history(self):
+        return self.edits.history
+
     def _capture(self, deep: bool = False) -> Snapshot:
-        """Current state. `deep` copies the tables, for data edits."""
-        return Snapshot(
-            panels=[panel.to_dict() for panel in self.project.panels],
-            plots=[spec.to_dict() for spec in self.project.plots],
-            datasets=[(ds.name, ds.df.copy() if deep else ds.df, ds.notes)
-                      for ds in self.project.datasets],
-            current_plot=max(self.tabbar.currentIndex(), 0),
-            current_dataset=max(self.data_panel.list.currentRow(), 0))
+        return self.edits.capture(deep)
 
     def _begin_edit(self, label: str, deep: bool = False):
-        """Start (or extend) a burst of edits recorded as one undo step."""
-        if self._restoring:
-            return
-        if self._burst_base is None:
-            self._burst_base = self._capture(deep)
-            self._burst_label = label
-        self._burst_timer.start()
-
-    def _commit_burst(self):
-        if self._burst_base is None:
-            return
-        before, self._burst_base = self._burst_base, None
-        deep = any(a is not b.df for (_, a, _), b
-                   in zip(before.datasets, self.project.datasets))
-        self.history.push(self._burst_label, before, self._capture(deep))
-        self._update_history_actions()
+        self.edits.begin(label, deep)
 
     def _record(self, label: str, before: Snapshot, deep: bool = False):
-        """Record a single, immediate action."""
-        if self._restoring:
-            return
-        self._commit_burst()
-        self.history.push(label, before, self._capture(deep))
-        self._update_history_actions()
+        self.edits.record(label, before, deep)
+
+    def _commit_burst(self):
+        self.edits.commit_burst()
 
     def _restore(self, snapshot: Snapshot):
-        from ..core.dataset import Dataset
-        self._restoring = True
-        self._burst_timer.stop()
-        self._burst_base = None
-        try:
-            self.project.plots = [PlotSpec.from_dict(d) for d in snapshot.plots]
-            self.project.panels = [Panel.from_dict(d)
-                                   for d in snapshot.panels]
-            self.project.datasets = [
-                Dataset(name, df, notes=notes)
-                for name, df, notes in snapshot.datasets]
-            self.data_panel.set_datasets(self.project.datasets,
-                                         snapshot.current_dataset)
-            self._sync_tabs(snapshot.current_plot)
-            self._sync_inspector()
-            self._render_now()
-        finally:
-            self._restoring = False
-        self._update_history_actions()
-
-    def undo(self):
-        self._commit_burst()
-        snapshot = self.history.undo()
-        if snapshot is None:
-            return
-        label = self.history.redo_label()
-        self._restore(snapshot)
-        self.statusBar().showMessage(f"Annulé : {label}", 3000)
-
-    def redo(self):
-        snapshot = self.history.redo()
-        if snapshot is None:
-            return
-        self._restore(snapshot)
-        self.statusBar().showMessage(f"Rétabli : {self.history.undo_label()}",
-                                     3000)
+        self.edits.restore(snapshot)
 
     def _update_history_actions(self):
-        self.a_undo.setEnabled(self.history.can_undo())
-        self.a_redo.setEnabled(self.history.can_redo())
-        self.a_undo.setText(f"Annuler {self.history.undo_label()}".strip()
-                            if self.history.can_undo() else "Annuler")
-        self.a_redo.setText(f"Rétablir {self.history.redo_label()}".strip()
-                            if self.history.can_redo() else "Rétablir")
+        self.edits.update_actions()
+
+    def undo(self):
+        self.edits.undo()
+
+    def redo(self):
+        self.edits.redo()
 
     def schedule_render(self):
         self.project.dirty = True
@@ -1231,7 +1030,7 @@ class MainWindow(QMainWindow):
         colors = palette_colors(dark)
         self.dark = dark
         self.a_dark.setChecked(dark)
-        self.settings.setValue("dark", dark)
+        self.memory.remember_dark(dark)
         icons = write_dock_icons(config_dir(), colors["text"],
                                  {"close": colors["danger"],
                                   "float": colors["accent"]})
@@ -1246,10 +1045,14 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------
     def show_log(self):
-        LogDialog(self).exec()
+        dialog = LogDialog(self)
+        dialog.exec()
+        dialog.deleteLater()      # otherwise every opening leaves one behind
 
     def show_about(self):
-        AboutDialog(VERSION, self).exec()
+        dialog = AboutDialog(VERSION, self)
+        dialog.exec()
+        dialog.deleteLater()
 
     def show_shortcuts(self):
         QMessageBox.information(
