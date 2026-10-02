@@ -301,7 +301,7 @@ class MainWindow(QMainWindow):
         self.a_dark.setCheckable(True)
         self.a_dark.setChecked(self.dark)
         self.a_log = self._act(tr("Journal des erreurs..."), self.show_log)
-        self.a_about = self._act(tr("A propos"), self.show_about)
+        self.a_about = self._act(tr("À propos"), self.show_about)
         self.a_shortcuts = self._act(tr("Raccourcis clavier"), self.show_shortcuts)
 
     def _build_menus(self):

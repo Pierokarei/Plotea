@@ -213,6 +213,36 @@ def test_the_first_screen_reads_in_english(english, closer):
         closer(window)
 
 
+def about_texts():
+    from plotea.ui.dialogs import AboutDialog
+
+    dialog = AboutDialog("9.9")
+    try:
+        return dialog.windowTitle(), " ".join(
+            label.text() for label in dialog.findChildren(QLabel))
+    finally:
+        dialog.deleteLater()
+
+
+def test_the_about_page_reads_in_english(english, catalogue):
+    """A dialog, so the window sweep above never opens it."""
+    title, body = about_texts()
+    assert title == "About Plotea"
+    assert "Version 9.9" in body
+    assert "Publication-quality figures" in body
+    assert "MIT license" in body
+    keys = set(catalogue) - {k for k, v in catalogue.items() if k == v}
+    assert not FRENCH.search(body) and body not in keys, body
+
+
+def test_the_about_page_is_french_with_its_accents():
+    title, body = about_texts()
+    assert title == "À propos de Plotea"
+    assert "Version 9.9" in body
+    assert "Alternative ouverte à GraphPad Prism" in body
+    assert "jusqu'à 1200 dpi" in body
+
+
 def test_figure_axis_titles_follow_the_language(english):
     """They end up in the exported figure, not only on screen."""
     from matplotlib.figure import Figure

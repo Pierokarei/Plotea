@@ -314,7 +314,7 @@ class AboutDialog(QDialog):
     def __init__(self, version: str, parent=None):
         super().__init__(parent)
         from ..resources import logo_pixmap
-        self.setWindowTitle(tr("A propos de Plotea"))
+        self.setWindowTitle(tr("À propos de Plotea"))
         self.setFixedWidth(430)
         badge = QLabel()
         badge.setPixmap(logo_pixmap(64))
@@ -323,9 +323,9 @@ class AboutDialog(QDialog):
         body = QLabel(
             tr("Version {version}\n\n"
                "Figures de qualité publication, libres et gratuites.\n"
-               "Alternative ouverte a GraphPad Prism.\n\n"
+               "Alternative ouverte à GraphPad Prism.\n\n"
                "Thématiques Nature, Science, Cell, PNAS.\n"
-               "Export SVG / PDF / EPS vectoriels et PNG / TIFF jusqu'a "
+               "Export SVG / PDF / EPS vectoriels et PNG / TIFF jusqu'à "
                "1200 dpi.\n"
                "Tests statistiques intégrés et ajustements non linéaires."
                "\n\n"
