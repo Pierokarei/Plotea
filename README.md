@@ -1,5 +1,7 @@
 # Plotea
 
+**Français** · [English](README.en.md)
+
 [![Tests](https://github.com/Pierokarei/Plotea/actions/workflows/tests.yml/badge.svg)](https://github.com/Pierokarei/Plotea/actions/workflows/tests.yml)
 
 Figures scientifiques de qualité publication, libres et gratuites — une
@@ -22,14 +24,9 @@ L'interface existe en **français** et en **anglais**. Au premier lancement,
 Plotea suit la langue du système (français sur un système français, anglais
 sinon) ; le choix se change ensuite dans **Affichage → Langue / Language**.
 
-> **In English.** Plotea is a free, open-source alternative to GraphPad Prism
-> for publication-quality scientific figures: bar, box, violin, line, scatter,
-> histogram and Kaplan-Meier survival plots, journal themes (Nature, Science,
-> Cell, PNAS), built-in statistics (t-tests, ANOVA with Tukey or Dunnett,
-> repeated-measures ANOVA, Kruskal-Wallis, log-rank, Grubbs outliers),
-> nonlinear fits and SVG / PDF / PNG 600 dpi export. The interface is
-> available in English: it follows your system language on first launch, and
-> can be switched at any time under **View → Langue / Language**.
+> **In English.** This README is also available in English:
+> [README.en.md](README.en.md). The interface itself can be switched to
+> English under **View → Langue / Language**.
 
 Les traductions sont de simples fichiers JSON dans `plotea/locales`, indexés
 par le texte français : ajouter une langue ne demande aucune ligne de Python.
@@ -65,9 +62,9 @@ tout texte d'interface sans traduction.
   les étiquettes restent modifiables dans Illustrator ou Inkscape.
 - **Mode monochrome** (hachures + palette de gris) pour l'impression N&B.
 - **Thème sombre** pour l'interface, la figure restant toujours sur fond blanc.
-- **Interface entièrement en français**, accents compris, y compris les
-  dialogues standards de Qt : le message de fermeture propose « Enregistrer /
-  Quitter sans enregistrer / Annuler », pas « Save / Discard / Cancel ».
+- **Interface en français ou en anglais**, jusqu'aux dialogues standards de
+  Qt : en français, le message de fermeture propose « Enregistrer / Quitter
+  sans enregistrer / Annuler », pas « Save / Discard / Cancel ».
 - **Un seul test statistique par figure** : les hypothèses sont vérifiées une
   fois sur tous les groupes, plutôt qu'au cas par cas, ce qui évite de mélanger
   Student et Mann-Whitney dans la même légende.
@@ -171,26 +168,26 @@ python -m plotea
 3. Choisissez la **thématique** de journal dans la barre d'outils.
 4. Activez **Statistiques ▸ Comparaisons et annotations** pour obtenir les
    tests et les barres de significativité.
-5. **Exporter la figure** : les boutons **Copier (PNG)** et **Exporter la
-   figure…** sont juste sous l'aperçu, à droite des commandes de zoom. SVG ou
-   PDF pour une soumission, PNG 600 dpi pour un document. Raccourcis `Ctrl+E`
-   et `Ctrl+Maj+C`.
+5. **Exporter la figure** : les boutons **Copier** (PNG dans le
+   presse-papiers) et **Exporter** sont dans la barre d'outils principale. SVG
+   ou PDF pour une soumission, PNG 600 dpi pour un document. Raccourcis
+   `Ctrl+E` et `Ctrl+Maj+C`.
 
 ### Deux formats de données
 
 **Format long** (recommandé) — une colonne décrit le groupe, une autre la
 valeur. Choisissez la colonne dans « Grouper par » :
 
-| Traitement | Viabilite |
+| Traitement | Viabilité |
 |---|---|
-| Controle | 100.01 |
-| Controle | 102.69 |
+| Contrôle | 100.01 |
+| Contrôle | 102.69 |
 | Drogue A | 82.14 |
 
 **Format large** — une colonne par groupe. Cochez plusieurs colonnes dans
 « Valeurs Y » :
 
-| Sain | Tumeur | Metastase |
+| Sain | Tumeur | Métastase |
 |---|---|---|
 | 7.11 | 14.99 | 4.01 |
 | 11.94 | 11.09 | 12.35 |
@@ -276,7 +273,7 @@ from plotea.core.plotspec import PlotSpec
 from plotea.core.themes import get_theme
 
 data = demo.viability()
-spec = PlotSpec(plot_type="bar", group="Traitement", y=["Viabilite"],
+spec = PlotSpec(plot_type="bar", group="Traitement", y=["Viabilité"],
                 theme="Nature", ylabel="Viabilité (%)", stats_enabled=True)
 
 figure = Figure(figsize=get_theme(spec.theme).figsize("single"))
@@ -310,13 +307,18 @@ plotea/
     enums.py       clés machine et libellés affichés
     diagnostics.py journal des erreurs
     demo.py        jeux de données synthétiques
+  i18n.py          langue de l'interface (le français est la langue source)
+  locales/         traductions, un fichier JSON par langue
   resources/       icône de l'application, dessinée en code
   ui/              interface PyQt6
     main_window.py assemblage, menus, actions
+    projects.py    ouvrir, enregistrer, copie de secours
+    session.py     ce qui est retenu d'un lancement à l'autre
+    editing.py     annuler / rétablir côté interface
     data_view.py   tableur éditable
     canvas.py      aperçu à la taille réelle
     inspector.py   panneau de mise en forme
-    panel_editor.py editeur de figure composite
+    panel_editor.py éditeur de figure composite
     stats_view.py  tables de résultats
     dialogs.py     import / export / à propos
     style.py       feuille de style Qt (clair et sombre)
@@ -330,8 +332,9 @@ du bureau ne divergent jamais.
 ### Langue et compatibilité des fichiers
 
 Les options sont stockées sous forme de **clés** (`sem`, `holm`, `hill4_log`),
-jamais avec leur libellé français. Traduire l'interface plus tard ne cassera
-donc aucun fichier enregistré aujourd'hui. À la lecture, une clé, un libellé
+jamais avec leur libellé français. Changer la langue de l'interface ne casse
+donc aucun fichier enregistré : un projet créé en français s'ouvre en anglais,
+et inversement. À la lecture, une clé, un libellé
 actuel ou un libellé d'une version antérieure sont tous acceptés : les anciens
 projets migrent à l'ouverture, sans étape de conversion.
 
@@ -345,23 +348,32 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 146 tests, environ 2 minutes
+pytest                      # 380 tests, environ un quart d'heure
 pytest tests/test_anova.py  # une seule suite
-pytest -k appariement       # un seul sujet
+pytest -k paired            # un seul sujet (les tests appariés)
 ```
 
 | Suite | Couvre |
 |---|---|
-| `test_engine.py` | rendu des 6 types, 6 thématiques, ajustements, tous les formats d'export |
+| `test_engine.py` | rendu de chaque type de graphique, 6 thématiques, ajustements, tous les formats d'export |
 | `test_import.py` | CSV européens, séparateurs, encodages, classeurs Excel |
 | `test_stats_fixes.py` | barres groupées, tests appariés, valeurs manquantes |
 | `test_anova.py` | ANOVA à deux facteurs, choix de test par famille |
+| `test_advanced_stats.py` | Dunnett, ANOVA à mesures répétées, valeurs aberrantes |
+| `test_survival.py` | Kaplan-Meier et log-rank, vérifiés sur un essai publié |
 | `test_transforms.py` | les neuf transformations et leur dialogue |
 | `test_history.py` | annuler / rétablir |
 | `test_panels.py` | figures composites, lettrage, persistance |
-| `test_session.py` | icône, disposition mémorisée, points d'entrée |
+| `test_data_table.py` | tableur : saisie, presse-papiers, menus contextuels |
+| `test_dialogs.py` | dialogues d'import, d'export et de transformation |
+| `test_project_files.py` | ouverture et enregistrement des projets |
+| `test_recovery.py` | copie de secours, abandons protégés, projets récents |
+| `test_session.py` | icône, disposition mémorisée, dernier dossier |
+| `test_startup.py` | démarrage de l'application, arguments, auto-test |
+| `test_window_actions.py` | actions de la fenêtre : graphiques, onglets, export, styles |
 | `test_debt.py` | clés vs libellés, journal d'erreurs, gros volumes |
 | `test_feedback.py` | retours d'utilisation : bascule des types, accès à l'export, langue |
+| `test_i18n.py` | français intact, anglais complet, choix de la langue |
 | `test_gui.py` | interface complète, bout en bout |
 
 Les tests tournent hors écran (`QT_QPA_PLATFORM=offscreen`) et sans afficheur
@@ -371,9 +383,9 @@ Linux, macOS et Windows, en Python 3.11 et 3.13, et sait aussi construire les
 binaires autonomes des trois systèmes à la demande.
 
 `test_stats_fixes.py` et `test_anova.py` comparent les p et les sommes des
-carres produits par l'application a des calculs faits a la main, et verifient
-que l'appariement resiste aux valeurs manquantes et a l'ordre des lignes.
-Les sorties visuelles sont ecrites dans `tests/_out/`.
+carrés produits par l'application à des calculs faits à la main, et vérifient
+que l'appariement résiste aux valeurs manquantes et à l'ordre des lignes.
+Les sorties visuelles sont écrites dans `tests/_out/`.
 
 ---
 
