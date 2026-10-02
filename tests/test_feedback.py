@@ -673,3 +673,4 @@ def test_selftest_reports_the_silent_invariants(shared_window, qapp):
     assert "filtre d'en-tête : actif" in lines, lines
     assert "PERDU" not in lines, lines
     assert "glyphes de panneau : 5 fichiers" in lines, lines
+    assert "import Prism : ok" in lines, lines

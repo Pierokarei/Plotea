@@ -109,7 +109,29 @@ def selftest_report(app: QApplication, window) -> list[str]:
               for code in i18n.LANGUAGES if code != i18n.SOURCE]
     lines.append(f"langue : {i18n.language()} - traductions "
                  + ", ".join(loaded))
+    lines.append(f"import Prism : {_prism_selftest()}")
     return lines
+
+
+def _prism_selftest() -> str:
+    """Read a tiny .pzfx: the reader rests on an XML parser nothing else
+    in the application uses, the kind of module a frozen build can lose."""
+    import tempfile
+
+    from .core import pzfx
+
+    sample = ('<GraphPadPrismFile><Table TableType="OneWay"><Title>T</Title>'
+              '<YColumn><Title>A</Title><Subcolumn><d>1</d><d>2</d>'
+              '</Subcolumn></YColumn></Table></GraphPadPrismFile>')
+    try:
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "selftest.pzfx")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(sample)
+            tables = pzfx.read_pzfx(path).tables
+    except Exception as exc:
+        return f"PERDU ({type(exc).__name__}: {exc})"
+    return "ok" if tables and len(tables[0].dataset.df) == 2 else "VIDE"
 
 
 def offer_recovery(window) -> bool:

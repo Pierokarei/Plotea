@@ -39,7 +39,7 @@ tout texte d'interface sans traduction.
 
 | | |
 |---|---|
-| **Import** | CSV, TSV, TXT (séparateur et décimale détectés), Excel `.xlsx` / `.xlsm` / `.xls` multi-feuilles, collage depuis Excel |
+| **Import** | CSV, TSV, TXT (séparateur et décimale détectés), Excel `.xlsx` / `.xlsm` / `.xls` multi-feuilles, collage depuis Excel, **fichiers GraphPad Prism `.pzfx`** |
 | **Types de graphiques** | courbes, nuages de points, histogrammes, boxplots, violin plots, barres avec erreurs (simples et groupées à deux facteurs), **courbes de survie Kaplan-Meier** |
 | **Thématiques** | Nature, Science, Cell, PNAS, Minimal, Grayscale — typographie, largeur de colonne et palette conformes aux instructions aux auteurs |
 | **Export** | SVG, PDF, EPS (vectoriels, texte éditable) · PNG, TIFF, JPEG jusqu'à 1200 dpi (600 dpi par défaut) |
@@ -223,6 +223,26 @@ de savoir qui est qui :
 Un sujet dont une des deux mesures manque est écarté de la comparaison ;
 l'appariement des autres n'est pas décalé pour autant.
 
+### Venir de Prism
+
+**Fichier ▸ Importer des données** ouvre aussi les fichiers Prism `.pzfx`.
+Chaque tableau de données devient une table Plotea, accompagnée du
+graphique que Prism en aurait tiré quand Plotea sait le tracer :
+
+| Tableau Prism | Dans Plotea |
+|---|---|
+| XY (réplicats ou moyenne / SD / N) | courbe, moyenne ± erreur |
+| Colonnes | barres, une par groupe |
+| Groupé | barres groupées (ligne × colonne) |
+| Survie | courbes de Kaplan-Meier avec le log-rank |
+| Contingence, parties d'un tout… | les données seules, pour l'instant |
+
+Les valeurs exclues dans Prism sont laissées de côté, comme Prism le fait,
+et comptées dans le message de fin d'import. Les graphiques et analyses de
+Prism, enregistrés dans un format que seul Prism lit, ne sont pas repris.
+Les fichiers `.prism` de Prism 10 doivent d'abord être enregistrés en
+`.pzfx` depuis Prism.
+
 ### Transformations
 
 **Données ▸ Transformer** (`Ctrl+M`) dérive une nouvelle table sans jamais
@@ -361,7 +381,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 390 tests, quelques minutes
+pytest                      # 416 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -370,6 +390,7 @@ pytest -k paired            # un seul sujet (les tests appariés)
 |---|---|
 | `test_engine.py` | rendu de chaque type de graphique, 6 thématiques, ajustements, tous les formats d'export |
 | `test_import.py` | CSV européens, séparateurs, encodages, classeurs Excel |
+| `test_pzfx.py` | import Prism, vérifié sur de vrais fichiers Prism |
 | `test_stats_fixes.py` | barres groupées, tests appariés, valeurs manquantes |
 | `test_anova.py` | ANOVA à deux facteurs, choix de test par famille |
 | `test_advanced_stats.py` | Dunnett, ANOVA à mesures répétées, valeurs aberrantes |

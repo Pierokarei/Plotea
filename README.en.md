@@ -34,7 +34,7 @@ any interface text that has no translation.
 
 | | |
 |---|---|
-| **Import** | CSV, TSV, TXT (separator and decimal mark detected), multi-sheet Excel `.xlsx` / `.xlsm` / `.xls`, paste from Excel |
+| **Import** | CSV, TSV, TXT (separator and decimal mark detected), multi-sheet Excel `.xlsx` / `.xlsm` / `.xls`, paste from Excel, **GraphPad Prism `.pzfx` files** |
 | **Plot types** | line, scatter, histogram, box plot, violin plot, bars with error bars (simple, and grouped with two factors), **Kaplan-Meier survival curves** |
 | **Themes** | Nature, Science, Cell, PNAS, Minimal, Grayscale: typography, column width and palette that follow each journal's author guidelines |
 | **Export** | SVG, PDF, EPS (vector, editable text) · PNG, TIFF, JPEG up to 1200 dpi (600 dpi by default) |
@@ -214,6 +214,25 @@ needs to know which is which:
 A subject missing one of its two measurements is left out of the comparison;
 the pairing of the others is not shifted.
 
+### Coming from Prism
+
+**File ▸ Import data** also opens Prism `.pzfx` files. Each data table
+becomes a Plotea table, together with the plot Prism would have drawn from
+it when Plotea can draw it:
+
+| Prism table | In Plotea |
+|---|---|
+| XY (replicates or mean / SD / N) | curve, mean ± error |
+| Column | bars, one per group |
+| Grouped | grouped bars (row × column) |
+| Survival | Kaplan-Meier curves with the log-rank test |
+| Contingency, parts of whole… | the data only, for now |
+
+Values excluded in Prism are left out, as Prism does, and counted in the
+message at the end of the import. Prism's graphs and analyses, stored in a
+format only Prism reads, are not carried over. Prism 10 `.prism` files must
+first be saved as `.pzfx` from Prism.
+
 ### Transforms
 
 **Data ▸ Transform** (`Ctrl+M`) derives a new table and never modifies the
@@ -355,7 +374,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 390 tests, a few minutes
+pytest                      # 416 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -364,6 +383,7 @@ pytest -k paired            # a single topic (paired tests)
 |---|---|
 | `test_engine.py` | rendering of every plot type, 6 themes, fits, every export format |
 | `test_import.py` | European CSV, separators, encodings, Excel workbooks |
+| `test_pzfx.py` | Prism import, checked on real Prism files |
 | `test_stats_fixes.py` | grouped bars, paired tests, missing values |
 | `test_anova.py` | two-way ANOVA, test choice per family |
 | `test_advanced_stats.py` | Dunnett, repeated-measures ANOVA, outliers |

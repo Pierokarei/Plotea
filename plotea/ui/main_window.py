@@ -464,12 +464,16 @@ class MainWindow(QMainWindow):
     def import_data(self):
         path, _ = QFileDialog.getOpenFileName(
             self, tr("Importer des données"), self.last_dir(),
-            tr("Tableaux (*.csv *.txt *.tsv *.xlsx *.xlsm *.xls);;"
+            tr("Tableaux (*.csv *.txt *.tsv *.xlsx *.xlsm *.xls *.pzfx);;"
             "CSV (*.csv *.txt *.tsv);;Excel (*.xlsx *.xlsm *.xls);;"
+            "GraphPad Prism (*.pzfx);;"
             "Tous les fichiers (*)"))
         if not path:
             return
         self._remember_dir(path)
+        if os.path.splitext(path)[1].lower() in (".pzfx", ".prism"):
+            self.import_prism(path)
+            return
         dlg = ImportDialog(path, self)
         if dlg.exec() != ImportDialog.DialogCode.Accepted or not dlg.datasets:
             return
@@ -489,6 +493,64 @@ class MainWindow(QMainWindow):
         self._record("Import de données", before)
         self.statusBar().showMessage(
             tr("{count} table(s) importée(s)").format(count=len(dlg.datasets)), 4000)
+
+    def import_prism(self, path: str) -> bool:
+        """Every data table of a Prism file, each with the plot that suits it.
+
+        Prism files hold tables already laid out for analysis, so there is
+        nothing to ask: no separator, no header row. What could surprise -
+        excluded values left out, table types Plotea cannot draw yet, the
+        graphs that stay behind in Prism - is said once, at the end.
+        """
+        from ..core import diagnostics, pzfx
+
+        name = os.path.basename(path)
+        try:
+            prism = pzfx.read_pzfx(path)
+        except pzfx.PzfxError as exc:
+            QMessageBox.warning(self, APP_NAME, str(exc))
+            return False
+        except Exception as exc:          # a Prism version we have not met
+            diagnostics.LOG.record("Import Prism impossible",
+                                   f"{type(exc).__name__}: {exc}", path)
+            QMessageBox.warning(self, APP_NAME, tr(
+                "Impossible de lire {name}. Le détail est dans Aide > "
+                "Journal des erreurs.").format(name=name))
+            return False
+        if not prism.tables:
+            QMessageBox.information(self, APP_NAME, tr(
+                "{name} ne contient aucun tableau de données.").format(
+                    name=name) + "\n\n" + "\n".join(prism.notes))
+            return False
+
+        before = self._capture()
+        theme = self.current_spec().theme if self.current_spec() else "Nature"
+        first_table, first_plot = None, None
+        for table in prism.tables:
+            dataset = self.project.add_dataset(table.dataset)
+            first_table = first_table or dataset
+            if not table.plot:
+                continue
+            spec = self.project.add_plot(PlotSpec(
+                name=dataset.name, dataset=dataset.name, theme=theme,
+                **table.plot))
+            if first_plot is None:
+                first_plot = self.project.plots.index(spec)
+        self.data_panel.set_datasets(self.project.datasets,
+                                     self.project.datasets.index(first_table))
+        self._sync_tabs(first_plot if first_plot is not None
+                        else self.tabbar.currentIndex())
+        self._record("Import Prism", before)
+
+        plots = sum(1 for table in prism.tables if table.plot)
+        lines = [tr("{tables} tableau(x) importé(s) de {name}, "
+                    "{plots} graphique(s) créé(s).").format(
+                        tables=len(prism.tables), name=name, plots=plots)]
+        lines += prism.notes
+        lines.append(tr("Les graphiques et analyses de Prism ne sont pas "
+                        "repris : seules les données le sont."))
+        QMessageBox.information(self, APP_NAME, "\n\n".join(lines))
+        return True
 
     def add_table(self):
         before = self._capture()

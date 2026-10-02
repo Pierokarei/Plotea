@@ -95,6 +95,7 @@ def runtime_keys() -> set[str]:
         export,
         fitting,
         plotting,
+        pzfx,
         stats,
         transforms,
     )
@@ -113,6 +114,10 @@ def runtime_keys() -> set[str]:
         if transform.suffix:
             keys.add(transform.suffix)
     keys.update(demo.EXAMPLES)
+    # Prism import: subcolumn names and the table types it cannot plot
+    keys.update(part for parts in pzfx.SUMMARY.values() for part in parts
+                if " " in part)
+    keys.update(pzfx.UNPLOTTED.values())
     keys.update(stats.TEST_LABELS.values())
     keys.update(export.FORMATS)
     keys.update(plotting.HIST_LABELS.values())
