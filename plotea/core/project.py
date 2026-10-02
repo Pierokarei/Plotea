@@ -36,6 +36,8 @@ class Project:
     panels: list = field(default_factory=list)        # list[Panel]
     path: str = ""
     dirty: bool = False
+    #: what load() could not read back, for the window to say out loud
+    load_warnings: list = field(default_factory=list)
     created: str = field(default_factory=lambda: datetime.now().isoformat())
 
     # -- dataset helpers ---------------------------------------------------
@@ -77,6 +79,31 @@ class Project:
         self.plots.append(spec)
         self.dirty = True
         return spec
+
+    def rename_plot(self, index: int, name: str) -> str:
+        """Rename a plot everywhere it is referred to; returns the name kept.
+
+        Composite figures list their plots by name, so renaming only the
+        plot made it drop out of every figure it belonged to. A name already
+        taken by another plot is made unique, as add_plot does, or two plots
+        would answer to it and a figure would show the wrong one.
+        """
+        if not 0 <= index < len(self.plots):
+            return ""
+        spec = self.plots[index]
+        old = spec.name
+        taken = {p.name for i, p in enumerate(self.plots) if i != index}
+        new, i = name, 2
+        while new in taken:
+            new = f"{name} ({i})"
+            i += 1
+        if new == old:
+            return old
+        spec.name = new
+        for panel in self.panels:
+            panel.plots = [new if n == old else n for n in panel.plots]
+        self.dirty = True
+        return new
 
     def remove_plot(self, index: int):
         if 0 <= index < len(self.plots):
@@ -144,9 +171,26 @@ class Project:
         return path
 
     def save(self, path: str) -> str:
+        """Write the project, never at the expense of the previous file.
+
+        A zip opened for writing is truncated on the spot, so a save that
+        failed half-way - a full disk, a table that would not serialise -
+        used to leave the old file emptied and the new one unfinished. The
+        archive is now written beside it and moved into place only once
+        complete, as the backup copy already was.
+        """
         if not path.lower().endswith(EXTENSION):
             path += EXTENSION
-        self.write_to(path)
+        partial = path + ".part"
+        try:
+            self.write_to(partial)
+            os.replace(partial, path)
+        except BaseException:
+            try:
+                os.remove(partial)
+            except OSError:
+                pass
+            raise
         self.path = path
         self.dirty = False
         return path
@@ -156,11 +200,15 @@ class Project:
         with zipfile.ZipFile(path) as zf:
             meta = json.loads(zf.read("project.json").decode("utf-8"))
             datasets = []
+            missing = []
             for entry in meta.get("datasets", []):
                 try:
                     with zf.open(entry["file"]) as fh:
                         df = pd.read_csv(fh)
                 except KeyError:
+                    # listed but absent: say so rather than open a project
+                    # that silently lacks a table
+                    missing.append(entry.get("name") or entry.get("file", "?"))
                     continue
                 datasets.append(Dataset(entry["name"], df,
                                         entry.get("source", ""),
@@ -172,6 +220,8 @@ class Project:
                            for p in meta.get("panels", [])],
                    path=path, created=meta.get("created", ""))
         proj.dirty = False
+        proj.load_warnings = [f"Table absente du fichier : {name}"
+                              for name in missing]
         return proj
 
 

@@ -725,11 +725,14 @@ class MainWindow(QMainWindow):
                                         text=spec.name)
         if ok and name.strip():
             before = self._capture()
-            spec.name = name.strip()
-            self.tabbar.setTabText(self.tabbar.currentIndex(), spec.name)
+            kept = self.project.rename_plot(self.tabbar.currentIndex(),
+                                            name.strip())
+            self.tabbar.setTabText(self.tabbar.currentIndex(), kept)
             self._record("Renommage", before)
-            self.project.dirty = True
             self._update_title()
+            if kept != name.strip():
+                self.statusBar().showMessage(
+                    f"Nom déjà pris : renommé en « {kept} »", 5000)
 
     def delete_plot(self):
         index = self.tabbar.currentIndex()
@@ -950,22 +953,32 @@ class MainWindow(QMainWindow):
             return
         current = self.tabbar.currentIndex()
         written = []
-        for i, spec in enumerate(list(self.project.plots)
+        used = set()
+        for i, item in enumerate(list(self.project.plots)
                                  + list(self.project.panels)):
             self.tabbar.setCurrentIndex(i)
             self._render_now()
             safe = "".join(c if c.isalnum() or c in " -_" else "_"
-                           for c in spec.name).strip() or f"figure{i + 1}"
+                           for c in item.name).strip() or f"figure{i + 1}"
+            # "Figure 1/2" and "Figure 1_2" sanitise to the same file, and a
+            # plot may share its name with a composite figure: never let one
+            # silently overwrite the other
+            stem, n = safe, 2
+            while stem.lower() in used:
+                stem = f"{safe} ({n})"
+                n += 1
+            used.add(stem.lower())
             options = export_mod.ExportOptions(
-                os.path.join(folder, safe), fmt,
+                os.path.join(folder, stem), fmt,
                 dpi=export_mod.DEFAULT_DPI,
-                transparent=spec.transparent_bg)
+                # a composite figure has no transparency setting of its own
+                transparent=getattr(item, "transparent_bg", False))
             try:
                 written.append(export_mod.save_figure(self.canvas.figure,
                                                       options))
             except Exception as exc:
                 QMessageBox.warning(self, APP_NAME,
-                                    f"{spec.name} : {exc}")
+                                    f"{item.name} : {exc}")
         self.tabbar.setCurrentIndex(current)
         self.statusBar().showMessage(
             f"{len(written)} figure(s) exportée(s) dans {folder}", 6000)
@@ -1011,20 +1024,35 @@ class MainWindow(QMainWindow):
         spec = self.current_spec()
         if spec is None:
             return
+        before = self._capture()
         project_mod.apply_style(spec, style)
         self._sync_inspector()
         self.schedule_render()
+        self._record("Style enregistré", before)
 
     def apply_style_to_all(self):
+        """Give every other plot the look of this one, undoably.
+
+        It used to change the other plots without marking the project as
+        modified - closing then asked nothing and the change was lost - and
+        without an undo step.
+        """
         spec = self.current_spec()
         if spec is None:
             return
+        others = [p for p in self.project.plots if p is not spec]
+        if not others:
+            self.statusBar().showMessage("Aucun autre graphique.", 3000)
+            return
+        before = self._capture()
         style = project_mod.extract_style(spec)
-        for other in self.project.plots:
-            if other is not spec:
-                project_mod.apply_style(other, style)
+        for other in others:
+            project_mod.apply_style(other, style)
+        self.project.dirty = True
+        self._update_title()
+        self._record("Style appliqué à tous", before)
         self.statusBar().showMessage(
-            f"Style appliqué a {len(self.project.plots)} graphiques", 4000)
+            f"Style appliqué à {len(others)} autre(s) graphique(s)", 4000)
 
     def apply_theme(self, dark: bool):
         colors = palette_colors(dark)
@@ -1069,30 +1097,14 @@ class MainWindow(QMainWindow):
             "Suppr         Effacer les cellules sélectionnées")
 
     def closeEvent(self, event):
-        if self.project.dirty:
-            # Spelled out rather than left to Qt: the standard buttons read
-            # "Save / Discard / Cancel" whenever the translations are missing,
-            # which is exactly what a packaged build tends to drop.
-            box = QMessageBox(self)
-            box.setWindowTitle(APP_NAME)
-            box.setIcon(QMessageBox.Icon.Question)
-            box.setText("Le projet a été modifié.")
-            box.setInformativeText("Voulez-vous l'enregistrer avant de "
-                                   "quitter ?")
-            save = box.addButton("Enregistrer",
-                                 QMessageBox.ButtonRole.AcceptRole)
-            box.addButton("Quitter sans enregistrer",
-                          QMessageBox.ButtonRole.DestructiveRole)
-            cancel = box.addButton("Annuler",
-                                   QMessageBox.ButtonRole.RejectRole)
-            box.setDefaultButton(save)
-            box.exec()
-            clicked = box.clickedButton()
-            if clicked is cancel:
-                event.ignore()
-                return
-            if clicked is save:
-                self.save_project()
+        # The same question as Ctrl+N and Ouvrir, asked by the same code:
+        # this copy used to close the window even when "Enregistrer" was
+        # followed by a cancelled file dialog, and the work was gone.
+        if self.project.dirty and not self.files.ask_to_keep_changes(
+                "Quitter sans enregistrer",
+                "Voulez-vous l'enregistrer avant de quitter ?"):
+            event.ignore()
+            return
         self._save_layout()
         # An orderly exit: whatever happens to the work, it was the user's
         # call, so no copy is left to claim a crash on the next start.

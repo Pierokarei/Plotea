@@ -85,11 +85,14 @@ class ProjectFiles(QObject):
         window.statusBar().showMessage("Copie de secours enregistrée", 2500)
         return True
 
-    def ask_to_keep_changes(self) -> bool:
+    def ask_to_keep_changes(self, discard: str = "Continuer sans enregistrer",
+                            question: str = "Voulez-vous l'enregistrer avant "
+                                            "de continuer ?") -> bool:
         """Offer to save before something replaces the current project.
 
-        Returns False when the user calls the whole thing off. Ctrl+N and
-        Ouvrir used to discard the work in progress without a word.
+        Returns False when the user calls the whole thing off - including
+        when they chose Enregistrer and then backed out of the file dialog,
+        which is the case closing the window used to get wrong.
         """
         window = self.window
         if not window.project.dirty:
@@ -98,11 +101,9 @@ class ProjectFiles(QObject):
         box.setWindowTitle(self.app_name)
         box.setIcon(QMessageBox.Icon.Question)
         box.setText("Le projet a été modifié.")
-        box.setInformativeText(
-            "Voulez-vous l'enregistrer avant de continuer ?")
+        box.setInformativeText(question)
         save = box.addButton("Enregistrer", QMessageBox.ButtonRole.AcceptRole)
-        box.addButton("Continuer sans enregistrer",
-                      QMessageBox.ButtonRole.DestructiveRole)
+        box.addButton(discard, QMessageBox.ButtonRole.DestructiveRole)
         cancel = box.addButton("Annuler", QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(save)
         box.exec()
@@ -165,22 +166,33 @@ class ProjectFiles(QObject):
         self.update_title()
         window.memory.remember_project(path)
         project_mod.clear_recovery()
-        window.statusBar().showMessage(f"Projet ouvert : {path}", 4000)
+        if window.project.load_warnings:
+            for warning in window.project.load_warnings:
+                diagnostics.LOG.record("Projet incomplet", warning, path)
+            window.statusBar().showMessage(
+                f"Projet ouvert, mais incomplet : "
+                f"{'; '.join(window.project.load_warnings)}", 12000)
+        else:
+            window.statusBar().showMessage(f"Projet ouvert : {path}", 4000)
         return True
 
-    def save(self):
+    def save(self) -> bool:
         window = self.window
         if not window.project.path:
             return self.save_as()
         try:
             window.project.save(window.project.path)
         except Exception as exc:
-            QMessageBox.critical(window, self.app_name, f"Échec :\n{exc}")
-            return
+            QMessageBox.critical(
+                window, self.app_name,
+                f"Échec de l'enregistrement :\n{exc}\n\n"
+                "Le fichier précédent est intact.")
+            return False
         self.update_title()
         window.memory.remember_project(window.project.path)
         project_mod.clear_recovery()      # the real file is now up to date
         window.statusBar().showMessage("Projet enregistré", 3000)
+        return True
 
     def save_as(self):
         window = self.window
@@ -190,11 +202,18 @@ class ProjectFiles(QObject):
                          window.project.name + project_mod.EXTENSION),
             FILTER)
         if not path:
-            return
+            return False
         window.memory.remember_dir(path)
+        before = (window.project.name, window.project.path)
         window.project.name = os.path.splitext(os.path.basename(path))[0]
         window.project.path = path
-        self.save()
+        if not self.save():
+            # nothing was written there: the project still belongs where it
+            # was, not to a file that does not exist
+            window.project.name, window.project.path = before
+            self.update_title()
+            return False
+        return True
 
     # ------------------------------------------------------------------
     def update_title(self):
