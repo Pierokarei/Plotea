@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from ..i18n import tr
 from .enums import TRANSFORM
 
 #: What a transform needs the caller to supply, beyond the value columns.
@@ -43,26 +44,28 @@ def percent_of_control(df: pd.DataFrame, p: Params) -> tuple[pd.DataFrame, str]:
     out = df.copy()
     cols = _numeric(df, p.columns)
     if not cols:
-        return out, "Aucune colonne numérique sélectionnée."
+        return out, tr("Aucune colonne numérique sélectionnée.")
 
     if p.group and p.group in df.columns:
         if not p.control:
-            return out, "Choisissez le groupe contrôle."
+            return out, tr("Choisissez le groupe contrôle.")
         mask = df[p.group].astype(str) == str(p.control)
         if not mask.any():
-            return out, f"Groupe contrôle '{p.control}' introuvable."
+            return out, tr("Groupe contrôle '{name}' introuvable.").format(
+                name=p.control)
         for col in cols:
             ref = _as_float(df.loc[mask, col]).mean()
             if not np.isfinite(ref) or ref == 0:
-                return out, f"Moyenne du contrôle nulle pour '{col}'."
+                return out, tr("Moyenne du contrôle nulle pour '{name}'."
+                               ).format(name=col)
             out[col] = _as_float(df[col]) / ref * 100.0
         return out, ""
 
     if not p.reference or p.reference not in df.columns:
-        return out, "Choisissez la colonne servant de contrôle."
+        return out, tr("Choisissez la colonne servant de contrôle.")
     ref = _as_float(df[p.reference]).mean()
     if not np.isfinite(ref) or ref == 0:
-        return out, "Moyenne de la colonne contrôle nulle."
+        return out, tr("Moyenne de la colonne contrôle nulle.")
     for col in cols:
         out[col] = _as_float(df[col]) / ref * 100.0
     return out, ""
@@ -91,8 +94,9 @@ def _log(base: float | None):
             values = values.mask(bad)
             out[col] = (np.log(values) if base is None
                         else np.log(values) / np.log(base))
-        message = (f"{dropped} valeur(s) <= 0 exclue(s) : le logarithme n'y "
-                   "est pas défini." if dropped else "")
+        message = (tr("{count} valeur(s) <= 0 exclue(s) : le logarithme "
+                      "n'y est pas défini.").format(count=dropped)
+                   if dropped else "")
         return out, message
     return run
 
@@ -135,7 +139,7 @@ def ratio_to_column(df: pd.DataFrame, p: Params) -> tuple[pd.DataFrame, str]:
     """Divide each selected column by a reference column, row by row."""
     out = df.copy()
     if not p.reference or p.reference not in df.columns:
-        return out, "Choisissez la colonne de référence."
+        return out, tr("Choisissez la colonne de référence.")
     ref = _as_float(df[p.reference]).replace(0.0, np.nan)
     for col in _numeric(df, p.columns):
         if col == p.reference:
@@ -149,9 +153,9 @@ def aggregate_replicates(df: pd.DataFrame,
     """Collapse replicates into mean, SD, SEM and n per group."""
     cols = _numeric(df, p.columns)
     if not (p.group and p.group in df.columns):
-        return df.copy(), "Choisissez la colonne de regroupement."
+        return df.copy(), tr("Choisissez la colonne de regroupement.")
     if not cols:
-        return df.copy(), "Aucune colonne numérique sélectionnée."
+        return df.copy(), tr("Aucune colonne numérique sélectionnée.")
     frames = []
     for col in cols:
         grouped = _as_float(df[col]).groupby(df[p.group], sort=False)
@@ -229,12 +233,14 @@ def apply(name: str, df: pd.DataFrame,
           params: Params) -> tuple[pd.DataFrame, str]:
     transform = by_label(name)
     if transform is None:
-        return df.copy(), f"Transformation inconnue : {name}"
+        return df.copy(), tr("Transformation inconnue : {name}").format(
+            name=name)
     if not params.columns:
         # Otherwise every transform quietly returns the table untouched, and
         # the user gets a copy named after a calculation that never ran.
-        return df.copy(), "Aucune colonne sélectionnée : rien à transformer."
+        return df.copy(), tr("Aucune colonne sélectionnée : rien à transformer.")
     try:
         return transform.run(df, params)
     except Exception as exc:
-        return df.copy(), f"Échec de la transformation : {exc}"
+        return df.copy(), tr("Échec de la transformation : {error}"
+                             ).format(error=exc)

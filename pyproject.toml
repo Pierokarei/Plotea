@@ -45,7 +45,8 @@ include = ["plotea*"]
 # wheel built without them installs an application whose desktop entry and
 # window icon have nothing to point at.
 [tool.setuptools.package-data]
-plotea = ["resources/*.ico", "resources/*.png", "resources/*.icns"]
+plotea = ["resources/*.ico", "resources/*.png", "resources/*.icns",
+          "locales/*.json"]
 
 [tool.ruff]
 line-length = 79

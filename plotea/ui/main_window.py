@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 
 from PyQt6.QtCore import QSettings, QSize, Qt, QTimer
-from PyQt6.QtGui import QAction, QKeySequence
+from PyQt6.QtGui import QAction, QActionGroup, QKeySequence
 from PyQt6.QtWidgets import (
     QAbstractButton,
     QApplication,
@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from .. import i18n
 from ..core import demo, plotting
 from ..core import export as export_mod
 from ..core import project as project_mod
@@ -33,6 +34,7 @@ from ..core.panel import Panel
 from ..core.plotspec import PlotSpec
 from ..core.project import Project, config_dir
 from ..core.themes import THEMES
+from ..i18n import tr
 from ..resources import app_icon, write_dock_icons
 from .canvas import PlotCanvas
 from .data_view import DataPanel
@@ -99,7 +101,7 @@ class MainWindow(QMainWindow):
             # then rather than leave a button with no tooltip
             dock.topLevelChanged.connect(
                 lambda _=False: self._label_dock_buttons())
-        self.statusBar().showMessage("Prêt")
+        self.statusBar().showMessage(tr("Prêt"))
         self.apply_theme(self.dark)
         self._restore_layout()
 
@@ -123,7 +125,7 @@ class MainWindow(QMainWindow):
 
         add = QToolButton()
         tag_icon(add, "plus")
-        add.setToolTip("Nouveau graphique (Ctrl+T)")
+        add.setToolTip(tr("Nouveau graphique (Ctrl+T)"))
         add.setAutoRaise(True)
         add.clicked.connect(self.new_plot)
 
@@ -134,9 +136,9 @@ class MainWindow(QMainWindow):
         self.cmb_theme_quick.addItems(list(THEMES))
         self.cmb_theme_quick.setFixedWidth(126)
         self.cmb_theme_quick.setToolTip(
-            "Thématique de journal du graphique courant")
+            tr("Thématique de journal du graphique courant"))
         self.cmb_theme_quick.currentTextChanged.connect(self.set_theme)
-        lbl_theme = QLabel("Thématique")
+        lbl_theme = QLabel(tr("Thématique"))
         lbl_theme.setProperty("hint", True)
 
         bar = QWidget()
@@ -169,7 +171,7 @@ class MainWindow(QMainWindow):
         self.data_panel.addTableRequested.connect(self.add_table)
         self.data_panel.transformRequested.connect(self.transform_data)
 
-        self.dock_data = QDockWidget("Données", self)
+        self.dock_data = QDockWidget(tr("Données"), self)
         self.dock_data.setObjectName("dock_data")
         self.dock_data.setWidget(self.data_panel)
         self.dock_data.setMinimumWidth(330)
@@ -192,7 +194,7 @@ class MainWindow(QMainWindow):
         self.right_stack.addWidget(self.inspector)
         self.right_stack.addWidget(self.panel_editor)
 
-        self.dock_inspector = QDockWidget("Mise en forme", self)
+        self.dock_inspector = QDockWidget(tr("Mise en forme"), self)
         self.dock_inspector.setObjectName("dock_inspector")
         self.dock_inspector.setWidget(self.right_stack)
         self.dock_inspector.setMinimumWidth(340)
@@ -200,7 +202,7 @@ class MainWindow(QMainWindow):
                            self.dock_inspector)
 
         self.stats_panel = StatsPanel()
-        self.dock_stats = QDockWidget("Analyses", self)
+        self.dock_stats = QDockWidget(tr("Analyses"), self)
         self.dock_stats.setObjectName("dock_stats")
         self.dock_stats.setWidget(self.stats_panel)
         self.dock_stats.setMinimumHeight(150)
@@ -209,6 +211,14 @@ class MainWindow(QMainWindow):
         self.resizeDocks([self.dock_stats], [210],
                          Qt.Orientation.Vertical)
 
+    #: Tooltips of the title-bar buttons, translated where they are shown.
+    DOCK_TIPS = {
+        "qt_dockwidget_floatbutton":
+            "Détacher le panneau dans sa propre fenêtre",
+        "qt_dockwidget_closebutton":
+            "Fermer le panneau (menu Affichage pour le rouvrir)",
+    }
+
     def _label_dock_buttons(self):
         """Give the title-bar buttons the tooltip every other button has.
 
@@ -216,17 +226,11 @@ class MainWindow(QMainWindow):
         they do - and that a closed panel comes back from the Affichage menu -
         is left to guesswork.
         """
-        tips = {
-            "qt_dockwidget_floatbutton":
-                "Détacher le panneau dans sa propre fenêtre",
-            "qt_dockwidget_closebutton":
-                "Fermer le panneau (menu Affichage pour le rouvrir)",
-        }
         for dock in (self.dock_data, self.dock_inspector, self.dock_stats):
             for button in dock.findChildren(QAbstractButton):
-                tip = tips.get(button.objectName())
+                tip = self.DOCK_TIPS.get(button.objectName())
                 if tip:
-                    button.setToolTip(f"{tip} — {dock.windowTitle()}")
+                    button.setToolTip(f"{tr(tip)} — {dock.windowTitle()}")
 
     def _act(self, text, slot, shortcut=None, icon=None, tip=""):
         action = QAction(text, self)
@@ -239,80 +243,80 @@ class MainWindow(QMainWindow):
         return action
 
     def _build_actions(self):
-        self.a_new = self._act("Nouveau projet", self.new_project, "Ctrl+N")
-        self.a_open = self._act("Ouvrir un projet...", self.open_project,
+        self.a_new = self._act(tr("Nouveau projet"), self.new_project, "Ctrl+N")
+        self.a_open = self._act(tr("Ouvrir un projet..."), self.open_project,
                                 "Ctrl+Shift+O", "open")
-        self.a_import = self._act("Importer des données...", self.import_data,
+        self.a_import = self._act(tr("Importer des données..."), self.import_data,
                                   "Ctrl+O", "import",
-                                  "Importer un fichier CSV ou Excel")
-        self.a_save = self._act("Enregistrer", self.save_project, "Ctrl+S",
+                                  tr("Importer un fichier CSV ou Excel"))
+        self.a_save = self._act(tr("Enregistrer"), self.save_project, "Ctrl+S",
                                 "save")
-        self.a_save_as = self._act("Enregistrer sous...", self.save_project_as,
+        self.a_save_as = self._act(tr("Enregistrer sous..."), self.save_project_as,
                                    "Ctrl+Shift+S")
-        self.a_export = self._act("Exporter la figure...", self.export_figure,
+        self.a_export = self._act(tr("Exporter la figure..."), self.export_figure,
                                   "Ctrl+E", "export",
-                                  "SVG, PDF, PNG 600 dpi...")
-        self.a_export_all = self._act("Exporter toutes les figures...",
+                                  tr("SVG, PDF, PNG 600 dpi..."))
+        self.a_export_all = self._act(tr("Exporter toutes les figures..."),
                                       self.export_all)
-        self.a_quit = self._act("Quitter", self.close, "Ctrl+Q")
+        self.a_quit = self._act(tr("Quitter"), self.close, "Ctrl+Q")
 
-        self.a_undo = self._act("Annuler", self.undo, "Ctrl+Z")
-        self.a_redo = self._act("Rétablir", self.redo, "Ctrl+Y")
+        self.a_undo = self._act(tr("Annuler"), self.undo, "Ctrl+Z")
+        self.a_redo = self._act(tr("Rétablir"), self.redo, "Ctrl+Y")
         self.a_undo.setEnabled(False)
         self.a_redo.setEnabled(False)
 
-        self.a_copy_png = self._act("Copier la figure (PNG)",
+        self.a_copy_png = self._act(tr("Copier la figure (PNG)"),
                                     lambda: self._copy(False),
                                     "Ctrl+Shift+C", "copy")
-        self.a_copy_svg = self._act("Copier la figure (SVG)",
+        self.a_copy_svg = self._act(tr("Copier la figure (SVG)"),
                                     lambda: self._copy(True))
-        self.a_paste = self._act("Coller des données", self._paste_data)
+        self.a_paste = self._act(tr("Coller des données"), self._paste_data)
 
-        self.a_new_plot = self._act("Nouveau graphique", self.new_plot,
+        self.a_new_plot = self._act(tr("Nouveau graphique"), self.new_plot,
                                     "Ctrl+T", "plus")
         # "composite", not "table": the data panel already uses the table
         # glyph for its blank-table button and the two must not look alike.
-        self.a_new_panel = self._act("Nouvelle figure composite",
+        self.a_new_panel = self._act(tr("Nouvelle figure composite"),
                                      self.new_panel, "Ctrl+Shift+T",
                                      "composite",
-                                     "Assembler plusieurs graphiques (A, B, C)")
+                                     tr("Assembler plusieurs graphiques (A, B, C)"))
         # its own glyph: side by side with Copier, two sets of overlapping
         # sheets were indistinguishable
-        self.a_dup_plot = self._act("Dupliquer le graphique",
+        self.a_dup_plot = self._act(tr("Dupliquer le graphique"),
                                     self.duplicate_plot, "Ctrl+D", "duplicate")
-        self.a_rename_plot = self._act("Renommer le graphique...",
+        self.a_rename_plot = self._act(tr("Renommer le graphique..."),
                                        self.rename_plot, "F2")
-        self.a_del_plot = self._act("Supprimer le graphique",
+        self.a_del_plot = self._act(tr("Supprimer le graphique"),
                                     self.delete_plot, None, "trash")
 
-        self.a_transform = self._act("Transformer les données...",
+        self.a_transform = self._act(tr("Transformer les données..."),
                                      self.transform_data, "Ctrl+M", "fit",
-                                     "Normaliser, % du contrôle, log...")
-        self.a_save_preset = self._act("Enregistrer le style courant...",
+                                     tr("Normaliser, % du contrôle, log..."))
+        self.a_save_preset = self._act(tr("Enregistrer le style courant..."),
                                        self.save_preset)
-        self.a_reset_layout = self._act("Réinitialiser la disposition",
+        self.a_reset_layout = self._act(tr("Réinitialiser la disposition"),
                                         self.reset_layout)
-        self.a_dark = self._act("Interface sombre",
+        self.a_dark = self._act(tr("Interface sombre"),
                                 lambda: self.apply_theme(not self.dark))
         self.a_dark.setCheckable(True)
         self.a_dark.setChecked(self.dark)
-        self.a_log = self._act("Journal des erreurs...", self.show_log)
-        self.a_about = self._act("A propos", self.show_about)
-        self.a_shortcuts = self._act("Raccourcis clavier", self.show_shortcuts)
+        self.a_log = self._act(tr("Journal des erreurs..."), self.show_log)
+        self.a_about = self._act(tr("A propos"), self.show_about)
+        self.a_shortcuts = self._act(tr("Raccourcis clavier"), self.show_shortcuts)
 
     def _build_menus(self):
         mb = self.menuBar()
-        m_file = mb.addMenu("&Fichier")
+        m_file = mb.addMenu(tr("&Fichier"))
         m_file.addAction(self.a_new)
         m_file.addAction(self.a_open)
-        self.m_recent = m_file.addMenu("Projets récents")
+        self.m_recent = m_file.addMenu(tr("Projets récents"))
         self.m_recent.aboutToShow.connect(self._fill_recent)
         m_file.addSeparator()
         m_file.addAction(self.a_import)
-        m_examples = m_file.addMenu("Jeux de données d'exemple")
+        m_examples = m_file.addMenu(tr("Jeux de données d'exemple"))
         for label in demo.EXAMPLES:
             m_examples.addAction(
-                self._act(label,
+                self._act(tr(label),
                           lambda _=False, name=label:
                           self.load_example(name)))
         m_file.addSeparator()
@@ -324,11 +328,11 @@ class MainWindow(QMainWindow):
         m_file.addSeparator()
         m_file.addAction(self.a_quit)
 
-        m_data = mb.addMenu("&Données")
+        m_data = mb.addMenu(tr("&Données"))
         m_data.addAction(self.a_import)
         m_data.addAction(self.a_transform)
 
-        m_edit = mb.addMenu("&Édition")
+        m_edit = mb.addMenu(tr("&Édition"))
         m_edit.addAction(self.a_undo)
         m_edit.addAction(self.a_redo)
         m_edit.addSeparator()
@@ -336,7 +340,7 @@ class MainWindow(QMainWindow):
         m_edit.addAction(self.a_copy_svg)
         m_edit.addAction(self.a_paste)
 
-        m_plot = mb.addMenu("&Graphique")
+        m_plot = mb.addMenu(tr("&Graphique"))
         m_plot.addAction(self.a_new_plot)
         m_plot.addAction(self.a_new_panel)
         m_plot.addAction(self.a_dup_plot)
@@ -344,32 +348,47 @@ class MainWindow(QMainWindow):
         m_plot.addSeparator()
         m_plot.addAction(self.a_del_plot)
 
-        m_style = mb.addMenu("&Style")
-        m_theme = m_style.addMenu("Thématique de journal")
+        m_style = mb.addMenu(tr("&Style"))
+        m_theme = m_style.addMenu(tr("Thématique de journal"))
         for name, theme in THEMES.items():
-            act = self._act(f"{name} - {theme.description}",
+            act = self._act(f"{name} - {tr(theme.description)}",
                             lambda _=False, n=name: self.set_theme(n))
             m_theme.addAction(act)
         m_style.addSeparator()
         m_style.addAction(self.a_save_preset)
-        self.m_presets = m_style.addMenu("Appliquer un style enregistré")
+        self.m_presets = m_style.addMenu(tr("Appliquer un style enregistré"))
         self.m_presets.aboutToShow.connect(self._fill_presets)
 
-        m_view = mb.addMenu("&Affichage")
+        m_view = mb.addMenu(tr("&Affichage"))
         m_view.addAction(self.dock_data.toggleViewAction())
         m_view.addAction(self.dock_inspector.toggleViewAction())
         m_view.addAction(self.dock_stats.toggleViewAction())
         m_view.addSeparator()
         m_view.addAction(self.a_reset_layout)
         m_view.addAction(self.a_dark)
+        m_view.addSeparator()
+        # "Langue / Language": whoever opens this menu may not read the
+        # current interface, so the entry names itself in both
+        self.m_language = m_view.addMenu("Langue / Language")
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        self.language_actions = {}
+        for code, name in i18n.LANGUAGES.items():
+            action = self.m_language.addAction(name)
+            action.setCheckable(True)
+            action.setChecked(code == i18n.language())
+            action.triggered.connect(
+                lambda _=False, chosen=code: self.choose_language(chosen))
+            group.addAction(action)
+            self.language_actions[code] = action
 
-        m_help = mb.addMenu("&Aide")
+        m_help = mb.addMenu(tr("&Aide"))
         m_help.addAction(self.a_shortcuts)
         m_help.addAction(self.a_log)
         m_help.addAction(self.a_about)
 
     def _build_toolbar(self):
-        tb = QToolBar("Principal")
+        tb = QToolBar(tr("Principal"))
         tb.setObjectName("main_toolbar")
         tb.setMovable(False)
         tb.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
@@ -385,14 +404,14 @@ class MainWindow(QMainWindow):
         tb.addAction(self.a_export)
         tb.addSeparator()
 
-        self.a_new_plot.setIconText("Nouveau")
-        self.a_new_panel.setIconText("Composite")
-        self.a_dup_plot.setIconText("Dupliquer")
-        self.a_import.setIconText("Importer")
-        self.a_open.setIconText("Ouvrir")
-        self.a_save.setIconText("Enregistrer")
-        self.a_export.setIconText("Exporter")
-        self.a_copy_png.setIconText("Copier")
+        self.a_new_plot.setIconText(tr("Nouveau"))
+        self.a_new_panel.setIconText(tr("Composite"))
+        self.a_dup_plot.setIconText(tr("Dupliquer"))
+        self.a_import.setIconText(tr("Importer"))
+        self.a_open.setIconText(tr("Ouvrir"))
+        self.a_save.setIconText(tr("Enregistrer"))
+        self.a_export.setIconText(tr("Exporter"))
+        self.a_copy_png.setIconText(tr("Copier"))
 
         self.addToolBar(tb)
 
@@ -444,10 +463,10 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     def import_data(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Importer des données", self.last_dir(),
-            "Tableaux (*.csv *.txt *.tsv *.xlsx *.xlsm *.xls);;"
+            self, tr("Importer des données"), self.last_dir(),
+            tr("Tableaux (*.csv *.txt *.tsv *.xlsx *.xlsm *.xls);;"
             "CSV (*.csv *.txt *.tsv);;Excel (*.xlsx *.xlsm *.xls);;"
-            "Tous les fichiers (*)")
+            "Tous les fichiers (*)"))
         if not path:
             return
         self._remember_dir(path)
@@ -469,7 +488,7 @@ class MainWindow(QMainWindow):
         self.schedule_render()
         self._record("Import de données", before)
         self.statusBar().showMessage(
-            f"{len(dlg.datasets)} table(s) importée(s)", 4000)
+            tr("{count} table(s) importée(s)").format(count=len(dlg.datasets)), 4000)
 
     def add_table(self):
         before = self._capture()
@@ -490,12 +509,12 @@ class MainWindow(QMainWindow):
         before = self._capture()
         created = self.project.add_dataset(
             Dataset(dlg.result_name, dlg.result_df, ds.source, ds.sheet,
-                    f"Dérivée de {ds.name}"))
+                    tr("Dérivée de {name}").format(name=ds.name)))
         self.data_panel.set_datasets(self.project.datasets,
                                      self.project.datasets.index(created))
         self._record("Transformation des données", before)
         self.statusBar().showMessage(
-            f"Table '{created.name}' créée", 5000)
+            tr("Table '{name}' créée").format(name=created.name), 5000)
 
     def load_example(self, label: str):
         before = self._capture()
@@ -661,7 +680,8 @@ class MainWindow(QMainWindow):
         base = self.current_spec()
         ds = self.data_panel.current_dataset() or (
             self.project.datasets[0] if self.project.datasets else None)
-        spec = PlotSpec(name=f"Graphique {len(self.project.plots) + 1}",
+        spec = PlotSpec(name=tr("Graphique {number}").format(
+                            number=len(self.project.plots) + 1),
                         dataset=ds.name if ds else "",
                         theme=base.theme if base else "Nature")
         if ds is not None:
@@ -687,7 +707,7 @@ class MainWindow(QMainWindow):
             return
         self.right_stack.setCurrentWidget(self.panel_editor)
         self.panel_editor.set_panel(panel, self.project.plot_names())
-        self.dock_inspector.setWindowTitle("Figure composite")
+        self.dock_inspector.setWindowTitle(tr("Figure composite"))
 
     def _on_panel_renamed(self):
         panel = self.current_panel()
@@ -707,8 +727,8 @@ class MainWindow(QMainWindow):
     def rename_plot(self):
         panel = self.current_panel()
         if panel is not None:
-            name, ok = QInputDialog.getText(self, "Renommer",
-                                            "Nom de la figure :",
+            name, ok = QInputDialog.getText(self, tr("Renommer"),
+                                            tr("Nom de la figure :"),
                                             text=panel.name)
             if ok and name.strip():
                 before = self._capture()
@@ -721,7 +741,7 @@ class MainWindow(QMainWindow):
         spec = self.current_spec()
         if spec is None:
             return
-        name, ok = QInputDialog.getText(self, "Renommer", "Nom du graphique :",
+        name, ok = QInputDialog.getText(self, tr("Renommer"), tr("Nom du graphique :"),
                                         text=spec.name)
         if ok and name.strip():
             before = self._capture()
@@ -732,7 +752,7 @@ class MainWindow(QMainWindow):
             self._update_title()
             if kept != name.strip():
                 self.statusBar().showMessage(
-                    f"Nom déjà pris : renommé en « {kept} »", 5000)
+                    tr("Nom déjà pris : renommé en « {name} »").format(name=kept), 5000)
 
     def delete_plot(self):
         index = self.tabbar.currentIndex()
@@ -744,7 +764,7 @@ class MainWindow(QMainWindow):
             return
         if len(self.project.plots) <= 1:
             QMessageBox.information(self, APP_NAME,
-                                    "Au moins un graphique est nécessaire.")
+                                    tr("Au moins un graphique est nécessaire."))
             return
         before = self._capture()
         self.project.remove_plot(index)
@@ -768,7 +788,7 @@ class MainWindow(QMainWindow):
             self._sync_panel_editor()
             return
         self.right_stack.setCurrentWidget(self.inspector)
-        self.dock_inspector.setWindowTitle("Mise en forme")
+        self.dock_inspector.setWindowTitle(tr("Mise en forme"))
         ds = self.project.get_dataset(spec.dataset)
         columns = ds.columns if ds else []
         self.inspector.set_spec(spec, columns, self.project.dataset_names())
@@ -809,7 +829,7 @@ class MainWindow(QMainWindow):
         self.resizeDocks([self.dock_data, self.dock_inspector], [340, 360],
                          Qt.Orientation.Horizontal)
         self.resizeDocks([self.dock_stats], [210], Qt.Orientation.Vertical)
-        self.statusBar().showMessage("Disposition réinitialisée", 3000)
+        self.statusBar().showMessage(tr("Disposition réinitialisée"), 3000)
 
     #: Kept on the window: the menu and the tests both ask for it here.
     RECENT_MAX = SessionMemory.RECENT_MAX
@@ -828,7 +848,7 @@ class MainWindow(QMainWindow):
         self.m_recent.clear()
         entries = self.memory.existing_projects()
         if not entries:
-            empty = self.m_recent.addAction("Aucun projet récent")
+            empty = self.m_recent.addAction(tr("Aucun projet récent"))
             empty.setEnabled(False)
             return
         for path in entries:
@@ -837,7 +857,7 @@ class MainWindow(QMainWindow):
             action.triggered.connect(
                 lambda _=False, target=path: self._open_recent(target))
         self.m_recent.addSeparator()
-        self.m_recent.addAction("Vider la liste").triggered.connect(
+        self.m_recent.addAction(tr("Vider la liste")).triggered.connect(
             self.memory.clear_projects)
 
     def _open_recent(self, path: str):
@@ -935,22 +955,26 @@ class MainWindow(QMainWindow):
             path = export_mod.save_figure(self.canvas.figure, options)
             self._remember_dir(path)
         except Exception as exc:
-            QMessageBox.critical(self, APP_NAME, f"Export impossible :\n{exc}")
+            QMessageBox.critical(self, APP_NAME, tr("Export impossible :\n{error}").format(error=exc))
             return
         self.canvas.refresh()
-        self.statusBar().showMessage(f"Exporté : {path}", 6000)
+        self.statusBar().showMessage(tr("Exporté : {path}").format(path=path), 6000)
 
     def export_all(self):
         folder = QFileDialog.getExistingDirectory(
-            self, "Dossier de destination", self.last_dir())
+            self, tr("Dossier de destination"), self.last_dir())
         if not folder:
             return
         self._remember_dir(folder)
-        fmt, ok = QInputDialog.getItem(self, "Format",
-                                       "Format d'export :",
-                                       list(export_mod.FORMATS), 3, False)
+        keys = list(export_mod.FORMATS)
+        shown = [tr(key) for key in keys]
+        choice, ok = QInputDialog.getItem(self, tr("Format"),
+                                          tr("Format d'export :"),
+                                          shown, 3, False)
         if not ok:
             return
+        # the dialog hands back the text it showed; the export wants the key
+        fmt = keys[shown.index(choice)] if choice in shown else choice
         current = self.tabbar.currentIndex()
         written = []
         used = set()
@@ -981,16 +1005,17 @@ class MainWindow(QMainWindow):
                                     f"{item.name} : {exc}")
         self.tabbar.setCurrentIndex(current)
         self.statusBar().showMessage(
-            f"{len(written)} figure(s) exportée(s) dans {folder}", 6000)
+            tr("{count} figure(s) exportée(s) dans {folder}").format(
+                count=len(written), folder=folder), 6000)
 
     def _copy(self, as_svg: bool):
         if as_svg:
             self.canvas.copy_svg_to_clipboard()
-            self.statusBar().showMessage("SVG copie dans le presse-papiers",
+            self.statusBar().showMessage(tr("SVG copie dans le presse-papiers"),
                                          3000)
         else:
             self.canvas.copy_to_clipboard(dpi=300)
-            self.statusBar().showMessage("Figure copiee (300 dpi)", 3000)
+            self.statusBar().showMessage(tr("Figure copiee (300 dpi)"), 3000)
 
     # ------------------------------------------------------------------
     # styles & appearance
@@ -999,25 +1024,25 @@ class MainWindow(QMainWindow):
         spec = self.current_spec()
         if spec is None:
             return
-        name, ok = QInputDialog.getText(self, "Style", "Nom du style :",
-                                        text=f"{spec.theme} personnalisé")
+        name, ok = QInputDialog.getText(self, tr("Style"), tr("Nom du style :"),
+                                        text=tr("{theme} personnalisé").format(theme=spec.theme))
         if ok and name.strip():
             project_mod.save_preset(name.strip(),
                                     project_mod.extract_style(spec))
-            self.statusBar().showMessage(f"Style '{name}' enregistré", 3000)
+            self.statusBar().showMessage(tr("Style '{name}' enregistré").format(name=name), 3000)
 
     def _fill_presets(self):
         self.m_presets.clear()
         presets = project_mod.load_presets()
         if not presets:
-            act = self.m_presets.addAction("(aucun style enregistré)")
+            act = self.m_presets.addAction(tr("(aucun style enregistré)"))
             act.setEnabled(False)
             return
         for name, style in presets.items():
             self.m_presets.addAction(
                 self._act(name, lambda _=False, s=style: self.apply_preset(s)))
         self.m_presets.addSeparator()
-        self.m_presets.addAction(self._act("Appliquer a tous les graphiques",
+        self.m_presets.addAction(self._act(tr("Appliquer a tous les graphiques"),
                                            self.apply_style_to_all))
 
     def apply_preset(self, style: dict):
@@ -1042,7 +1067,7 @@ class MainWindow(QMainWindow):
             return
         others = [p for p in self.project.plots if p is not spec]
         if not others:
-            self.statusBar().showMessage("Aucun autre graphique.", 3000)
+            self.statusBar().showMessage(tr("Aucun autre graphique."), 3000)
             return
         before = self._capture()
         style = project_mod.extract_style(spec)
@@ -1052,7 +1077,55 @@ class MainWindow(QMainWindow):
         self._update_title()
         self._record("Style appliqué à tous", before)
         self.statusBar().showMessage(
-            f"Style appliqué à {len(others)} autre(s) graphique(s)", 4000)
+            tr("Style appliqué à {count} autre(s) graphique(s)").format(
+                count=len(others)), 4000)
+
+    def choose_language(self, language: str) -> bool:
+        """Remember the language and offer to restart in it.
+
+        Every caption is set when its widget is built, so the language takes
+        effect on the next start; restarting now goes through the usual
+        closing, which asks before losing anything.
+        """
+        if language not in i18n.LANGUAGES:
+            return False
+        self.memory.remember_language(language)
+        if language == i18n.language():
+            return False
+        # said in the language just chosen: the user may not read the other
+        box = QMessageBox(self)
+        box.setWindowTitle(APP_NAME)
+        box.setIcon(QMessageBox.Icon.Information)
+        if language == "fr":
+            box.setText("Plotea s'affichera en français au prochain "
+                        "démarrage.")
+            restart = box.addButton("Redémarrer maintenant",
+                                    QMessageBox.ButtonRole.AcceptRole)
+            box.addButton("Plus tard", QMessageBox.ButtonRole.RejectRole)
+        else:
+            box.setText("Plotea will be in English from the next start.")
+            restart = box.addButton("Restart now",
+                                    QMessageBox.ButtonRole.AcceptRole)
+            box.addButton("Later", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        if box.clickedButton() is restart:
+            return self.restart()
+        return False
+
+    def restart(self) -> bool:
+        """Close (asking about unsaved work), then start again."""
+        if not self.close():
+            return False                 # the user kept the window open
+        import sys
+
+        from PyQt6.QtCore import QProcess
+
+        if getattr(sys, "frozen", False):        # packaged: Plotea.exe
+            QProcess.startDetached(sys.executable, sys.argv[1:])
+        else:
+            QProcess.startDetached(sys.executable, sys.argv)
+        QApplication.instance().quit()
+        return True
 
     def apply_theme(self, dark: bool):
         colors = palette_colors(dark)
@@ -1084,8 +1157,8 @@ class MainWindow(QMainWindow):
 
     def show_shortcuts(self):
         QMessageBox.information(
-            self, "Raccourcis clavier",
-            "Ctrl+O        Importer des données\n"
+            self, tr("Raccourcis clavier"),
+            tr("Ctrl+O        Importer des données\n"
             "Ctrl+Shift+O  Ouvrir un projet\n"
             "Ctrl+S        Enregistrer le projet\n"
             "Ctrl+E        Exporter la figure\n"
@@ -1094,7 +1167,7 @@ class MainWindow(QMainWindow):
             "F2            Renommer le graphique\n"
             "Ctrl+C / V    Copier / coller dans le tableau\n"
             "Ctrl+Shift+C  Copier la figure en PNG\n"
-            "Suppr         Effacer les cellules sélectionnées")
+            "Suppr         Effacer les cellules sélectionnées"))
 
     def closeEvent(self, event):
         # The same question as Ctrl+N and Ouvrir, asked by the same code:

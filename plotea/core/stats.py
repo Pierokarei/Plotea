@@ -16,6 +16,7 @@ try:
 except Exception:                                     # pragma: no cover
     HAVE_SCIPY = False
 
+from ..i18n import tr
 from .enums import CORRECTION, ERROR_TYPE, STATS_FORMAT, STATS_MODE, STATS_TEST
 
 TESTS = STATS_TEST.keys()
@@ -368,7 +369,7 @@ def two_way_anova(cells: dict, factor_a: str = "Facteur A",
     needs. Returns (table, message); the table is empty when it cannot be run.
     """
     if not HAVE_SCIPY:
-        return [], "SciPy est requis."
+        return [], tr("SciPy est requis.")
     levels_a, levels_b = [], []
     for key in cells:
         a, b = str(key[0]), str(key[1])
@@ -377,7 +378,7 @@ def two_way_anova(cells: dict, factor_a: str = "Facteur A",
         if b not in levels_b:
             levels_b.append(b)
     if len(levels_a) < 2 or len(levels_b) < 2:
-        return [], "Deux niveaux au minimum sont nécessaires par facteur."
+        return [], tr("Deux niveaux au minimum sont nécessaires par facteur.")
 
     y, obs_a, obs_b = [], [], []
     for key, values in cells.items():
@@ -388,7 +389,7 @@ def two_way_anova(cells: dict, factor_a: str = "Facteur A",
             obs_a.append(str(key[0]))
             obs_b.append(str(key[1]))
     if len(cells) < len(levels_a) * len(levels_b):
-        return [], "Certaines combinaisons n'ont aucune donnée."
+        return [], tr("Certaines combinaisons n'ont aucune donnée.")
     y = np.asarray(y, dtype=float)
 
     ca = _effect_coding(levels_a, obs_a)
@@ -404,7 +405,7 @@ def two_way_anova(cells: dict, factor_a: str = "Facteur A",
     full = np.column_stack([ones, ca, cb, cab])
     df_error = y.size - np.linalg.matrix_rank(full)
     if df_error < 1:
-        return [], "Pas assez d'observations pour estimer le modèle."
+        return [], tr("Pas assez d'observations pour estimer le modèle.")
 
     def rss(matrix: np.ndarray) -> float:
         beta, *_ = np.linalg.lstsq(matrix, y, rcond=None)
@@ -488,14 +489,14 @@ def repeated_measures_anova(paired: dict) -> tuple[list[dict], str]:
     (table, message); the table is empty when the design cannot support it.
     """
     if not HAVE_SCIPY:
-        return [], "SciPy est requis."
+        return [], tr("SciPy est requis.")
     conditions, subjects, grid = complete_cases(paired)
     if len(conditions) < 2:
-        return [], "Deux conditions au minimum sont nécessaires."
+        return [], tr("Deux conditions au minimum sont nécessaires.")
     n, k = grid.shape
     if n < 2:
-        return [], ("Aucun sujet mesuré dans toutes les conditions : "
-                    "une ANOVA à mesures répétées est impossible.")
+        return [], (tr("Aucun sujet mesuré dans toutes les conditions : "
+                    "une ANOVA à mesures répétées est impossible."))
 
     grand = float(grid.mean())
     ss_cond = n * float(np.sum((grid.mean(axis=0) - grand) ** 2))
@@ -505,7 +506,7 @@ def repeated_measures_anova(paired: dict) -> tuple[list[dict], str]:
     df_cond, df_subj = k - 1, n - 1
     df_error = df_cond * df_subj
     if df_error < 1 or ss_error <= 0:
-        return [], "Pas assez de sujets pour estimer l'erreur."
+        return [], tr("Pas assez de sujets pour estimer l'erreur.")
 
     ms_cond, ms_error = ss_cond / df_cond, ss_error / df_error
     f = ms_cond / ms_error
@@ -522,9 +523,10 @@ def repeated_measures_anova(paired: dict) -> tuple[list[dict], str]:
         {"Source": "Résidus", "SS": ss_error, "ddl": df_error, "MS": ms_error,
          "F": float("nan"), "p": float("nan"), "eta2 partiel": float("nan")},
     ]
-    message = (f"{n} sujets complets sur {k} conditions - "
-               f"Greenhouse-Geisser epsilon = {epsilon:.3f}, "
-               f"p corrigé = {p_to_text(p_gg)}")
+    message = tr("{subjects} sujets complets sur {conditions} conditions - "
+                 "Greenhouse-Geisser epsilon = {epsilon:.3f}, "
+                 "p corrigé = {p}").format(subjects=n, conditions=k,
+                                           epsilon=epsilon, p=p_to_text(p_gg))
     return rows, message
 
 

@@ -23,6 +23,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # Preferences, generated glyphs and the backup copy go to a folder of our
 # own: a test run must not touch what the installed application uses, and
 # must not leave a copy behind that would claim a crash on the next start.
+# The suite checks French texts; the CI runners speak English, and the
+# language would otherwise follow theirs.
+os.environ["PLOTEA_LANG"] = "fr"
 os.environ["PLOTEA_CONFIG_DIR"] = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "_out", "config")
 

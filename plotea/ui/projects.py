@@ -16,6 +16,7 @@ from ..core import project as project_mod
 from ..core.dataset import empty_dataset
 from ..core.plotspec import PlotSpec
 from ..core.project import Project
+from ..i18n import tr
 
 FILTER = "Projet Plotea (*.plotea)"
 
@@ -39,15 +40,16 @@ class ProjectFiles(QObject):
         if with_example:
             window.project.add_dataset(demo.viability())
             window.project.add_plot(PlotSpec(
-                name="Graphique 1", plot_type="bar",
+                name=tr("Graphique {number}").format(number=1),
+                plot_type="bar",
                 dataset=window.project.datasets[0].name,
-                group="Traitement", y=["Viabilité"],
-                ylabel="Viabilité (%)", stats_enabled=True,
-                title="Effet des traitements"))
+                group=tr("Traitement"), y=[tr("Viabilité")],
+                ylabel=tr("Viabilité (%)"), stats_enabled=True,
+                title=tr("Effet des traitements")))
         else:
             window.project.add_dataset(empty_dataset())
             window.project.add_plot(PlotSpec(
-                name="Graphique 1",
+                name=tr("Graphique {number}").format(number=1),
                 dataset=window.project.datasets[0].name))
         window._reload_all(select_plot=0)
         self.update_title()
@@ -79,10 +81,10 @@ class ProjectFiles(QObject):
                     "Copie de secours impossible",
                     f"{type(exc).__name__}: {exc}")
                 window.statusBar().showMessage(
-                    "Copie de secours impossible - voir Aide > Journal", 6000)
+                    tr("Copie de secours impossible - voir Aide > Journal"), 6000)
             return False
         self._autosave_warned = False
-        window.statusBar().showMessage("Copie de secours enregistrée", 2500)
+        window.statusBar().showMessage(tr("Copie de secours enregistrée"), 2500)
         return True
 
     def ask_to_keep_changes(self, discard: str = "Continuer sans enregistrer",
@@ -100,11 +102,11 @@ class ProjectFiles(QObject):
         box = QMessageBox(window)
         box.setWindowTitle(self.app_name)
         box.setIcon(QMessageBox.Icon.Question)
-        box.setText("Le projet a été modifié.")
-        box.setInformativeText(question)
-        save = box.addButton("Enregistrer", QMessageBox.ButtonRole.AcceptRole)
-        box.addButton(discard, QMessageBox.ButtonRole.DestructiveRole)
-        cancel = box.addButton("Annuler", QMessageBox.ButtonRole.RejectRole)
+        box.setText(tr("Le projet a été modifié."))
+        box.setInformativeText(tr(question))
+        save = box.addButton(tr("Enregistrer"), QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(tr(discard), QMessageBox.ButtonRole.DestructiveRole)
+        cancel = box.addButton(tr("Annuler"), QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(save)
         box.exec()
         clicked = box.clickedButton()
@@ -136,7 +138,7 @@ class ProjectFiles(QObject):
         window._reload_all(0)
         self.update_title()
         window.statusBar().showMessage(
-            "Travail récupéré - enregistrez-le pour le conserver", 8000)
+            tr("Travail récupéré - enregistrez-le pour le conserver"), 8000)
         return True
 
     # ------------------------------------------------------------------
@@ -146,7 +148,7 @@ class ProjectFiles(QObject):
         if not self.ask_to_keep_changes():
             return
         path, _ = QFileDialog.getOpenFileName(
-            self.window, "Ouvrir un projet", self.window.last_dir(), FILTER)
+            self.window, tr("Ouvrir un projet"), self.window.last_dir(), FILTER)
         if path:
             self.load(path)
 
@@ -157,7 +159,7 @@ class ProjectFiles(QObject):
             window.project = Project.load(path)
         except Exception as exc:
             QMessageBox.critical(window, self.app_name,
-                                 f"Ouverture impossible :\n{exc}")
+                                 tr("Ouverture impossible :\n{error}").format(error=exc))
             window.memory.forget_project(path)
             return False
         if not window.project.plots:
@@ -170,10 +172,11 @@ class ProjectFiles(QObject):
             for warning in window.project.load_warnings:
                 diagnostics.LOG.record("Projet incomplet", warning, path)
             window.statusBar().showMessage(
-                f"Projet ouvert, mais incomplet : "
-                f"{'; '.join(window.project.load_warnings)}", 12000)
+                tr("Projet ouvert, mais incomplet : {details}").format(
+                    details="; ".join(tr(w) for w in
+                                      window.project.load_warnings)), 12000)
         else:
-            window.statusBar().showMessage(f"Projet ouvert : {path}", 4000)
+            window.statusBar().showMessage(tr("Projet ouvert : {path}").format(path=path), 4000)
         return True
 
     def save(self) -> bool:
@@ -185,19 +188,19 @@ class ProjectFiles(QObject):
         except Exception as exc:
             QMessageBox.critical(
                 window, self.app_name,
-                f"Échec de l'enregistrement :\n{exc}\n\n"
-                "Le fichier précédent est intact.")
+                tr("Échec de l'enregistrement :\n{error}\n\n"
+                   "Le fichier précédent est intact.").format(error=exc))
             return False
         self.update_title()
         window.memory.remember_project(window.project.path)
         project_mod.clear_recovery()      # the real file is now up to date
-        window.statusBar().showMessage("Projet enregistré", 3000)
+        window.statusBar().showMessage(tr("Projet enregistré"), 3000)
         return True
 
     def save_as(self):
         window = self.window
         path, _ = QFileDialog.getSaveFileName(
-            window, "Enregistrer le projet",
+            window, tr("Enregistrer le projet"),
             os.path.join(window.last_dir(),
                          window.project.name + project_mod.EXTENSION),
             FILTER)
@@ -219,6 +222,7 @@ class ProjectFiles(QObject):
     def update_title(self):
         window = self.window
         mark = "*" if window.project.dirty else ""
-        name = window.project.path or window.project.name
+        # the default name is Plotea's; a name the user typed is theirs
+        name = window.project.path or tr(window.project.name)
         window.setWindowTitle(
             f"{self.app_name} - {os.path.basename(name)}{mark}")

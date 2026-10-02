@@ -28,6 +28,7 @@ from ..core import export, plotting
 from ..core import panel as panel_mod
 from ..core.plotspec import PlotSpec
 from ..core.themes import get_theme
+from ..i18n import tr
 
 ZOOM_STEPS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]
 BASE_DPI = 96.0
@@ -81,7 +82,7 @@ class PlotCanvas(QWidget):
         self.size_label.setSizePolicy(QSizePolicy.Policy.Ignored,
                                       QSizePolicy.Policy.Preferred)
         self.zoom_box = QComboBox()
-        self.zoom_box.addItem("Ajuster")
+        self.zoom_box.addItem(tr("Ajuster"))
         for z in ZOOM_STEPS:
             self.zoom_box.addItem(f"{int(z * 100)} %")
         self.zoom_box.setCurrentIndex(0)
@@ -90,11 +91,11 @@ class PlotCanvas(QWidget):
 
         minus = QToolButton()
         minus.setText("-")
-        minus.setToolTip("Dezoomer")
+        minus.setToolTip(tr("Dezoomer"))
         minus.clicked.connect(lambda: self._step_zoom(-1))
         plus = QToolButton()
         plus.setText("+")
-        plus.setToolTip("Zoomer")
+        plus.setToolTip(tr("Zoomer"))
         plus.clicked.connect(lambda: self._step_zoom(1))
 
         self.action_bar = QWidget()
@@ -144,8 +145,9 @@ class PlotCanvas(QWidget):
         self.last_info = info
         self.canvas.draw()
         self.size_label.setText(
-            f"{w_mm:.0f} x {h_mm:.0f} mm   |   thème {spec.theme}"
-            f"   |   zoom {self._zoom * 100:.0f} %")
+            tr("{w:.0f} x {h:.0f} mm   |   thème {theme}   |   zoom {zoom:.0f} %"
+               ).format(w=w_mm, h=h_mm, theme=spec.theme,
+                        zoom=self._zoom * 100))
         self.rendered.emit(info)
         return info
 
@@ -164,8 +166,9 @@ class PlotCanvas(QWidget):
         self.last_info = info
         self.canvas.draw()
         self.size_label.setText(
-            f"{w_mm:.0f} x {h_mm:.0f} mm   |   {info.drawn} panneau(x)"
-            f"   |   zoom {self._zoom * 100:.0f} %")
+            tr("{w:.0f} x {h:.0f} mm   |   {count} panneau(x)   |   zoom {zoom:.0f} %"
+               ).format(w=w_mm, h=h_mm, count=info.drawn,
+                        zoom=self._zoom * 100))
         self.rendered.emit(info)
         return info
 

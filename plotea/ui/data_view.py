@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.dataset import Dataset
+from ..i18n import tr
 from .widgets import follow_sections, tag_icon
 
 
@@ -222,22 +223,23 @@ class DataPanel(QWidget):
             Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._cell_menu)
 
-        self.info = QLabel("Aucune donnée")
+        self.info = QLabel(tr("Aucune donnée"))
         self.info.setProperty("hint", True)
 
         bar = QHBoxLayout()
         bar.setSpacing(4)
         for name, icon, tip, slot in (
-                ("Importer", "import", "Importer CSV / Excel (Ctrl+O)",
+                (tr("Importer"), "import",
+                 tr("Importer CSV / Excel (Ctrl+O)"),
                  self.importRequested.emit),
-                ("Nouvelle", "table", "Nouvelle table vierge",
+                (tr("Nouvelle"), "table", tr("Nouvelle table vierge"),
                  self.addTableRequested.emit),
-                ("+ Ligne", "plus", "Ajouter 10 lignes",
+                (tr("+ Ligne"), "plus", tr("Ajouter 10 lignes"),
                  lambda: self.model.add_rows(10)),
-                ("+ Colonne", "plus", "Ajouter une colonne",
+                (tr("+ Colonne"), "plus", tr("Ajouter une colonne"),
                  lambda: self.model.add_column()),
-                ("Transformer", "fit",
-                 "Normaliser, % du contrôle, log, score z...",
+                (tr("Transformer"), "fit",
+                 tr("Normaliser, % du contrôle, log, score z..."),
                  self.transformRequested.emit)):
             btn = QToolButton()
             btn.setText(name)
@@ -296,7 +298,7 @@ class DataPanel(QWidget):
             self.list.setCurrentRow(min(select, len(datasets) - 1))
         else:
             self.model.set_dataframe(pd.DataFrame())
-            self.info.setText("Aucune donnée")
+            self.info.setText(tr("Aucune donnée"))
 
     def current_dataset(self) -> Dataset | None:
         i = self.list.currentRow()
@@ -310,9 +312,10 @@ class DataPanel(QWidget):
             return
         self.model.set_dataframe(ds.df)
         num = len(ds.numeric_columns())
-        self.info.setText(f"{len(ds.df)} lignes - {len(ds.df.columns)} colonnes"
-                          f" ({num} numériques)"
-                          + (f" - {ds.source}" if ds.source else ""))
+        self.info.setText(
+            tr("{rows} lignes - {cols} colonnes ({numeric} numériques)"
+               ).format(rows=len(ds.df), cols=len(ds.df.columns), numeric=num)
+            + (f" - {ds.source}" if ds.source else ""))
         self.datasetChanged.emit()
 
     def refresh_current_label(self):
@@ -385,16 +388,16 @@ class DataPanel(QWidget):
         if col < 0:
             return
         menu = QMenu(self)
-        rename = menu.addAction("Renommer la colonne...")
-        to_num = menu.addAction("Convertir en numérique")
+        rename = menu.addAction(tr("Renommer la colonne..."))
+        to_num = menu.addAction(tr("Convertir en numérique"))
         menu.addSeparator()
-        insert = menu.addAction("Insérer une colonne")
-        delete = menu.addAction("Supprimer la colonne")
+        insert = menu.addAction(tr("Insérer une colonne"))
+        delete = menu.addAction(tr("Supprimer la colonne"))
         act = menu.exec(header.mapToGlobal(pos))
         df = self.model.dataframe()
         if act is rename:
-            new, ok = QInputDialog.getText(self, "Renommer",
-                                           "Nouveau nom :",
+            new, ok = QInputDialog.getText(self, tr("Renommer"),
+                                           tr("Nouveau nom :"),
                                            text=str(df.columns[col]))
             if ok and new.strip():
                 self.model.setHeaderData(col, Qt.Orientation.Horizontal,
@@ -413,11 +416,11 @@ class DataPanel(QWidget):
 
     def _cell_menu(self, pos):
         menu = QMenu(self)
-        a_copy = menu.addAction("Copier")
-        a_paste = menu.addAction("Coller")
-        a_clear = menu.addAction("Effacer")
+        a_copy = menu.addAction(tr("Copier"))
+        a_paste = menu.addAction(tr("Coller"))
+        a_clear = menu.addAction(tr("Effacer"))
         menu.addSeparator()
-        a_delrow = menu.addAction("Supprimer les lignes sélectionnées")
+        a_delrow = menu.addAction(tr("Supprimer les lignes sélectionnées"))
         act = menu.exec(self.table.viewport().mapToGlobal(pos))
         if act is a_copy:
             self.copy_selection()
@@ -434,18 +437,18 @@ class DataPanel(QWidget):
         if self.list.currentRow() < 0:
             return
         menu = QMenu(self)
-        a_rename = menu.addAction("Renommer la table...")
-        a_dup = menu.addAction("Dupliquer")
-        a_transpose = menu.addAction("Transposer")
+        a_rename = menu.addAction(tr("Renommer la table..."))
+        a_dup = menu.addAction(tr("Dupliquer"))
+        a_transpose = menu.addAction(tr("Transposer"))
         menu.addSeparator()
-        a_del = menu.addAction("Supprimer")
+        a_del = menu.addAction(tr("Supprimer"))
         act = menu.exec(self.list.mapToGlobal(pos))
         ds = self.current_dataset()
         if ds is None:
             return
         if act is a_rename:
-            new, ok = QInputDialog.getText(self, "Renommer la table",
-                                           "Nom :", text=ds.name)
+            new, ok = QInputDialog.getText(self, tr("Renommer la table"),
+                                           tr("Nom :"), text=ds.name)
             if ok and new.strip():
                 ds.name = new.strip()
                 self.refresh_current_label()
@@ -465,8 +468,8 @@ class DataPanel(QWidget):
             self.dataEdited.emit()
         elif act is a_del:
             if len(self.datasets) == 1:
-                QMessageBox.information(self, "Plotea",
-                                        "Au moins une table est nécessaire.")
+                QMessageBox.information(self, tr("Plotea"),
+                                        tr("Au moins une table est nécessaire."))
                 return
             self.datasets.remove(ds)
             self.set_datasets(self.datasets, 0)

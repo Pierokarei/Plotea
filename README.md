@@ -16,6 +16,26 @@ jour.
 
 ![Figure composite](docs/screenshot_panel.png)
 
+### Langue / Language
+
+L'interface existe en **français** et en **anglais**. Au premier lancement,
+Plotea suit la langue du système (français sur un système français, anglais
+sinon) ; le choix se change ensuite dans **Affichage → Langue / Language**.
+
+> **In English.** Plotea is a free, open-source alternative to GraphPad Prism
+> for publication-quality scientific figures: bar, box, violin, line, scatter,
+> histogram and Kaplan-Meier survival plots, journal themes (Nature, Science,
+> Cell, PNAS), built-in statistics (t-tests, ANOVA with Tukey or Dunnett,
+> repeated-measures ANOVA, Kruskal-Wallis, log-rank, Grubbs outliers),
+> nonlinear fits and SVG / PDF / PNG 600 dpi export. The interface is
+> available in English: it follows your system language on first launch, and
+> can be switched at any time under **View → Langue / Language**.
+
+Les traductions sont de simples fichiers JSON dans `plotea/locales`, indexés
+par le texte français : ajouter une langue ne demande aucune ligne de Python.
+`python tools/i18n_keys.py` liste ce qui manque, et la suite de tests refuse
+tout texte d'interface sans traduction.
+
 ---
 
 ## Ce que fait Plotea

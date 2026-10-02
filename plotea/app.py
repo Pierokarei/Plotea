@@ -11,28 +11,65 @@ from PyQt6.QtWidgets import QApplication
 
 from .core import diagnostics
 from .core.project import config_dir
+from .i18n import tr
 from .resources import app_icon
 from .ui.main_window import APP_NAME, VERSION, MainWindow
 from .ui.style import build_qss
 
+#: Qt's own number format and dialog buttons, per interface language.
+QT_LOCALES = {
+    "fr": (QLocale.Language.French, QLocale.Country.France),
+    "en": (QLocale.Language.English, QLocale.Country.UnitedStates),
+}
+
+
+def install_language(app: QApplication, language: str) -> list:
+    """Make Qt's own texts and number formats follow the interface.
+
+    Without this the standard buttons of a QMessageBox come out as "Save",
+    "Discard" and "Cancel" in a French interface, and spin boxes use a
+    decimal comma in an English one. Qt speaks English by itself, so only
+    French needs a translator. The translators are returned because Qt
+    drops one that nothing keeps a reference to.
+    """
+    for old in getattr(app, "_translators", []):
+        app.removeTranslator(old)
+    lang, country = QT_LOCALES.get(language, QT_LOCALES["fr"])
+    QLocale.setDefault(QLocale(lang, country))
+    kept = []
+    if language == "fr":
+        folder = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+        for name in ("qtbase_fr", "qt_fr"):
+            translator = QTranslator(app)
+            if translator.load(name, folder):
+                app.installTranslator(translator)
+                kept.append(translator)
+    app._translators = kept
+    return kept
+
 
 def install_french(app: QApplication) -> list:
-    """Translate Qt's own dialogs, so no English button sits in a French app.
+    """Kept for the callers that only ever wanted French."""
+    return install_language(app, "fr")
 
-    Without this, the standard buttons of a QMessageBox come out as "Save",
-    "Discard" and "Cancel". The translators are returned because Qt drops a
-    translator that nothing keeps a reference to.
+
+def choose_language(memory) -> str:
+    """The interface language, in order of authority.
+
+    PLOTEA_LANG (tests, scripts), then the choice made in the menu, then the
+    system's own language: a French system starts in French, anything else
+    in English, so nobody meets a first screen they cannot read.
     """
-    QLocale.setDefault(QLocale(QLocale.Language.French,
-                               QLocale.Country.France))
-    folder = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
-    kept = []
-    for name in ("qtbase_fr", "qt_fr"):
-        translator = QTranslator(app)
-        if translator.load(name, folder):
-            app.installTranslator(translator)
-            kept.append(translator)
-    return kept
+    from . import i18n
+
+    forced = os.environ.get("PLOTEA_LANG", "")
+    if forced in i18n.LANGUAGES:
+        return forced
+    chosen = memory.language()
+    if chosen in i18n.LANGUAGES:
+        return chosen
+    system = QLocale.system().language()
+    return "fr" if system == QLocale.Language.French else "en"
 
 
 def steady_tooltips(app: QApplication):
@@ -65,6 +102,13 @@ def selftest_report(app: QApplication, window) -> list[str]:
                  + ("actif" if isinstance(guard, _SectionTips) else "PERDU"))
     icons = getattr(window, "dock_icons", {})
     lines.append(f"glyphes de panneau : {len(icons)} fichiers")
+    # a packaged build that lost its catalogues would fall back to French
+    # without a word; say which language is in effect and how complete
+    from . import i18n
+    loaded = [f"{code}: {len(i18n.load_catalogue(code))}"
+              for code in i18n.LANGUAGES if code != i18n.SOURCE]
+    lines.append(f"langue : {i18n.language()} - traductions "
+                 + ", ".join(loaded))
     return lines
 
 
@@ -88,13 +132,13 @@ def offer_recovery(window) -> bool:
     box = QMessageBox(window)
     box.setWindowTitle(APP_NAME)
     box.setIcon(QMessageBox.Icon.Question)
-    box.setText("La session précédente ne s'est pas terminée normalement.")
+    box.setText(tr("La session précédente ne s'est pas terminée normalement."))
     box.setInformativeText(
-        f"Une copie de secours de « {info.get('name', 'Projet')} » a été "
-        f"enregistrée le {when}.\n{origin}\n\n"
-        "Voulez-vous la récupérer ?")
-    recover = box.addButton("Récupérer", QMessageBox.ButtonRole.AcceptRole)
-    box.addButton("Supprimer la copie",
+        tr("Une copie de secours de « {name} » a été enregistrée le {when}."
+           "\n{origin}\n\nVoulez-vous la récupérer ?").format(
+            name=info.get("name", tr("Projet")), when=when, origin=origin))
+    recover = box.addButton(tr("Récupérer"), QMessageBox.ButtonRole.AcceptRole)
+    box.addButton(tr("Supprimer la copie"),
                   QMessageBox.ButtonRole.DestructiveRole)
     box.setDefaultButton(recover)
     box.exec()
@@ -117,10 +161,10 @@ def _excepthook(exc_type, exc, tb):
         window = QApplication.activeWindow()
         QMessageBox.warning(
             window, APP_NAME,
-            "Une opération a échoué :\n\n"
-            f"{exc_type.__name__}: {exc}\n\n"
-            "L'application continue de fonctionner. Le détail est dans "
-            "Aide > Journal des erreurs.")
+            tr("Une opération a échoué :\n\n{error}\n\n"
+               "L'application continue de fonctionner. Le détail est dans "
+               "Aide > Journal des erreurs.").format(
+                error=f"{exc_type.__name__}: {exc}"))
     except Exception:
         pass
 
@@ -146,7 +190,15 @@ def build(argv: list[str]) -> tuple:
     app.setOrganizationName("Plotea")
     app.setStyle("Fusion")
     steady_tooltips(app)
-    app._translators = install_french(app)
+
+    # before the first widget: every caption is read at construction
+    from PyQt6.QtCore import QSettings
+
+    from . import i18n
+    from .ui.session import SessionMemory
+    language = i18n.set_language(
+        choose_language(SessionMemory(QSettings("Plotea", "Plotea"))))
+    install_language(app, language)
     app.setDesktopFileName("plotea")       # Wayland / GNOME task switcher
     app.setWindowIcon(app_icon())
 
@@ -177,8 +229,8 @@ def open_arguments(window, argv: list[str]) -> bool:
             diagnostics.LOG.record("Ouverture au démarrage impossible",
                                    f"{type(exc).__name__}: {exc}", arg)
             window.statusBar().showMessage(
-                f"Ouverture impossible : {os.path.basename(arg)} - "
-                "détail dans Aide > Journal des erreurs", 10000)
+                tr("Ouverture impossible : {name} - détail dans Aide > Journal "
+                   "des erreurs").format(name=os.path.basename(arg)), 10000)
             return False
         window._reload_all(0)
         window._update_title()

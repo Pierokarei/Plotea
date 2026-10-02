@@ -14,6 +14,7 @@ from ..core.dataset import Dataset
 from ..core.history import History, Snapshot
 from ..core.panel import Panel
 from ..core.plotspec import PlotSpec
+from ..i18n import tr
 
 #: A run of edits closer together than this is recorded as one step, so
 #: dragging a slider does not leave fifty entries to undo one by one.
@@ -103,7 +104,8 @@ class EditHistory(QObject):
             return
         label = self.history.redo_label()
         self.restore(snapshot)
-        self.window.statusBar().showMessage(f"Annulé : {label}", 3000)
+        self.window.statusBar().showMessage(
+            tr("Annulé : {action}").format(action=tr(label)), 3000)
 
     def redo(self):
         snapshot = self.history.redo()
@@ -111,7 +113,8 @@ class EditHistory(QObject):
             return
         self.restore(snapshot)
         self.window.statusBar().showMessage(
-            f"Rétabli : {self.history.undo_label()}", 3000)
+            tr("Rétabli : {action}").format(
+                action=tr(self.history.undo_label())), 3000)
 
     def clear(self):
         self.history.clear()
@@ -123,9 +126,13 @@ class EditHistory(QObject):
         window = self.window
         window.a_undo.setEnabled(self.history.can_undo())
         window.a_redo.setEnabled(self.history.can_redo())
+        # the step names are stored in French and translated on display, so
+        # the history itself does not depend on the interface language
         window.a_undo.setText(
-            f"Annuler {self.history.undo_label()}".strip()
-            if self.history.can_undo() else "Annuler")
+            tr("Annuler {action}").format(
+                action=tr(self.history.undo_label())).strip()
+            if self.history.can_undo() else tr("Annuler"))
         window.a_redo.setText(
-            f"Rétablir {self.history.redo_label()}".strip()
-            if self.history.can_redo() else "Rétablir")
+            tr("Rétablir {action}").format(
+                action=tr(self.history.redo_label())).strip()
+            if self.history.can_redo() else tr("Rétablir"))

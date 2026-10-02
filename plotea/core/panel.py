@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass, field
 
 import matplotlib as mpl
 
+from ..i18n import tr
 from . import plotting
 from .enums import PANEL_FIELDS, PANEL_LETTERS, SPAN
 from .themes import MM, get_theme
@@ -100,11 +101,12 @@ def render_panel(fig, panel: Panel, specs: dict, frames: dict) -> PanelInfo:
             info.missing.append(name)
     if info.missing:
         info.warnings.append(
-            "Graphique(s) introuvable(s) : " + ", ".join(info.missing))
+            tr("Graphique(s) introuvable(s) : {names}").format(
+                names=", ".join(info.missing)))
 
     if not chosen:
         ax = fig.add_subplot(111)
-        ax.text(0.5, 0.5, "Ajoutez des graphiques a cette figure",
+        ax.text(0.5, 0.5, tr("Ajoutez des graphiques a cette figure"),
                 ha="center", va="center", transform=ax.transAxes,
                 color="#999999")
         ax.set_axis_off()
@@ -123,8 +125,9 @@ def render_panel(fig, panel: Panel, specs: dict, frames: dict) -> PanelInfo:
         row, col = divmod(index, cols)
         if row >= rows:
             info.warnings.append(
-                f"La grille {rows}x{cols} ne peut pas contenir "
-                f"{len(chosen)} graphiques.")
+                tr("La grille {rows}x{cols} ne peut pas contenir "
+                   "{count} graphiques.").format(rows=rows, cols=cols,
+                                                 count=len(chosen)))
             break
         theme = get_theme(spec.theme)
         with mpl.rc_context(theme.rc()):

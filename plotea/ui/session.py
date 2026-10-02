@@ -35,6 +35,14 @@ class SessionMemory:
         self.settings.remove("geometry")
         self.settings.remove("windowState")
 
+    # -- language -------------------------------------------------------
+    def language(self) -> str:
+        """The language chosen in the menu, or "" when never chosen."""
+        return self.settings.value("language", "", type=str) or ""
+
+    def remember_language(self, language: str):
+        self.settings.setValue("language", language)
+
     # -- appearance -----------------------------------------------------
     def dark(self) -> bool:
         return self.settings.value("dark", False, type=bool)

@@ -12,6 +12,8 @@ import traceback
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from ..i18n import tr
+
 MAX_ENTRIES = 200
 LOG_NAME = "plotea-erreurs.log"
 
@@ -24,7 +26,8 @@ class Entry:
     detail: str = ""
 
     def short(self) -> str:
-        return f"[{self.when}] {self.context} : {self.summary}"
+        # the context is one of Plotea's own phrases, stored in French
+        return f"[{self.when}] {tr(self.context)} : {self.summary}"
 
     def full(self) -> str:
         head = self.short()
@@ -54,7 +57,7 @@ class Log:
 
     def text(self) -> str:
         if not self.entries:
-            return "Aucune erreur enregistrée."
+            return tr("Aucune erreur enregistrée.")
         return "\n\n".join(entry.full() for entry in reversed(self.entries))
 
     def __len__(self) -> int:

@@ -15,6 +15,7 @@ from datetime import datetime
 
 import pandas as pd
 
+from ..i18n import tr
 from .dataset import Dataset
 from .panel import Panel
 from .plotspec import PlotSpec
@@ -220,8 +221,9 @@ class Project:
                            for p in meta.get("panels", [])],
                    path=path, created=meta.get("created", ""))
         proj.dirty = False
-        proj.load_warnings = [f"Table absente du fichier : {name}"
-                              for name in missing]
+        proj.load_warnings = [
+            tr("Table absente du fichier : {name}").format(name=name)
+            for name in missing]
         return proj
 
 

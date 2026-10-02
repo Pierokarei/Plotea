@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 from ..core import enums
 from ..core.panel import Panel
 from ..core.themes import THEMES
+from ..i18n import tr
 from .widgets import CollapsibleSection, hint, row
 
 
@@ -55,59 +56,59 @@ class PanelEditor(QWidget):
 
     # ------------------------------------------------------------------
     def _build_content(self):
-        sec = CollapsibleSection("Contenu de la figure", True)
+        sec = CollapsibleSection(tr("Contenu de la figure"), True)
         self.vbox.addWidget(sec)
 
         self.txt_name = QLineEdit()
         self.txt_name.textEdited.connect(self._on_rename)
-        sec.add_row("Nom", self.txt_name)
+        sec.add_row(tr("Nom"), self.txt_name)
 
         self.lst_plots = QListWidget()
         self.lst_plots.setMaximumHeight(150)
-        sec.add_widget(QLabel("Panneaux, dans l'ordre"))
+        sec.add_widget(QLabel(tr("Panneaux, dans l'ordre")))
         sec.add_widget(self.lst_plots)
 
         self.cmb_available = QComboBox()
-        add = QPushButton("Ajouter")
+        add = QPushButton(tr("Ajouter"))
         add.clicked.connect(self._add_plot)
         sec.add_widget(row(self.cmb_available, add, stretch_last=True))
 
-        up = QPushButton("Monter")
-        down = QPushButton("Descendre")
-        remove = QPushButton("Retirer")
+        up = QPushButton(tr("Monter"))
+        down = QPushButton(tr("Descendre"))
+        remove = QPushButton(tr("Retirer"))
         up.clicked.connect(lambda: self._move(-1))
         down.clicked.connect(lambda: self._move(1))
         remove.clicked.connect(self._remove_plot)
         sec.add_widget(row(up, down, remove))
-        sec.add_widget(hint("Les lettres A, B, C suivent cet ordre."))
+        sec.add_widget(hint(tr("Les lettres A, B, C suivent cet ordre.")))
 
     def _build_layout_section(self):
-        sec = CollapsibleSection("Disposition", True)
+        sec = CollapsibleSection(tr("Disposition"), True)
         self.vbox.addWidget(sec)
         self.spn_cols = QSpinBox()
         self.spn_cols.setRange(1, 8)
         self.spn_rows = QSpinBox()
         self.spn_rows.setRange(0, 8)
-        self.spn_rows.setSpecialValueText("auto")
-        sec.add_row("Colonnes", self.spn_cols)
-        sec.add_row("Lignes", self.spn_rows)
+        self.spn_rows.setSpecialValueText(tr("auto"))
+        sec.add_row(tr("Colonnes"), self.spn_cols)
+        sec.add_row(tr("Lignes"), self.spn_rows)
 
         self.cmb_span = QComboBox()
         self._fill(self.cmb_span, enums.SPAN)
-        sec.add_row("Largeur", self.cmb_span)
+        sec.add_row(tr("Largeur"), self.cmb_span)
         self.spn_w = self._spin(40, 500, 1)
         self.spn_h = self._spin(30, 500, 1)
-        sec.add_row("Taille (mm)", row(self.spn_w, QLabel("x"), self.spn_h))
+        sec.add_row(tr("Taille (mm)"), row(self.spn_w, QLabel(tr("x")), self.spn_h))
 
         self.cmb_theme = QComboBox()
         self.cmb_theme.addItems(list(THEMES))
-        sec.add_row("Largeur de référence", self.cmb_theme)
+        sec.add_row(tr("Largeur de référence"), self.cmb_theme)
 
         self.spn_wspace = self._spin(0.0, 1.5, 0.02)
         self.spn_hspace = self._spin(0.0, 1.5, 0.02)
-        sec.add_row("Écart H / V", row(self.spn_wspace, self.spn_hspace))
-        self.chk_sharex = QCheckBox("Meme axe X")
-        self.chk_sharey = QCheckBox("Meme axe Y")
+        sec.add_row(tr("Écart H / V"), row(self.spn_wspace, self.spn_hspace))
+        self.chk_sharex = QCheckBox(tr("Meme axe X"))
+        self.chk_sharey = QCheckBox(tr("Meme axe Y"))
         sec.add_widget(row(self.chk_sharex, self.chk_sharey))
 
         for widget in (self.spn_cols, self.spn_rows, self.spn_w, self.spn_h,
@@ -119,13 +120,13 @@ class PanelEditor(QWidget):
             widget.toggled.connect(self._push)
 
     def _build_style(self):
-        sec = CollapsibleSection("Lettres de panneau", True)
+        sec = CollapsibleSection(tr("Lettres de panneau"), True)
         self.vbox.addWidget(sec)
         self.cmb_letters = QComboBox()
         self._fill(self.cmb_letters, enums.PANEL_LETTERS)
-        sec.add_row("Style", self.cmb_letters)
+        sec.add_row(tr("Style"), self.cmb_letters)
         self.spn_letter = self._spin(5, 24, 0.5)
-        sec.add_row("Taille (pt)", self.spn_letter)
+        sec.add_row(tr("Taille (pt)"), self.spn_letter)
         self.cmb_letters.currentIndexChanged.connect(self._push)
         self.spn_letter.valueChanged.connect(self._push)
 
@@ -133,7 +134,7 @@ class PanelEditor(QWidget):
     def _fill(combo: QComboBox, enum) -> QComboBox:
         combo.clear()
         for choice in enum:
-            combo.addItem(choice.label, choice.key)
+            combo.addItem(tr(choice.label), choice.key)
         return combo
 
     @staticmethod

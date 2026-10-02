@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from ..i18n import tr
 from .enums import FIT_MODEL
 
 try:
@@ -184,9 +185,9 @@ class FitResult:
         for k in self.params:
             se = self.stderr.get(k, float("nan"))
             if np.isfinite(se):
-                lines.append(f"{k} = {self.params[k]:.4g} +/- {se:.3g}")
+                lines.append(f"{tr(k)} = {self.params[k]:.4g} +/- {se:.3g}")
             else:
-                lines.append(f"{k} = {self.params[k]:.4g}")
+                lines.append(f"{tr(k)} = {self.params[k]:.4g}")
         return lines
 
 
@@ -199,6 +200,12 @@ def _jacobian(func, x, popt, eps=1e-6):
         up[i] = p + step
         J[:, i] = (func(x, *up) - base) / step
     return J
+
+
+def model_label(name: str) -> str:
+    """The readable name of a model given by key or by label."""
+    model = MODELS.get(FIT_MODEL.normalise(name))
+    return model.label if model is not None else name
 
 
 def fit(x, y, model_name: str, n_points: int = 200,
@@ -218,11 +225,11 @@ def fit(x, y, model_name: str, n_points: int = 200,
         return FitResult(model_name, {}, {}, float("nan"), float("nan"),
                          float("nan"), int(x.size), "", np.array([]),
                          np.array([]), ok=False,
-                         message="Pas assez de points pour ce modèle.")
+                         message=tr("Pas assez de points pour ce modèle."))
     if not HAVE_SCIPY:
         return FitResult(model_name, {}, {}, float("nan"), float("nan"),
                          float("nan"), int(x.size), "", np.array([]),
-                         np.array([]), ok=False, message="scipy requis.")
+                         np.array([]), ok=False, message=tr("scipy requis."))
 
     try:
         p0 = model.guess(x, y)
@@ -232,7 +239,8 @@ def fit(x, y, model_name: str, n_points: int = 200,
         return FitResult(model_name, {}, {}, float("nan"), float("nan"),
                          float("nan"), int(x.size), "", np.array([]),
                          np.array([]), ok=False,
-                         message=f"Convergence impossible ({exc}).")
+                         message=tr("Convergence impossible ({error})."
+                                    ).format(error=exc))
 
     resid = y - model.func(x, *popt)
     ss_res = float(np.sum(resid ** 2))

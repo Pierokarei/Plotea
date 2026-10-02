@@ -32,6 +32,7 @@ from ..core import dataset as ds_mod
 from ..core import export as export_mod
 from ..core import transforms
 from ..core.themes import MM
+from ..i18n import tr
 from .widgets import CheckList
 
 SEPARATORS = {"Automatique": None, "Virgule ,": ",", "Point-virgule ;": ";",
@@ -45,44 +46,48 @@ class ImportDialog(QDialog):
     def __init__(self, path: str, parent=None):
         super().__init__(parent)
         self.path = path
-        self.setWindowTitle("Importer des données")
+        self.setWindowTitle(tr("Importer des données"))
         self.resize(760, 540)
         self.datasets: list = []
 
         self.is_excel = os.path.splitext(path)[1].lower() in ds_mod.EXCEL_EXT
 
         self.cmb_sheet = QComboBox()
+        # the label is shown translated, the French label stays the key:
+        # reading the separator back from the visible text broke the moment
+        # that text was in another language
         self.cmb_sep = QComboBox()
-        self.cmb_sep.addItems(list(SEPARATORS))
+        for label in SEPARATORS:
+            self.cmb_sep.addItem(tr(label), label)
         self.cmb_dec = QComboBox()
-        self.cmb_dec.addItems([". (point)", ", (virgule)"])
+        self.cmb_dec.addItems([tr(". (point)"), tr(", (virgule)")])
         self.cmb_enc = QComboBox()
         self.cmb_enc.addItems(ENCODINGS)
         self.spn_header = QSpinBox()
         self.spn_header.setRange(0, 50)
-        self.chk_all_sheets = QCheckBox("Importer toutes les feuilles")
+        self.chk_all_sheets = QCheckBox(tr("Importer toutes les feuilles"))
 
         if self.is_excel:
             try:
                 self.cmb_sheet.addItems(ds_mod.list_sheets(path))
             except Exception as exc:
-                QMessageBox.warning(self, "Plotea",
-                                    f"Lecture impossible : {exc}")
+                QMessageBox.warning(self, tr("Plotea"),
+                                    tr("Lecture impossible : {error}").format(error=exc))
         for w in (self.cmb_sep, self.cmb_dec, self.cmb_enc):
             w.setEnabled(not self.is_excel)
         self.cmb_sheet.setEnabled(self.is_excel)
         self.chk_all_sheets.setEnabled(self.is_excel)
 
         form = QFormLayout()
-        form.addRow("Fichier", QLabel(os.path.basename(path)))
+        form.addRow(tr("Fichier"), QLabel(os.path.basename(path)))
         if self.is_excel:
-            form.addRow("Feuille", self.cmb_sheet)
+            form.addRow(tr("Feuille"), self.cmb_sheet)
             form.addRow("", self.chk_all_sheets)
         else:
-            form.addRow("Séparateur", self.cmb_sep)
-            form.addRow("Décimale", self.cmb_dec)
-            form.addRow("Encodage", self.cmb_enc)
-        form.addRow("Ligne d'en-tête", self.spn_header)
+            form.addRow(tr("Séparateur"), self.cmb_sep)
+            form.addRow(tr("Décimale"), self.cmb_dec)
+            form.addRow(tr("Encodage"), self.cmb_enc)
+        form.addRow(tr("Ligne d'en-tête"), self.spn_header)
 
         self.preview = QTableWidget()
         self.preview.setAlternatingRowColors(True)
@@ -94,15 +99,15 @@ class ImportDialog(QDialog):
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Importer")
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText(tr("Importer"))
         buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(
-            "Annuler")
+            tr("Annuler"))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
         lay = QVBoxLayout(self)
         lay.addLayout(form)
-        lay.addWidget(QLabel("Aperçu"))
+        lay.addWidget(QLabel(tr("Aperçu")))
         lay.addWidget(self.preview, 1)
         lay.addWidget(self.info)
         lay.addWidget(buttons)
@@ -120,7 +125,7 @@ class ImportDialog(QDialog):
                      else self.cmb_sheet.currentText())
         return ds_mod.load_file(
             self.path, sheet=sheet,
-            separator=SEPARATORS[self.cmb_sep.currentText()],
+            separator=SEPARATORS.get(self.cmb_sep.currentData()),
             decimal="." if self.cmb_dec.currentIndex() == 0 else ",",
             header_row=self.spn_header.value(),
             encoding=self.cmb_enc.currentText())
@@ -130,12 +135,12 @@ class ImportDialog(QDialog):
             self.datasets = self._load()
         except Exception as exc:
             self.datasets = []
-            self.info.setText(f"Erreur : {exc}")
+            self.info.setText(tr("Erreur : {error}").format(error=exc))
             self.preview.setRowCount(0)
             self.preview.setColumnCount(0)
             return
         if not self.datasets:
-            self.info.setText("Aucune donnée trouvée.")
+            self.info.setText(tr("Aucune donnée trouvée."))
             return
         df = self.datasets[0].df
         head = df.head(60)
@@ -150,8 +155,10 @@ class ImportDialog(QDialog):
         numeric = len([c for c in df.columns
                        if pd.api.types.is_numeric_dtype(df[c])])
         self.info.setText(
-            f"{len(self.datasets)} table(s) - {len(df)} lignes x "
-            f"{len(df.columns)} colonnes ({numeric} numériques)")
+            tr("{tables} table(s) - {rows} lignes x {cols} colonnes "
+               "({numeric} numériques)").format(
+                tables=len(self.datasets), rows=len(df),
+                cols=len(df.columns), numeric=numeric))
 
 
 class ExportDialog(QDialog):
@@ -160,18 +167,20 @@ class ExportDialog(QDialog):
     def __init__(self, suggested_name: str, width_mm: float, height_mm: float,
                  parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Exporter la figure")
+        self.setWindowTitle(tr("Exporter la figure"))
         self.setMinimumWidth(460)
 
         self.cmb_format = QComboBox()
-        self.cmb_format.addItems(list(export_mod.FORMATS))
-        self.cmb_format.setCurrentText("PNG (raster)")
+        for label in export_mod.FORMATS:
+            self.cmb_format.addItem(tr(label), label)
+        self.cmb_format.setCurrentIndex(
+            self.cmb_format.findData("PNG (raster)"))
         self.cmb_dpi = QComboBox()
         self.cmb_dpi.setEditable(True)
         self.cmb_dpi.addItems([str(d) for d in export_mod.DPI_PRESETS])
         self.cmb_dpi.setCurrentText(str(export_mod.DEFAULT_DPI))
-        self.chk_transparent = QCheckBox("Fond transparent")
-        self.chk_tight = QCheckBox("Recadrer au contenu")
+        self.chk_transparent = QCheckBox(tr("Fond transparent"))
+        self.chk_tight = QCheckBox(tr("Recadrer au contenu"))
         self.chk_tight.setChecked(True)
 
         self.spn_w = QDoubleSpinBox()
@@ -182,10 +191,10 @@ class ExportDialog(QDialog):
         self.spn_h.setRange(20, 500)
         self.spn_h.setDecimals(1)
         self.spn_h.setValue(height_mm)
-        self.chk_override = QCheckBox("Redimensionner a l'export")
+        self.chk_override = QCheckBox(tr("Redimensionner a l'export"))
 
         self.txt_path = QLineEdit(suggested_name)
-        browse = QPushButton("Parcourir...")
+        browse = QPushButton(tr("Parcourir..."))
         browse.clicked.connect(self._browse)
         path_row = QWidget()
         pl = QHBoxLayout(path_row)
@@ -197,23 +206,23 @@ class ExportDialog(QDialog):
         self.lbl_result.setProperty("hint", True)
 
         form = QFormLayout()
-        form.addRow("Format", self.cmb_format)
-        form.addRow("Résolution (dpi)", self.cmb_dpi)
-        form.addRow("Taille (mm)", self._row(self.spn_w, self.spn_h))
+        form.addRow(tr("Format"), self.cmb_format)
+        form.addRow(tr("Résolution (dpi)"), self.cmb_dpi)
+        form.addRow(tr("Taille (mm)"), self._row(self.spn_w, self.spn_h))
         form.addRow("", self.chk_override)
         form.addRow("", self.chk_transparent)
         form.addRow("", self.chk_tight)
-        form.addRow("Fichier", path_row)
+        form.addRow(tr("Fichier"), path_row)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save
             | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Save).setText(
-            "Exporter")
+            tr("Exporter"))
         buttons.button(QDialogButtonBox.StandardButton.Save).setProperty(
             "accent", True)
         buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(
-            "Annuler")
+            tr("Annuler"))
         buttons.accepted.connect(self._validate)
         buttons.rejected.connect(self.reject)
 
@@ -245,8 +254,12 @@ class ExportDialog(QDialog):
         except ValueError:
             return export_mod.DEFAULT_DPI
 
+    def _format(self) -> str:
+        """The export format key, whatever language the list is shown in."""
+        return self.cmb_format.currentData() or "PNG (raster)"
+
     def _sync(self, *_):
-        fmt = self.cmb_format.currentText()
+        fmt = self._format()
         vector = export_mod.is_vector(fmt)
         self.cmb_dpi.setEnabled(not vector)
         self.spn_w.setEnabled(self.chk_override.isChecked())
@@ -257,21 +270,21 @@ class ExportDialog(QDialog):
             self.txt_path.setText(base + ext)
         if vector:
             self.lbl_result.setText(
-                "Vectoriel : texte éditable (Illustrator / Inkscape), "
-                "redimensionnable sans perte.")
+                tr("Vectoriel : texte éditable (Illustrator / Inkscape), "
+                "redimensionnable sans perte."))
         else:
             dpi = self._dpi()
             px_w = int(self.spn_w.value() * MM * dpi)
             px_h = int(self.spn_h.value() * MM * dpi)
             note = "" if dpi >= 300 else "  (300 dpi minimum recommandé)"
-            self.lbl_result.setText(f"Image finale : {px_w} x {px_h} px"
-                                    f" a {dpi} dpi{note}")
+            self.lbl_result.setText(tr("Image finale : {w} x {h} px a {dpi} dpi").format(
+                w=px_w, h=px_h, dpi=dpi) + note)
 
     def _browse(self):
-        fmt = self.cmb_format.currentText()
-        ext = export_mod.FORMATS[fmt][0]
+        fmt = self.cmb_format.currentText()       # shown in the file filter
+        ext = export_mod.FORMATS[self._format()][0]
         path, _ = QFileDialog.getSaveFileName(
-            self, "Exporter la figure", self.txt_path.text(),
+            self, tr("Exporter la figure"), self.txt_path.text(),
             f"{fmt} (*{ext})")
         if path:
             self.txt_path.setText(path)
@@ -279,14 +292,14 @@ class ExportDialog(QDialog):
 
     def _validate(self):
         if not self.txt_path.text().strip():
-            QMessageBox.warning(self, "Plotea", "Choisissez un fichier.")
+            QMessageBox.warning(self, tr("Plotea"), tr("Choisissez un fichier."))
             return
         self.accept()
 
     def options(self) -> export_mod.ExportOptions:
         return export_mod.ExportOptions(
             path=self.txt_path.text().strip(),
-            fmt=self.cmb_format.currentText(),
+            fmt=self._format(),
             dpi=self._dpi(),
             transparent=self.chk_transparent.isChecked(),
             tight=self.chk_tight.isChecked(),
@@ -301,25 +314,26 @@ class AboutDialog(QDialog):
     def __init__(self, version: str, parent=None):
         super().__init__(parent)
         from ..resources import logo_pixmap
-        self.setWindowTitle("A propos de Plotea")
+        self.setWindowTitle(tr("A propos de Plotea"))
         self.setFixedWidth(430)
         badge = QLabel()
         badge.setPixmap(logo_pixmap(64))
-        title = QLabel("Plotea")
+        title = QLabel(tr("Plotea"))
         title.setStyleSheet("font-size: 24px; font-weight: 700;")
         body = QLabel(
-            f"Version {version}\n\n"
-            "Figures de qualité publication, libres et gratuites.\n"
-            "Alternative ouverte a GraphPad Prism.\n\n"
-            "Thématiques Nature, Science, Cell, PNAS.\n"
-            "Export SVG / PDF / EPS vectoriels et PNG / TIFF jusqu'a "
-            "1200 dpi.\n"
-            "Tests statistiques intégrés et ajustements non linéaires.\n\n"
-            "Construit avec PyQt6, matplotlib, pandas, SciPy.\n"
-            "Licence MIT.")
+            tr("Version {version}\n\n"
+               "Figures de qualité publication, libres et gratuites.\n"
+               "Alternative ouverte a GraphPad Prism.\n\n"
+               "Thématiques Nature, Science, Cell, PNAS.\n"
+               "Export SVG / PDF / EPS vectoriels et PNG / TIFF jusqu'a "
+               "1200 dpi.\n"
+               "Tests statistiques intégrés et ajustements non linéaires."
+               "\n\n"
+               "Construit avec PyQt6, matplotlib, pandas, SciPy.\n"
+               "Licence MIT.").format(version=version))
         body.setWordWrap(True)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.button(QDialogButtonBox.StandardButton.Close).setText("Fermer")
+        buttons.button(QDialogButtonBox.StandardButton.Close).setText(tr("Fermer"))
         buttons.rejected.connect(self.reject)
         buttons.accepted.connect(self.accept)
         lay = QVBoxLayout(self)
@@ -336,14 +350,14 @@ class TransformDialog(QDialog):
     def __init__(self, dataset, parent=None):
         super().__init__(parent)
         self.dataset = dataset
-        self.setWindowTitle("Transformer les données")
+        self.setWindowTitle(tr("Transformer les données"))
         self.resize(780, 600)
         self.result_df = None
         self.result_name = ""
 
         self.cmb_transform = QComboBox()
         for transform in transforms.TRANSFORMS.values():
-            self.cmb_transform.addItem(transform.label, transform.key)
+            self.cmb_transform.addItem(tr(transform.label), transform.key)
         self.lbl_about = QLabel()
         self.lbl_about.setWordWrap(True)
         self.lbl_about.setProperty("hint", True)
@@ -362,13 +376,13 @@ class TransformDialog(QDialog):
         self.txt_name = QLineEdit()
 
         form = QFormLayout()
-        form.addRow("Transformation", self.cmb_transform)
+        form.addRow(tr("Transformation"), self.cmb_transform)
         form.addRow("", self.lbl_about)
-        form.addRow("Colonnes", self.lst_cols)
-        self.row_group = form.addRow("Grouper par", self.cmb_group)
-        form.addRow("Contrôle", self.cmb_control)
-        form.addRow("Colonne de référence", self.cmb_reference)
-        form.addRow("Nom de la table", self.txt_name)
+        form.addRow(tr("Colonnes"), self.lst_cols)
+        self.row_group = form.addRow(tr("Grouper par"), self.cmb_group)
+        form.addRow(tr("Contrôle"), self.cmb_control)
+        form.addRow(tr("Colonne de référence"), self.cmb_reference)
+        form.addRow(tr("Nom de la table"), self.txt_name)
 
         self.preview = QTableWidget()
         self.preview.setAlternatingRowColors(True)
@@ -382,15 +396,15 @@ class TransformDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText(
-            "Créer la table")
+            tr("Créer la table"))
         buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(
-            "Annuler")
+            tr("Annuler"))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
         lay = QVBoxLayout(self)
         lay.addLayout(form)
-        lay.addWidget(QLabel("Aperçu"))
+        lay.addWidget(QLabel(tr("Aperçu")))
         lay.addWidget(self.preview, 1)
         lay.addWidget(self.info)
         lay.addWidget(buttons)
@@ -410,7 +424,7 @@ class TransformDialog(QDialog):
         transform = transforms.by_label(self.current_key())
         if transform is None:
             return
-        self.lbl_about.setText(transform.description)
+        self.lbl_about.setText(tr(transform.description))
         needs = transform.needs
         self._set_visible(self.cmb_group, transforms.NEEDS_GROUP in needs)
         self._set_visible(self.cmb_control, transforms.NEEDS_CONTROL in needs)
@@ -470,18 +484,19 @@ class TransformDialog(QDialog):
                     f"{value:g}" if isinstance(value, float) else str(value))
                 self.preview.setItem(r, c, QTableWidgetItem(text))
         self.info.setText(message or
-                          f"{len(frame)} lignes x {len(frame.columns)} colonnes")
+                          tr("{rows} lignes x {cols} colonnes").format(
+                              rows=len(frame), cols=len(frame.columns)))
 
     def accept(self):
         self.refresh()
         if not self.lst_cols.checked_items():
-            QMessageBox.warning(self, "Plotea",
-                                "Choisissez au moins une colonne à "
-                                "transformer.")
+            QMessageBox.warning(self, tr("Plotea"),
+                                tr("Choisissez au moins une colonne à "
+                                "transformer."))
             return
         if self.result_df is None or self.result_df.empty:
-            QMessageBox.warning(self, "Plotea", "La transformation ne produit "
-                                                "aucune donnée.")
+            QMessageBox.warning(self, tr("Plotea"), tr("La transformation ne produit "
+                                                "aucune donnée."))
             return
         self.result_name = self.txt_name.text().strip() or "Table transformee"
         super().accept()
@@ -494,7 +509,7 @@ class LogDialog(QDialog):
         super().__init__(parent)
         from ..core import diagnostics
         self.diagnostics = diagnostics
-        self.setWindowTitle("Journal des erreurs")
+        self.setWindowTitle(tr("Journal des erreurs"))
         self.resize(760, 520)
 
         self.view = QPlainTextEdit()
@@ -506,12 +521,12 @@ class LogDialog(QDialog):
         self.info.setProperty("hint", True)
         self.info.setWordWrap(True)
 
-        copy = QPushButton("Copier")
+        copy = QPushButton(tr("Copier"))
         copy.clicked.connect(self._copy)
-        clear = QPushButton("Vider")
+        clear = QPushButton(tr("Vider"))
         clear.clicked.connect(self._clear)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.button(QDialogButtonBox.StandardButton.Close).setText("Fermer")
+        buttons.button(QDialogButtonBox.StandardButton.Close).setText(tr("Fermer"))
         buttons.rejected.connect(self.reject)
         buttons.accepted.connect(self.accept)
         buttons.addButton(copy, QDialogButtonBox.ButtonRole.ActionRole)
@@ -526,8 +541,8 @@ class LogDialog(QDialog):
     def refresh(self):
         log = self.diagnostics.LOG
         self.view.setPlainText(log.text())
-        where = f" - fichier : {log.path}" if log.path else ""
-        self.info.setText(f"{len(log)} événement(s){where}")
+        where = tr(" - fichier : {path}").format(path=log.path) if log.path else ""
+        self.info.setText(tr("{count} événement(s)").format(count=len(log)) + where)
 
     def _copy(self):
         QApplication.clipboard().setText(self.diagnostics.LOG.text())

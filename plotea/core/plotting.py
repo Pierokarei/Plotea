@@ -12,6 +12,7 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 
+from ..i18n import tr
 from . import diagnostics, fitting
 from . import stats as st
 from .plotspec import PlotSpec
@@ -252,9 +253,16 @@ def _lighten(color: str, amount: float = 0.55) -> tuple:
     return tuple(rgb + (1.0 - rgb) * amount)
 
 
-def _no_data(ax, message: str = "Aucune donnée à tracer"):
+#: Y axis title of a histogram, by statistic; it ends up in the exported
+#: figure, so it is translated where it is drawn.
+HIST_LABELS = {"count": "Effectif", "density": "Densité",
+               "probability": "Probabilité", "percent": "Pourcentage (%)"}
+
+
+def _no_data(ax, message: str = ""):
     """Say so on the figure rather than letting an empty array explode."""
-    ax.text(0.5, 0.5, message, ha="center", va="center",
+    ax.text(0.5, 0.5, message or tr("Aucune donnée à tracer"),
+            ha="center", va="center",
             transform=ax.transAxes, color="#999999")
     ax.set_axis_off()
     return {}, {}
@@ -344,8 +352,9 @@ def _draw_points_overlay(ax, values, center, color, spec, theme, rng,
         return
     values, trimmed = _subsample(values, MAX_OVERLAY_POINTS)
     if trimmed and info is not None:
-        message = (f"Nuage limite a {MAX_OVERLAY_POINTS} points par groupe "
-                   "pour l'affichage ; les statistiques utilisent tout.")
+        message = tr("Nuage limite a {count} points par groupe pour "
+                     "l'affichage ; les statistiques utilisent tout.").format(
+                         count=MAX_OVERLAY_POINTS)
         if message not in info.warnings:
             info.warnings.append(message)
     pos = _point_positions(values, center, spec, rng)
@@ -675,11 +684,9 @@ def draw_histogram(ax, df, spec, theme, info):
                 ax.plot(xs, ys, color=colors[i], lw=theme.linewidth * 1.4,
                         zorder=10)
             except Exception:
-                info.warnings.append("KDE indisponible (scipy requis).")
+                info.warnings.append(tr("KDE indisponible (scipy requis)."))
     if not spec.ylabel:
-        ax.set_ylabel({"count": "Effectif", "density": "Densité",
-                       "probability": "Probabilité",
-                       "percent": "Pourcentage (%)"}[spec.hist_stat])
+        ax.set_ylabel(tr(HIST_LABELS[spec.hist_stat]))
     return {}, {}
 
 
@@ -783,14 +790,14 @@ def draw_survival(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
     time_col = spec.x or (spec.y[0] if spec.y else "")
     if time_col not in df.columns:
         info.warnings.append(
-            "Survie : choisissez la colonne de temps de suivi (axe X).")
+            tr("Survie : choisissez la colonne de temps de suivi (axe X)."))
         return _no_data(ax)
 
     event_col = spec.event_col if spec.event_col in df.columns else ""
     if not event_col:
         info.warnings.append(
-            "Aucune colonne d'événement : toutes les observations sont "
-            "comptées comme des événements, sans censure.")
+            tr("Aucune colonne d'événement : toutes les observations sont "
+            "comptées comme des événements, sans censure."))
 
     curves = {}
     if spec.group and spec.group in df.columns:
@@ -818,7 +825,7 @@ def draw_survival(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
 
     ax.set_ylim(0, 1.04)
     ax.set_xlabel(spec.xlabel or str(time_col))
-    ax.set_ylabel(spec.ylabel or "Survie")
+    ax.set_ylabel(spec.ylabel or tr("Survie"))
     info.series = labels
     info.groups = labels
     info.stat_groups = {}
@@ -853,7 +860,7 @@ def render(fig, spec: PlotSpec, df: pd.DataFrame) -> RenderInfo:
 
     if df is None or df.empty:
         ax = fig.add_subplot(111)
-        ax.text(0.5, 0.5, "Aucune donnée", ha="center", va="center",
+        ax.text(0.5, 0.5, tr("Aucune donnée"), ha="center", va="center",
                 transform=ax.transAxes, color="#999999")
         ax.set_axis_off()
         return info
@@ -879,7 +886,7 @@ def draw_into(ax, spec: PlotSpec, df: pd.DataFrame,
     info = info if info is not None else RenderInfo()
     theme = theme or get_theme(spec.theme)
     if df is None or df.empty:
-        ax.text(0.5, 0.5, "Aucune donnée", ha="center", va="center",
+        ax.text(0.5, 0.5, tr("Aucune donnée"), ha="center", va="center",
                 transform=ax.transAxes, color="#999999")
         ax.set_axis_off()
         return info
@@ -891,7 +898,8 @@ def draw_into(ax, spec: PlotSpec, df: pd.DataFrame,
         diagnostics.exception(f"Rendu de '{spec.name}' ({spec.plot_type})",
                               exc)
         info.warnings.append(
-            f"Erreur de rendu : {exc} — détails dans Aide > Journal.")
+            tr("Erreur de rendu : {error} — détails dans Aide > Journal."
+               ).format(error=exc))
         positions, tops = {}, {}
 
     _finish_axes(ax, spec, theme, info)
@@ -927,27 +935,27 @@ def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
     if spec.stats_test in st.CONTROL_TESTS:
         if spec.stats_mode != "vs_control" or spec.stats_control not in groups:
             info.warnings.append(
-                "Dunnett compare chaque groupe au contrôle : choisissez "
-                "« vs contrôle » et le groupe de référence.")
+                tr("Dunnett compare chaque groupe au contrôle : choisissez "
+                "« vs contrôle » et le groupe de référence."))
             return
         if info.stat_pairs is not None:
             info.warnings.append(
-                "Dunnett indisponible sur des barres groupées à deux "
-                "facteurs.")
+                tr("Dunnett indisponible sur des barres groupées à deux "
+                "facteurs."))
             return
 
     paired = None
     if spec.stats_test in st.PAIRED_TESTS:
         if info.stat_pairs is not None:
             info.warnings.append(
-                "Test apparié indisponible sur des barres groupees a deux "
-                "facteurs.")
+                tr("Test apparié indisponible sur des barres groupees a deux "
+                "facteurs."))
             return
         paired = extract_paired(df, spec)
         if paired is None:
             info.warnings.append(
-                "Test apparié : choisissez la colonne d'appariement "
-                "(sujet, patient, réplicat) dans la section Statistiques.")
+                tr("Test apparié : choisissez la colonne d'appariement "
+                "(sujet, patient, réplicat) dans la section Statistiques."))
             return
 
     if spec.stats_test == "rm_anova":
@@ -968,8 +976,8 @@ def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
     info.comparisons = comps
     if not comps and paired is not None:
         info.warnings.append(
-            "Aucun sujet mesuré dans les deux groupes : appariement "
-            "impossible avec cette colonne.")
+            tr("Aucun sujet mesuré dans les deux groupes : appariement "
+            "impossible avec cette colonne."))
     draw_brackets(ax, comps, positions, tops, spec, theme)
 
 
@@ -991,7 +999,7 @@ def _finish_axes(ax, spec: PlotSpec, theme: Theme, info: RenderInfo):
         try:
             ax.set_yscale("log")
         except Exception:
-            info.warnings.append("Échelle log Y impossible (valeurs <= 0).")
+            info.warnings.append(tr("Échelle log Y impossible (valeurs <= 0)."))
     if spec.xmin is not None or spec.xmax is not None:
         ax.set_xlim(left=spec.xmin, right=spec.xmax)
     if spec.ymin is not None or spec.ymax is not None:

@@ -29,7 +29,11 @@ def icon_for_platform():
 
 
 datas = [(os.path.join("plotea", "resources"),
-          os.path.join("plotea", "resources"))]
+          os.path.join("plotea", "resources")),
+         # the translations: without them the English interface silently
+         # falls back to French in the packaged build
+         (os.path.join("plotea", "locales"),
+          os.path.join("plotea", "locales"))]
 datas += collect_data_files("matplotlib", subdir="mpl-data")
 # Qt's French translations: without them the standard dialog buttons fall
 # back to English inside the bundle.
