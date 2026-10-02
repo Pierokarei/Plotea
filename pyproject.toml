@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plotea"
-version = "1.0.0"
-description = "Figures scientifiques de qualite publication - alternative libre a GraphPad Prism"
+dynamic = ["version"]
+description = "Figures scientifiques de qualité publication - alternative libre à GraphPad Prism"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -37,6 +37,11 @@ plotea = "plotea.app:main"
 
 [project.gui-scripts]
 plotea-gui = "plotea.app:main"
+
+# read without importing the package: plotea/__init__.py is the one place
+# the version is written
+[tool.setuptools.dynamic]
+version = { attr = "plotea.__version__" }
 
 [tool.setuptools.packages.find]
 include = ["plotea*"]

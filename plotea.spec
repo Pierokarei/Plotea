@@ -15,6 +15,8 @@ import PyQt6
 from PyInstaller.utils.hooks import collect_data_files
 
 ROOT = os.path.abspath(os.getcwd())
+sys.path.insert(0, ROOT)
+from plotea import __version__  # noqa: E402  - the one version number
 ICON_DIR = os.path.join(ROOT, "plotea", "resources")
 
 
@@ -117,7 +119,8 @@ if sys.platform == "darwin":
         info_plist={
             "CFBundleName": "Plotea",
             "CFBundleDisplayName": "Plotea",
-            "CFBundleShortVersionString": "1.0.0",
+            "CFBundleShortVersionString": __version__,
+            "CFBundleVersion": __version__,
             "NSHighResolutionCapable": True,
             "CFBundleDocumentTypes": [{
                 "CFBundleTypeName": "Projet Plotea",

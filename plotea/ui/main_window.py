@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from .. import i18n
+from .. import __version__, i18n
 from ..core import demo, plotting
 from ..core import export as export_mod
 from ..core import project as project_mod
@@ -55,7 +55,7 @@ from .style import build_qss, palette_colors
 from .widgets import refresh_icons, set_icon_color, tag_icon
 
 APP_NAME = "Plotea"
-VERSION = "1.0.0"
+VERSION = __version__
 
 #: How often the work in progress is copied beside the configuration. Two
 #: minutes is the most a power cut may cost: often enough to go unnoticed,

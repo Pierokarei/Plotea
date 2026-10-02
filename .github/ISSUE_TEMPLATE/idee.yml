@@ -1,0 +1,33 @@
+name: Proposer une amélioration / Suggest an improvement
+description: Un graphique, un test statistique ou une fonction qui vous manque. / A plot, a statistical test or a feature you miss.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Vous pouvez écrire en français ou en anglais. / You can write in French or English.
+
+  - type: textarea
+    id: need
+    attributes:
+      label: Ce que vous voulez faire / What you want to do
+      description: Le besoin plutôt que la solution, par exemple « comparer l'EC50 de deux courbes ». / The need rather than the solution, for example "compare the EC50 of two curves".
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: Comment vous faites aujourd'hui / How you do it today
+      description: Dans Prism, Excel, R… Une capture d'écran ou un exemple de figure aide beaucoup. / In Prism, Excel, R… A screenshot or an example figure helps a lot.
+
+  - type: dropdown
+    id: field
+    attributes:
+      label: Domaine / Field
+      options:
+        - Biologie cellulaire / Cell biology
+        - Pharmacologie / Pharmacology
+        - Recherche clinique / Clinical research
+        - Ingénierie / Engineering
+        - Autre / Other

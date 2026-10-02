@@ -1,14 +1,22 @@
 """Build the standalone application for the current platform.
 
     pip install pyinstaller
-    python tools/build_app.py
+    python tools/build_app.py             # dist/Plotea (dist/Plotea.app)
+    python tools/build_app.py --archive   # plus the archive to hand out
 
 Regenerates the icons, runs PyInstaller against plotea.spec and, on Linux,
 writes a .desktop file next to the binary. The result lands in dist/.
+
+--archive packs what a user downloads: Plotea-<version>-<system>.zip on
+Windows and macOS, .tar.gz on Linux. Each system gets the format that keeps
+what its build needs - the symbolic links inside a macOS bundle, the
+executable bit on Linux - which a plain zip written by Python would lose.
 """
 from __future__ import annotations
 
+import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -80,15 +88,69 @@ def report() -> None:
         print("  ", entry)
 
 
-def main() -> int:
+def version() -> str:
+    """Read from plotea/__init__.py without importing the package."""
+    path = os.path.join(ROOT, "plotea", "__init__.py")
+    with open(path, encoding="utf-8") as handle:
+        found = re.search(r'^__version__ = "([^"]+)"', handle.read(), re.M)
+    if found is None:
+        raise RuntimeError("__version__ introuvable dans plotea/__init__.py")
+    return found.group(1)
+
+
+def system(platform: str = sys.platform) -> str:
+    if platform.startswith("win"):
+        return "windows"
+    if platform == "darwin":
+        return "macos"
+    return "linux"
+
+
+def archive_name(number: str, platform: str = sys.platform) -> str:
+    kind = system(platform)
+    extension = "tar.gz" if kind == "linux" else "zip"
+    return f"Plotea-{number}-{kind}.{extension}"
+
+
+def make_archive(platform: str = sys.platform) -> str:
+    """Pack the build in dist/ into the archive users download."""
+    kind = system(platform)
+    target = os.path.join(DIST, archive_name(version(), platform))
+    if os.path.exists(target):
+        os.remove(target)
+    if kind == "macos":
+        # ditto is what the Finder uses: it keeps the bundle's symbolic links
+        # and extended attributes, which zipfile would flatten
+        code = subprocess.call(["ditto", "-c", "-k", "--sequesterRsrc",
+                                "--keepParent", "Plotea.app", target],
+                               cwd=DIST)
+        if code:
+            raise RuntimeError("ditto a échoué")
+    else:
+        stem = target[:-len(".tar.gz")] if kind == "linux" else target[:-4]
+        shutil.make_archive(stem, "gztar" if kind == "linux" else "zip",
+                            root_dir=DIST, base_dir="Plotea")
+    print("archive", target)
+    return target
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--archive", action="store_true",
+                        help="emballer aussi l'archive à distribuer")
+    options = parser.parse_args(argv)
     make_icons()
     code = build()
     if code:
         print("Build echoue.")
         return code
     write_desktop_entry()
+    archive = make_archive() if options.archive else ""
     report()
-    print("\nTermine. Distribuez le dossier dist/Plotea tel quel.")
+    if archive:
+        print(f"\nTermine. Distribuez {os.path.basename(archive)}.")
+    else:
+        print("\nTermine. Distribuez le dossier dist/Plotea tel quel.")
     return 0
 
 

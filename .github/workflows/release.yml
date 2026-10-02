@@ -1,0 +1,146 @@
+name: Release
+
+# Pousser une etiquette v<version> (par exemple v1.0.0) construit les trois
+# archives et prepare une version en BROUILLON : rien n'est public tant que
+# quelqu'un n'a pas relu la page et clique sur "Publish release".
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write     # creer la version et y joindre les archives
+  actions: read       # lire le resultat du workflow Tests
+
+jobs:
+  check:
+    name: Version et tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Une etiquette qui ne correspond pas au code donnerait une archive
+      # "1.1.0" qui s'annonce 1.0.0 dans sa fenetre A propos.
+      - name: L'etiquette correspond a plotea/__init__.py
+        id: version
+        shell: bash
+        run: |
+          version=$(python3 -c "import sys; sys.path.insert(0, 'tools'); import build_app; print(build_app.version())")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error title=Version::L'etiquette $GITHUB_REF_NAME ne correspond pas a __version__ = $version (attendu : v$version)"
+            exit 1
+          fi
+
+      # On ne distribue que ce que la suite de tests a valide. Les tests de
+      # ce commit tournent peut-etre encore : on les attend.
+      - name: Les tests de ce commit sont passes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          for attempt in $(seq 1 90); do
+            runs=$(gh run list --workflow tests.yml --commit "$GITHUB_SHA" \
+                     --json status,conclusion --limit 20)
+            pending=$(echo "$runs" | jq '[.[] | select(.status != "completed")] | length')
+            success=$(echo "$runs" | jq '[.[] | select(.conclusion == "success")] | length')
+            total=$(echo "$runs" | jq 'length')
+            if [ "$success" -gt 0 ]; then
+              echo "Tests reussis pour $GITHUB_SHA"
+              exit 0
+            fi
+            if [ "$total" -gt 0 ] && [ "$pending" -eq 0 ]; then
+              echo "::error title=Tests::Les tests ont echoue sur ce commit : rien n'est publie."
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "::error title=Tests::Aucun resultat de tests pour $GITHUB_SHA. Poussez d'abord le commit sur main, puis l'etiquette."
+          exit 1
+
+  build:
+    name: Archive (${{ matrix.os }})
+    needs: check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Dependances systeme Qt (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 fonts-liberation
+
+      - name: Installation
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . pyinstaller
+
+      - name: Construction et archive
+        run: python tools/build_app.py --archive
+
+      # On verifie ce que l'utilisateur telecharge, pas le dossier de
+      # construction : une archive qui perd un fichier ou un lien
+      # symbolique doit echouer ici, pas chez lui.
+      - name: L'archive decompressee demarre
+        env:
+          PLOTEA_SELFTEST: "1"
+          QT_QPA_PLATFORM: offscreen
+          PLOTEA_CONFIG_DIR: ${{ runner.temp }}/plotea-config
+        shell: bash
+        run: |
+          archive=$(ls dist/Plotea-${{ needs.check.outputs.version }}-*)
+          echo "archive : $archive"
+          mkdir verify && cd verify
+          case "$RUNNER_OS" in
+            Windows) 7z x -bd "../$archive" > /dev/null && ./Plotea/Plotea.exe ;;
+            macOS)   ditto -x -k "../$archive" . && ./Plotea.app/Contents/MacOS/Plotea ;;
+            Linux)   tar xzf "../$archive" && ./Plotea/Plotea ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plotea-${{ runner.os }}
+          path: dist/Plotea-${{ needs.check.outputs.version }}-*
+          retention-days: 7
+          compression-level: 0     # deja compresse
+
+  release:
+    name: Version en brouillon
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: plotea-*
+          merge-multiple: true
+          path: archives
+
+      - name: Creer le brouillon
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+        shell: bash
+        run: |
+          ls -la archives
+          sed "s/{version}/$VERSION/g" .github/release-notes.md > notes.md
+          gh release create "$GITHUB_REF_NAME" archives/* \
+            --draft --verify-tag \
+            --title "Plotea $VERSION" \
+            --notes-file notes.md

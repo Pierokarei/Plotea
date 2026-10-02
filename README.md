@@ -9,10 +9,10 @@ alternative ouverte à GraphPad Prism. Interface PyQt6, moteur matplotlib,
 statistiques SciPy.
 
 La suite de tests est exécutée à chaque commit sous **Linux, macOS et
-Windows**, en Python 3.11 et 3.13. Les binaires autonomes des trois systèmes
-se construisent depuis l'onglet Actions (workflow *Tests*, bouton *Run
-workflow*) ; seul celui de Windows a été lancé sur une vraie machine à ce
-jour.
+Windows**, en Python 3.11 et 3.13. Chaque version publiée fournit une
+application autonome pour les trois systèmes, construite et testée
+automatiquement ; seule celle de Windows a été lancée sur une vraie machine à
+ce jour.
 
 ![Plotea](docs/screenshot.png)
 
@@ -88,15 +88,28 @@ tout texte d'interface sans traduction.
 
 ### Application autonome (recommandé)
 
-Aucun Python à installer : téléchargez l'archive de votre système,
+Aucun Python à installer : téléchargez l'archive de votre système sur la
+page des [versions publiées](https://github.com/Pierokarei/Plotea/releases/latest),
 décompressez-la, lancez `Plotea`. Tout est inclus — l'interpréteur, Qt et la
 pile scientifique.
 
-Pour la construire vous-même :
+| Système | Archive | Au premier lancement |
+|---|---|---|
+| Windows 10 / 11 | `Plotea-<version>-windows.zip` | **Extraire tout**, puis lancer `Plotea\Plotea.exe`. Au message « Windows a protégé votre ordinateur » : **Informations complémentaires → Exécuter quand même**. |
+| macOS (puces Apple M1 et suivantes) | `Plotea-<version>-macos.zip` | Glisser `Plotea.app` dans Applications. Au refus de macOS : **Réglages Système → Confidentialité et sécurité → Ouvrir quand même** (clic droit → **Ouvrir** sur macOS 14 ou plus ancien). |
+| Linux (Ubuntu 24.04 ou plus récent) | `Plotea-<version>-linux.tar.gz` | `tar xzf` l'archive, puis lancer `./Plotea/Plotea`. |
+
+Ces avertissements viennent de ce que Plotea n'est pas signé par un
+certificat payant ; ils ne reviennent pas ensuite. La page de chaque version
+détaille la marche à suivre. Les Mac à processeur Intel installent Plotea
+depuis les sources.
+
+Pour construire l'application vous-même :
 
 ```bash
 pip install pyinstaller
-python tools/build_app.py
+python tools/build_app.py             # le dossier dist/Plotea
+python tools/build_app.py --archive   # plus l'archive à distribuer
 ```
 
 Le résultat est dans `dist/` : un dossier `Plotea` sur Windows et Linux, un
@@ -348,7 +361,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 380 tests, environ un quart d'heure
+pytest                      # 390 tests, quelques minutes
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -374,6 +387,7 @@ pytest -k paired            # un seul sujet (les tests appariés)
 | `test_debt.py` | clés vs libellés, journal d'erreurs, gros volumes |
 | `test_feedback.py` | retours d'utilisation : bascule des types, accès à l'export, langue |
 | `test_i18n.py` | français intact, anglais complet, choix de la langue |
+| `test_release.py` | numéro de version unique, archives à distribuer, notes de version |
 | `test_gui.py` | interface complète, bout en bout |
 
 Les tests tournent hors écran (`QT_QPA_PLATFORM=offscreen`) et sans afficheur

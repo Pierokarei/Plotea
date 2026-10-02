@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Installer Plotea / Installing Plotea
+    url: https://github.com/Pierokarei/Plotea/releases/latest
+    about: Les archives à télécharger et les instructions du premier lancement. / The archives to download and first-launch instructions.

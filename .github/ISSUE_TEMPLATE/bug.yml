@@ -1,0 +1,66 @@
+name: Signaler un problème / Report a bug
+description: Plotea plante, affiche une erreur ou produit un résultat faux. / Plotea crashes, shows an error or gives a wrong result.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps de signaler ce problème. Vous pouvez écrire en français ou en anglais.
+        Thank you for reporting this. You can write in French or English.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: Ce qui s'est passé / What happened
+      description: Ce que vous avez vu, et ce que vous attendiez à la place. / What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Comment le reproduire / How to reproduce it
+      description: Les étapes, dans l'ordre. Si un fichier de données ou un projet `.plotea` le déclenche, joignez-le (glissez-le ici) s'il ne contient rien de confidentiel. / The steps, in order. If a data file or a `.plotea` project triggers it, attach it (drag it here) if it holds nothing confidential.
+      placeholder: |
+        1. Fichier → Jeux de données d'exemple → …
+        2. …
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version de Plotea / Plotea version
+      description: Menu Aide → À propos. / Help → About menu.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: system
+    attributes:
+      label: Système / System
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS (Apple M1 ou plus récent / or later)
+        - macOS (Intel)
+        - Linux
+        - Autre / Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Langue de l'interface / Interface language
+      options:
+        - Français
+        - English
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Journal des erreurs / Error log
+      description: Menu Aide → Journal des erreurs, puis copiez son contenu ici s'il n'est pas vide. / Help → Error log menu, then paste its content here if it is not empty.
+      render: text
