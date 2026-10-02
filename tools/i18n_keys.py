@@ -57,6 +57,14 @@ def literal_keys() -> dict[str, str]:
             if name == "tr" or (name in STORED_NAMES
                                 and any(c.isalpha() for c in first.value)):
                 found.setdefault(first.value, f"{rel}:{first.lineno}")
+        # ask_to_keep_changes translates the texts it is handed
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Call)
+                    and getattr(node.func, "attr", "") == "ask_to_keep_changes"):
+                for arg in [*node.args, *(k.value for k in node.keywords)]:
+                    if isinstance(arg, ast.Constant) and \
+                            isinstance(arg.value, str):
+                        found.setdefault(arg.value, f"{rel}:{arg.lineno}")
         # the row headers of the comparisons table are dictionary keys
         if rel.endswith(os.path.join("ui", "stats_view.py")):
             for node in ast.walk(tree):

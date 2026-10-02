@@ -429,7 +429,7 @@ def two_way_anova(cells: dict, factor_a: str = "Facteur A",
                      "F": f, "p": p,
                      "eta2 partiel": ss / (ss + rss_full) if ss + rss_full
                      else float("nan")})
-    rows.append({"Source": "Residus", "SS": rss_full, "ddl": df_error,
+    rows.append({"Source": "Résidus", "SS": rss_full, "ddl": df_error,
                  "MS": mse, "F": float("nan"), "p": float("nan"),
                  "eta2 partiel": float("nan")})
     return rows, ""

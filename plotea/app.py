@@ -127,8 +127,9 @@ def offer_recovery(window) -> bool:
     if not info:
         return False
 
-    when = (info.get("saved", "") or "").replace("T", " à ")
-    origin = info.get("origin") or "projet jamais enregistré"
+    day, _sep, hour = (info.get("saved", "") or "").partition("T")
+    when = tr("{day} à {hour}").format(day=day, hour=hour) if hour else day
+    origin = info.get("origin") or tr("projet jamais enregistré")
     box = QMessageBox(window)
     box.setWindowTitle(APP_NAME)
     box.setIcon(QMessageBox.Icon.Question)

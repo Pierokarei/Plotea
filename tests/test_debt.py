@@ -206,7 +206,7 @@ def test_big_box_caps_the_overlay():
     spec = PlotSpec(plot_type="box", group="g", y=["y"], show_points=True)
     fig = Figure(figsize=(3.5, 2.7))
     info = plotting.render(fig, spec, big)
-    assert any("limite" in w for w in info.warnings), info.warnings
+    assert any("limité" in w for w in info.warnings), info.warnings
     drawn = sum(c.get_offsets().shape[0] for c in fig.axes[0].collections)
     assert drawn <= 3 * plotting.MAX_OVERLAY_POINTS, drawn
     # the statistics still see everything

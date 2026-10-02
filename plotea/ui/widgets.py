@@ -40,6 +40,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
+
 
 # --------------------------------------------------------------------------
 # Icons drawn at runtime: no binary assets, crisp at any DPI
@@ -357,7 +359,7 @@ class ColorButton(QPushButton):
 
     def _pick(self):
         col = QColorDialog.getColor(QColor(self._color), self,
-                                    "Couleur de la serie")
+                                    tr("Couleur de la série"))
         if col.isValid():
             self.setColor(col.name())
             self.colorChanged.emit(self._color)

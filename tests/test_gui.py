@@ -188,7 +188,7 @@ def test_grouped_bar_stats_through_ui():
     spec.stats_test = "t apparié"
     win._render_now()
     assert win.canvas.last_info.comparisons == []
-    assert any("groupees" in w for w in win.canvas.last_info.warnings), \
+    assert any("groupées" in w for w in win.canvas.last_info.warnings), \
         win.canvas.last_info.warnings
     spec.stats_test = "Auto"
     win._render_now()

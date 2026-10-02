@@ -106,7 +106,7 @@ def render_panel(fig, panel: Panel, specs: dict, frames: dict) -> PanelInfo:
 
     if not chosen:
         ax = fig.add_subplot(111)
-        ax.text(0.5, 0.5, tr("Ajoutez des graphiques a cette figure"),
+        ax.text(0.5, 0.5, tr("Ajoutez des graphiques à cette figure"),
                 ha="center", va="center", transform=ax.transAxes,
                 color="#999999")
         ax.set_axis_off()

@@ -91,7 +91,7 @@ class PlotCanvas(QWidget):
 
         minus = QToolButton()
         minus.setText("-")
-        minus.setToolTip(tr("Dezoomer"))
+        minus.setToolTip(tr("Dézoomer"))
         minus.clicked.connect(lambda: self._step_zoom(-1))
         plus = QToolButton()
         plus.setText("+")

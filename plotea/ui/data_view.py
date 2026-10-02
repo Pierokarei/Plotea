@@ -105,9 +105,11 @@ class DataFrameModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.ToolTipRole \
                 and orientation == Qt.Orientation.Horizontal:
             col = self._df.columns[section]
-            kind = ("numérique" if pd.api.types.is_numeric_dtype(self._df[col])
-                    else "texte")
-            return f"{col} - {kind} - {self._df[col].notna().sum()} valeurs"
+            kind = (tr("numérique")
+                    if pd.api.types.is_numeric_dtype(self._df[col])
+                    else tr("texte"))
+            return tr("{name} - {kind} - {count} valeurs").format(
+                name=col, kind=kind, count=self._df[col].notna().sum())
         return None
 
     def setHeaderData(self, section, orientation, value,

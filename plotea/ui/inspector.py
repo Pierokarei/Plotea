@@ -339,7 +339,7 @@ class Inspector(QWidget):
         self.lst_err.setMaximumHeight(110)
         self.r_err_cols = sec.add_row(tr("Colonnes d'erreur"), self.lst_err)
         self.hint_err = hint(
-            tr("Cochez une colonne d'erreur par serie Y, dans le meme ordre "
+            tr("Cochez une colonne d'erreur par série Y, dans le même ordre "
             "(ex. WT puis WT SD)."))
         sec.add_widget(self.hint_err)
         sec.add_widget(hint(
@@ -367,7 +367,7 @@ class Inspector(QWidget):
         sec.add_row(tr("Taille (mm)"), row(self.spn_w, QLabel(tr("x")), self.spn_h))
 
         self.chk_transparent = self._bind(
-            QCheckBox(tr("Fond transparent a l'export")), "transparent_bg")
+            QCheckBox(tr("Fond transparent à l'export")), "transparent_bg")
         self.chk_hatch = self._bind(
             QCheckBox(tr("Motifs hachurés (impression N&B)")), "monochrome_hatch")
         sec.add_widget(self.chk_transparent)
@@ -377,7 +377,7 @@ class Inspector(QWidget):
         self.colors_layout = QVBoxLayout(self.colors_holder)
         self.colors_layout.setContentsMargins(0, 4, 0, 0)
         self.colors_layout.setSpacing(4)
-        sec.add_widget(QLabel(tr("Couleurs des series")))
+        sec.add_widget(QLabel(tr("Couleurs des séries")))
         sec.add_widget(self.colors_holder)
         reset = QPushButton(tr("Réinitialiser les couleurs"))
         reset.setProperty("flat", True)
@@ -560,12 +560,12 @@ class Inspector(QWidget):
         sec.add_widget(row(self.chk_minor, self.chk_despine))
         self.spn_rot = self._bind(_spin(-90, 90, 5, 0), "tick_rotation")
         sec.add_row(tr("Rotation X"), self.spn_rot)
-        self.chk_zero = self._bind(QCheckBox(tr("Barres ancrees a zero")),
+        self.chk_zero = self._bind(QCheckBox(tr("Barres ancrées à zéro")),
                                    "y_from_zero")
         sec.add_widget(self.chk_zero)
 
     def _build_series(self):
-        sec = self._add(CollapsibleSection(tr("Apparence des series"), False))
+        sec = self._add(CollapsibleSection(tr("Apparence des séries"), False))
         self.spn_lw = self._bind(_spin(0, 8, 0.1, 2), "line_width")
         self.spn_lw.setSpecialValueText(tr("auto"))
         sec.add_row(tr("Épaisseur"), self.spn_lw)
@@ -691,7 +691,7 @@ class Inspector(QWidget):
         self.cmb_eqloc = self._bind(QComboBox(), "fit_equation_loc")
         self.fill(self.cmb_eqloc, enums.EQUATION_LOC)
         sec.add_row(tr("Position équation"), self.cmb_eqloc)
-        sec.add_widget(hint(tr("L'ajustement est calcule serie par serie.")))
+        sec.add_widget(hint(tr("L'ajustement est calculé série par série.")))
 
     def _build_stats(self):
         sec = self._add(CollapsibleSection(tr("Statistiques"), True))
@@ -728,7 +728,7 @@ class Inspector(QWidget):
         sec.add_row(tr("Écart des barres"), self.spn_gap)
         sec.add_widget(hint(
             tr("Auto choisit t de Student / Welch / Mann-Whitney selon la "
-            "normalité (Shapiro) et l'egalite des variances (Levene). "
+            "normalité (Shapiro) et l'égalité des variances (Levene). "
             "Dunnett exige un groupe contrôle ; l'ANOVA à mesures répétées "
             "exige une colonne d'appariement.")))
 

@@ -352,7 +352,7 @@ def _draw_points_overlay(ax, values, center, color, spec, theme, rng,
         return
     values, trimmed = _subsample(values, MAX_OVERLAY_POINTS)
     if trimmed and info is not None:
-        message = tr("Nuage limite a {count} points par groupe pour "
+        message = tr("Nuage limité à {count} points par groupe pour "
                      "l'affichage ; les statistiques utilisent tout.").format(
                          count=MAX_OVERLAY_POINTS)
         if message not in info.warnings:
@@ -895,8 +895,9 @@ def draw_into(ax, spec: PlotSpec, df: pd.DataFrame,
     try:
         positions, tops = drawer(ax, df, spec, theme, info)
     except Exception as exc:       # keep the window alive, but keep the trace
-        diagnostics.exception(f"Rendu de '{spec.name}' ({spec.plot_type})",
-                              exc)
+        diagnostics.exception(
+            tr("Rendu de « {name} » ({kind})").format(
+                name=spec.name, kind=spec.plot_type), exc)
         info.warnings.append(
             tr("Erreur de rendu : {error} — détails dans Aide > Journal."
                ).format(error=exc))
@@ -948,7 +949,7 @@ def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
     if spec.stats_test in st.PAIRED_TESTS:
         if info.stat_pairs is not None:
             info.warnings.append(
-                tr("Test apparié indisponible sur des barres groupees a deux "
+                tr("Test apparié indisponible sur des barres groupées à deux "
                 "facteurs."))
             return
         paired = extract_paired(df, spec)

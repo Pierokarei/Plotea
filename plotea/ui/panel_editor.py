@@ -107,8 +107,8 @@ class PanelEditor(QWidget):
         self.spn_wspace = self._spin(0.0, 1.5, 0.02)
         self.spn_hspace = self._spin(0.0, 1.5, 0.02)
         sec.add_row(tr("Écart H / V"), row(self.spn_wspace, self.spn_hspace))
-        self.chk_sharex = QCheckBox(tr("Meme axe X"))
-        self.chk_sharey = QCheckBox(tr("Meme axe Y"))
+        self.chk_sharex = QCheckBox(tr("Même axe X"))
+        self.chk_sharey = QCheckBox(tr("Même axe Y"))
         sec.add_widget(row(self.chk_sharex, self.chk_sharey))
 
         for widget in (self.spn_cols, self.spn_rows, self.spn_w, self.spn_h,

@@ -191,7 +191,7 @@ class ExportDialog(QDialog):
         self.spn_h.setRange(20, 500)
         self.spn_h.setDecimals(1)
         self.spn_h.setValue(height_mm)
-        self.chk_override = QCheckBox(tr("Redimensionner a l'export"))
+        self.chk_override = QCheckBox(tr("Redimensionner à l'export"))
 
         self.txt_path = QLineEdit(suggested_name)
         browse = QPushButton(tr("Parcourir..."))
@@ -276,8 +276,9 @@ class ExportDialog(QDialog):
             dpi = self._dpi()
             px_w = int(self.spn_w.value() * MM * dpi)
             px_h = int(self.spn_h.value() * MM * dpi)
-            note = "" if dpi >= 300 else "  (300 dpi minimum recommandé)"
-            self.lbl_result.setText(tr("Image finale : {w} x {h} px a {dpi} dpi").format(
+            note = "" if dpi >= 300 else \
+                "  " + tr("(300 dpi minimum recommandé)")
+            self.lbl_result.setText(tr("Image finale : {w} x {h} px à {dpi} dpi").format(
                 w=px_w, h=px_h, dpi=dpi) + note)
 
     def _browse(self):

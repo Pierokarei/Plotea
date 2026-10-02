@@ -189,8 +189,8 @@ TRANSFORMS: dict[str, Transform] = {
         percent_of_control, {NEEDS_GROUP, NEEDS_CONTROL, NEEDS_REFERENCE},
         "% ctrl"),
     "normalize": Transform(
-        "normalize", "Normaliser de 0 a 100",
-        "Ramène le minimum de chaque colonne a 0 et le maximum a 100.",
+        "normalize", "Normaliser de 0 à 100",
+        "Ramène le minimum de chaque colonne à 0 et le maximum à 100.",
         normalize_range, set(), "norm"),
     "log10": Transform(
         "log10", "Logarithme décimal", "log10 de chaque valeur (x > 0).",
@@ -203,14 +203,14 @@ TRANSFORMS: dict[str, Transform] = {
         "log2, utile pour les rapports d'expression.", _log(2.0), set(),
         "log2"),
     "zscore": Transform(
-        "zscore", "Score z", "Centre et réduit, par groupe si demandé.",
+        "zscore", "Score z", "Centré et réduit, par groupe si demandé.",
         zscore, {NEEDS_GROUP}, "z"),
     "baseline": Transform(
         "baseline", "Soustraire la ligne de base",
-        "Retire la première valeur mesuree, par groupe si demandé.",
+        "Retire la première valeur mesurée, par groupe si demandé.",
         subtract_baseline, {NEEDS_GROUP}, "base"),
     "ratio": Transform(
-        "ratio", "Rapport a une colonne",
+        "ratio", "Rapport à une colonne",
         "Divise chaque colonne choisie par une colonne de référence.",
         ratio_to_column, {NEEDS_REFERENCE}, "ratio"),
     "aggregate": Transform(

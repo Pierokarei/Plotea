@@ -154,11 +154,11 @@ class StatsPanel(QWidget):
             rows.append({
                 "Groupe A": c.a, "Groupe B": c.b, "Test": c.test,
                 "n A": c.n_a, "n B": c.n_b, "Statistique": c.stat,
-                "p brut": c.p, "p ajuste": c.p_adj, "Signif.": c.stars,
+                "p brut": c.p, "p ajusté": c.p_adj, "Signif.": c.stars,
                 "Cohen d": c.effect,
             })
         self._test_rows = rows
-        _fill(self.tests, rows, highlight="p ajuste")
+        _fill(self.tests, rows, highlight="p ajusté")
 
         _fill(self.anova, info.anova, highlight="p")
         self._anova_rows = list(info.anova)
@@ -195,7 +195,7 @@ class StatsPanel(QWidget):
             head.append(tr("groupes : {names}").format(
                 names=", ".join(map(str, info.groups[:8]))))
         self.header.setText("   |   ".join(head) if head
-                            else tr("Aucune analyse a afficher"))
+                            else tr("Aucune analyse à afficher"))
 
         if info.fits:
             blocks = []
@@ -204,7 +204,7 @@ class StatsPanel(QWidget):
                 model = tr(fitting.model_label(res.model))
                 lines = [f"=== {label} - {model} ==="]
                 lines += res.summary_lines()
-                lines.append(tr("R2 ajuste = {r2:.4f}    RMSE = {rmse:.4g}"
+                lines.append(tr("R2 ajusté = {r2:.4f}    RMSE = {rmse:.4g}"
                                 ).format(r2=res.r2_adj, rmse=res.rmse))
                 for k, v in res.extra.items():
                     lines.append(f"{tr(k)} = {v:.4g}")

@@ -1011,11 +1011,11 @@ class MainWindow(QMainWindow):
     def _copy(self, as_svg: bool):
         if as_svg:
             self.canvas.copy_svg_to_clipboard()
-            self.statusBar().showMessage(tr("SVG copie dans le presse-papiers"),
+            self.statusBar().showMessage(tr("SVG copié dans le presse-papiers"),
                                          3000)
         else:
             self.canvas.copy_to_clipboard(dpi=300)
-            self.statusBar().showMessage(tr("Figure copiee (300 dpi)"), 3000)
+            self.statusBar().showMessage(tr("Figure copiée (300 dpi)"), 3000)
 
     # ------------------------------------------------------------------
     # styles & appearance
@@ -1042,7 +1042,7 @@ class MainWindow(QMainWindow):
             self.m_presets.addAction(
                 self._act(name, lambda _=False, s=style: self.apply_preset(s)))
         self.m_presets.addSeparator()
-        self.m_presets.addAction(self._act(tr("Appliquer a tous les graphiques"),
+        self.m_presets.addAction(self._act(tr("Appliquer à tous les graphiques"),
                                            self.apply_style_to_all))
 
     def apply_preset(self, style: dict):
@@ -1174,8 +1174,8 @@ class MainWindow(QMainWindow):
         # this copy used to close the window even when "Enregistrer" was
         # followed by a cancelled file dialog, and the work was gone.
         if self.project.dirty and not self.files.ask_to_keep_changes(
-                "Quitter sans enregistrer",
-                "Voulez-vous l'enregistrer avant de quitter ?"):
+                discard="Quitter sans enregistrer",
+                question="Voulez-vous l'enregistrer avant de quitter ?"):
             event.ignore()
             return
         self._save_layout()

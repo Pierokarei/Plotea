@@ -216,7 +216,7 @@ LEGEND_LOC = Enum("legend_loc", [
     ("center right", "Centre droite"),
     ("upper center", "Haut centre"),
     ("lower center", "Bas centre"),
-    ("outside right", "A droite du cadre"),
+    ("outside right", "À droite du cadre"),
     ("outside top", "Au-dessus du cadre"),
 ])
 
@@ -229,13 +229,13 @@ PANEL_LETTERS = Enum("letters", [
 
 TRANSFORM = Enum("transform", [
     ("percent", "Pourcentage du contrôle"),
-    ("normalize", "Normaliser de 0 a 100"),
+    ("normalize", "Normaliser de 0 à 100"),
     ("log10", "Logarithme décimal"),
     ("ln", "Logarithme naturel"),
     ("log2", "Logarithme base 2"),
     ("zscore", "Score z"),
     ("baseline", "Soustraire la ligne de base"),
-    ("ratio", "Rapport a une colonne"),
+    ("ratio", "Rapport à une colonne"),
     ("aggregate", "Moyenne des réplicats"),
 ])
 

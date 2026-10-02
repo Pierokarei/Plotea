@@ -211,7 +211,7 @@ THEMES: dict[str, Theme] = {
     ),
     "Minimal": Theme(
         name="Minimal",
-        description="Sans-serif 9 pt - axes epures, grille horizontale legere",
+        description="Sans-serif 9 pt - axes épurés, grille horizontale légère",
         font_family=["Inter", "Helvetica", "Arial", "DejaVu Sans"],
         base_size=9.0,
         palette="Okabe-Ito (CB-safe)",

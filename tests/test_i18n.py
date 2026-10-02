@@ -243,6 +243,49 @@ def test_the_about_page_is_french_with_its_accents():
     assert "jusqu'à 1200 dpi" in body
 
 
+def shown_by(monkeypatch, answer=""):
+    """Record what the next message boxes say, and press `answer` if given."""
+    seen = []
+
+    def record(box):
+        seen.append((box.informativeText(),
+                     {b.text().replace("&", "") for b in box.buttons()}))
+        for button in box.buttons():
+            if button.text().replace("&", "") == answer:
+                button.click()
+        return 0
+    monkeypatch.setattr(QMessageBox, "exec", record)
+    return seen
+
+
+def test_quitting_asks_in_english(english, window, monkeypatch):
+    """The texts are handed to ask_to_keep_changes, not wrapped in tr()."""
+    seen = shown_by(monkeypatch, answer="Cancel")
+    window.project.dirty = True
+    try:
+        assert not window.close(), "Cancel: the window stays"
+    finally:
+        window.project.dirty = False
+    question, buttons = seen[0]
+    assert question == "Do you want to save it before quitting?"
+    assert {"Save", "Quit without saving", "Cancel"} <= buttons
+
+
+def test_the_recovery_offer_reads_in_english(english, window, monkeypatch):
+    from plotea.app import offer_recovery
+    from plotea.core import project as project_mod
+
+    project_mod.write_recovery(window.project)
+    seen = shown_by(monkeypatch)
+    try:
+        offer_recovery(window)
+    finally:
+        project_mod.clear_recovery()
+    text = seen[0][0]
+    assert "project never saved" in text and " at " in text, text
+    assert " à " not in text and not FRENCH.search(text), text
+
+
 def test_figure_axis_titles_follow_the_language(english):
     """They end up in the exported figure, not only on screen."""
     from matplotlib.figure import Figure

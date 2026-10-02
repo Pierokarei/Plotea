@@ -18,7 +18,7 @@ def test_balanced_matches_hand_computation():
     rows, msg = stats.two_way_anova(cells, "Facteur", "Niveau")
     assert not msg, msg
     assert [r["Source"] for r in rows] == [
-        "Facteur", "Niveau", "Facteur x Niveau", "Residus"], rows
+        "Facteur", "Niveau", "Facteur x Niveau", "Résidus"], rows
 
     y = np.concatenate([cells[k] for k in cells])
     grand = y.mean()
@@ -40,8 +40,8 @@ def test_balanced_matches_hand_computation():
                                                        ss_a)
     assert abs(table["Niveau"]["SS"] - ss_b) < 1e-8
     assert abs(table["Facteur x Niveau"]["SS"] - ss_ab) < 1e-8
-    assert abs(table["Residus"]["SS"] - ss_err) < 1e-8
-    assert table["Residus"]["ddl"] == 4 * (n - 1)
+    assert abs(table["Résidus"]["SS"] - ss_err) < 1e-8
+    assert table["Résidus"]["ddl"] == 4 * (n - 1)
 
 
 def test_detects_interaction():
