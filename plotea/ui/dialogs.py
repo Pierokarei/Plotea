@@ -474,6 +474,11 @@ class TransformDialog(QDialog):
 
     def accept(self):
         self.refresh()
+        if not self.lst_cols.checked_items():
+            QMessageBox.warning(self, "Plotea",
+                                "Choisissez au moins une colonne à "
+                                "transformer.")
+            return
         if self.result_df is None or self.result_df.empty:
             QMessageBox.warning(self, "Plotea", "La transformation ne produit "
                                                 "aucune donnée.")

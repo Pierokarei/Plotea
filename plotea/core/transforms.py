@@ -230,6 +230,10 @@ def apply(name: str, df: pd.DataFrame,
     transform = by_label(name)
     if transform is None:
         return df.copy(), f"Transformation inconnue : {name}"
+    if not params.columns:
+        # Otherwise every transform quietly returns the table untouched, and
+        # the user gets a copy named after a calculation that never ran.
+        return df.copy(), "Aucune colonne sélectionnée : rien à transformer."
     try:
         return transform.run(df, params)
     except Exception as exc:

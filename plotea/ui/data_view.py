@@ -324,13 +324,19 @@ class DataPanel(QWidget):
 
     # -- clipboard ----------------------------------------------------------
     def copy_selection(self):
+        """Values only, as every spreadsheet does.
+
+        A header line looks helpful until the selection is pasted back into
+        the table: the column name lands in a cell. Column names travel
+        through Exporter, not through the clipboard.
+        """
         sel = self.table.selectedIndexes()
         if not sel:
             return
         rows = sorted({i.row() for i in sel})
         cols = sorted({i.column() for i in sel})
         df = self.model.dataframe()
-        lines = ["\t".join(str(df.columns[c]) for c in cols)]
+        lines = []
         for r in rows:
             lines.append("\t".join(
                 "" if pd.isna(df.iat[r, c]) else str(df.iat[r, c])
@@ -448,8 +454,13 @@ class DataPanel(QWidget):
             self.datasets.append(ds.copy())
             self.set_datasets(self.datasets, len(self.datasets) - 1)
         elif act is a_transpose:
-            ds.df = ds.df.set_index(ds.df.columns[0]).T.reset_index()
-            ds.df.columns = [str(c) for c in ds.df.columns]
+            # The first column keeps its name: the old headers become its
+            # values, and transposing a second time gives the table back
+            # exactly. Renaming it is one double-click away.
+            first = str(ds.df.columns[0])
+            turned = ds.df.set_index(ds.df.columns[0]).T.reset_index()
+            turned.columns = [first] + [str(c) for c in turned.columns[1:]]
+            ds.df = turned
             self.model.set_dataframe(ds.df)
             self.dataEdited.emit()
         elif act is a_del:

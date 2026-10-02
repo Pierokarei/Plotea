@@ -125,8 +125,12 @@ def _excepthook(exc_type, exc, tb):
         pass
 
 
-def main(argv: list[str] | None = None) -> int:
-    argv = list(sys.argv if argv is None else argv)
+def build(argv: list[str]) -> tuple:
+    """Everything up to the event loop, as (application, window).
+
+    Separate from main() so a test can inspect a real startup without
+    entering a loop it would then have to get out of.
+    """
     sys.excepthook = _excepthook
     try:
         diagnostics.use_file(config_dir())
@@ -134,7 +138,9 @@ def main(argv: list[str] | None = None) -> int:
         pass
     QApplication.setAttribute(
         Qt.ApplicationAttribute.AA_DontCreateNativeWidgetSiblings, True)
-    app = QApplication(argv)
+    # Qt allows one application object per process; a test session, or an
+    # embedding host, already has one.
+    app = QApplication.instance() or QApplication(argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(VERSION)
     app.setOrganizationName("Plotea")
@@ -151,6 +157,38 @@ def main(argv: list[str] | None = None) -> int:
 
     window = MainWindow()
     window.show()
+    return app, window
+
+
+def open_arguments(window, argv: list[str]) -> bool:
+    """Open a .plotea given on the command line, and say so when it fails.
+
+    Double-clicking a damaged project used to open an empty window with no
+    explanation at all.
+    """
+    from .core.project import Project
+
+    for arg in argv[1:]:
+        if not arg.lower().endswith(".plotea"):
+            continue
+        try:
+            window.project = Project.load(arg)
+        except Exception as exc:
+            diagnostics.LOG.record("Ouverture au démarrage impossible",
+                                   f"{type(exc).__name__}: {exc}", arg)
+            window.statusBar().showMessage(
+                f"Ouverture impossible : {os.path.basename(arg)} - "
+                "détail dans Aide > Journal des erreurs", 10000)
+            return False
+        window._reload_all(0)
+        window._update_title()
+        return True
+    return False
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv if argv is None else argv)
+    app, window = build(argv)
 
     if os.environ.get("PLOTEA_SELFTEST"):
         # Smoke test for packaged builds: prove the app starts, then leave
@@ -164,16 +202,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     offer_recovery(window)
-
-    for arg in argv[1:]:
-        if arg.lower().endswith(".plotea"):
-            try:
-                from .core.project import Project
-                window.project = Project.load(arg)
-                window._reload_all(0)
-                window._update_title()
-            except Exception:
-                pass
+    open_arguments(window, argv)
     return app.exec()
 
 
