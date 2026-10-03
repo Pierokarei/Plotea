@@ -164,16 +164,27 @@ def adjust(pvals: list[float], method: str) -> list[float]:
 # --------------------------------------------------------------------------
 # Omnibus + pairwise
 # --------------------------------------------------------------------------
-def omnibus(groups: dict[str, np.ndarray]) -> tuple[str, float, float]:
-    """Global test across >2 groups. Returns (name, statistic, p)."""
+def omnibus(groups: dict[str, np.ndarray], test: str = "auto"
+            ) -> tuple[str, float, float]:
+    """Global test across >2 groups. Returns (name, statistic, p).
+
+    A test chosen by name brings its own global test - "ANOVA + Tukey" an
+    ANOVA, "Kruskal-Wallis + Dunn" a Kruskal-Wallis - whatever normality
+    says; only the other choices let the assumptions decide.
+    """
     data = [np.asarray(v, float)[~np.isnan(np.asarray(v, float))]
             for v in groups.values()]
     data = [d for d in data if d.size > 1]
     if not HAVE_SCIPY or len(data) < 2:
         return ("", float("nan"), float("nan"))
-    normal = all(is_normal(d) for d in data)
+    if test == "anova_tukey":
+        parametric = True
+    elif test == "kruskal_dunn":
+        parametric = False
+    else:
+        parametric = all(is_normal(d) for d in data) and equal_variance(data)
     try:
-        if normal and equal_variance(data):
+        if parametric:
             res = sps.f_oneway(*data)
             return ("ANOVA à un facteur", float(res.statistic),
                     float(res.pvalue))
@@ -311,6 +322,13 @@ def pairwise(groups: dict[str, np.ndarray], test: str = "auto",
                                   cohens_d(clean[control], clean[name])))
         return out
 
+    if test == "kruskal_dunn":
+        out = dunn(clean, pairs)
+        for comp, adjusted in zip(out, adjust([c.p for c in out],
+                                              correction)):
+            comp.p_adj = adjusted
+        return out
+
     # Tukey HSD handles its own family-wise error rate
     if test == "anova_tukey" and len(keys) > 2:
         try:
@@ -347,6 +365,36 @@ def pairwise(groups: dict[str, np.ndarray], test: str = "auto",
     for c, pa in zip(raw, adjusted):
         c.p_adj = pa
     return raw
+
+
+def dunn(groups: dict[str, np.ndarray], pairs: list) -> list[Comparison]:
+    """Dunn's test: pairs compared on the mean ranks of the pooled data.
+
+    The follow-up of a Kruskal-Wallis test. Every value is ranked once,
+    across all the groups - not pair by pair as Mann-Whitney would - and
+    the difference of two mean ranks is a z with a correction for ties.
+    Raw p-values: the caller corrects them for multiplicity.
+    """
+    keys = list(groups)
+    values = np.concatenate([groups[k] for k in keys])
+    ranks = sps.rankdata(values)
+    n_total = values.size
+    _, ties = np.unique(values, return_counts=True)
+    tie_term = float(np.sum(ties ** 3 - ties)) / (12.0 * (n_total - 1))
+    spread = n_total * (n_total + 1) / 12.0 - tie_term
+    mean_rank, size, start = {}, {}, 0
+    for k in keys:
+        size[k] = groups[k].size
+        mean_rank[k] = float(ranks[start:start + size[k]].mean())
+        start += size[k]
+    out = []
+    for a, b in pairs:
+        se = np.sqrt(spread * (1.0 / size[a] + 1.0 / size[b]))
+        z = (mean_rank[a] - mean_rank[b]) / se if se > 0 else 0.0
+        p = float(2 * sps.norm.sf(abs(z)))
+        out.append(Comparison(a, b, float(z), p, p, "Dunn", size[a], size[b],
+                              cohens_d(groups[a], groups[b])))
+    return out
 
 
 def _effect_coding(levels: list[str], observed: list[str]) -> np.ndarray:

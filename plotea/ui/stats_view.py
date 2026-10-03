@@ -9,6 +9,7 @@ from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QComboBox,
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
@@ -23,7 +24,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from .. import i18n
 from ..core import fitting, plotting
+from ..core.methods import methods_text
 from ..i18n import tr
 
 
@@ -140,6 +143,7 @@ class StatsPanel(QWidget):
         self.tabs.addTab(self.fits, tr("Ajustements"))
         self.tabs.addTab(self.outliers, tr("Aberrantes"))
         self.tabs.addTab(self.effects, tr("Effets"))
+        self.tabs.addTab(self._build_methods(), tr("Méthodes"))
 
         self.header = QLabel(tr("Aucune analyse"))
         self.header.setProperty("hint", True)
@@ -173,12 +177,56 @@ class StatsPanel(QWidget):
         self._anova_rows: list[dict] = []
         self._outlier_rows: list[dict] = []
         self._effect_rows: list[dict] = []
+        self._info, self._spec = None, None
         self.tabs.setTabVisible(2, False)
         self.tabs.setTabVisible(self.tabs.indexOf(self.effects), False)
 
     # ------------------------------------------------------------------
-    def update_from(self, info):
-        """Refresh every tab from a RenderInfo."""
+    def _build_methods(self) -> QWidget:
+        """The Methods paragraph, in the language the article is written in,
+        which need not be the interface's."""
+        page = QWidget()
+        self.methods_page = page
+        self.cmb_methods_language = QComboBox()
+        for code, name in i18n.LANGUAGES.items():
+            self.cmb_methods_language.addItem(name, code)
+        self.cmb_methods_language.setCurrentIndex(
+            max(self.cmb_methods_language.findData(i18n.language()), 0))
+        self.cmb_methods_language.currentIndexChanged.connect(
+            lambda *_: self._refresh_methods())
+        self.methods = QPlainTextEdit()
+        self.methods.setReadOnly(True)
+        row = QHBoxLayout()
+        row.setContentsMargins(8, 4, 8, 0)
+        row.addWidget(QLabel(tr("Langue du paragraphe")))
+        row.addWidget(self.cmb_methods_language)
+        row.addStretch(1)
+        lay = QVBoxLayout(page)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addLayout(row)
+        lay.addWidget(self.methods)
+        return page
+
+    def _refresh_methods(self):
+        if self._spec is None or self._info is None:
+            self.methods.setPlainText(tr(
+                "Le paragraphe Méthodes décrit un graphique : sélectionnez-en "
+                "un plutôt qu'une figure composite."))
+            return
+        language = self.cmb_methods_language.currentData() or "en"
+        self.methods.setPlainText(methods_text(self._spec, self._info,
+                                               language))
+
+    def forget_plot(self):
+        """A composite figure is on screen: no single plot to describe, and
+        the last one's paragraph must not pass for this figure's."""
+        self._info, self._spec = None, None
+        self._refresh_methods()
+
+    def update_from(self, info, spec=None):
+        """Refresh every tab from a RenderInfo (and the spec it drew)."""
+        self._info, self._spec = info, spec
+        self._refresh_methods()
         self._desc_rows = list(info.descriptives)
         _fill(self.desc, self._desc_rows)
 
@@ -277,6 +325,9 @@ class StatsPanel(QWidget):
     def copy_current(self):
         if self.tabs.currentWidget() is self.fits:
             QApplication.clipboard().setText(self.fits.toPlainText())
+            return
+        if self.tabs.currentWidget() is self.methods_page:
+            QApplication.clipboard().setText(self.methods.toPlainText())
             return
         rows = self._current_rows()
         if rows:

@@ -1247,7 +1247,7 @@ def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
         elif message:
             info.warnings.append(message)
     elif len(groups) > 2 and info.stat_pairs is None:
-        info.omnibus = st.omnibus(groups)
+        info.omnibus = st.omnibus(groups, spec.stats_test)
     comps = st.pairwise(groups, spec.stats_test, spec.stats_correction,
                         spec.stats_mode, spec.stats_control,
                         pairs=info.stat_pairs, paired=paired)

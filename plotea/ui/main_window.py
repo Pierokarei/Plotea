@@ -1015,6 +1015,7 @@ class MainWindow(QMainWindow):
                                             self.project.frames_by_name())
             self.tabbar.setTabText(self.tabbar.currentIndex(),
                                    self._panel_tab_text(panel))
+            self.stats_panel.forget_plot()
             self._update_title()
             if info.warnings:
                 self.statusBar().showMessage(" ; ".join(info.warnings), 6000)
@@ -1029,7 +1030,7 @@ class MainWindow(QMainWindow):
         self.inspector.update_series(
             series, plotting.series_colors(spec, series))
         self.inspector.set_group_labels([str(g) for g in info.groups])
-        self.stats_panel.update_from(info)
+        self.stats_panel.update_from(info, spec)
         self.tabbar.setTabText(self.tabbar.currentIndex(), spec.name)
         self.data_panel.refresh_current_label()
         self._update_title()

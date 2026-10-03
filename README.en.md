@@ -47,6 +47,11 @@ any interface text that has no translation.
 ### Beyond Prism
 
 - **Free, no license key**: MIT-licensed code, nothing to activate.
+- **A Methods paragraph ready to paste** (Methods tab of the Analyses
+  panel), in French or English whatever the interface language: error
+  bars and sample sizes, the test actually run, the correction, the star
+  thresholds, the fit model, the software versions. It describes what
+  Plotea computed, never what it did not do.
 - **Automatic test choice**: Shapiro for normality and Levene for equal
   variances, with the option to force a given test.
 - **95 % confidence band** on nonlinear fits, computed with the delta
@@ -389,7 +394,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 479 tests, 5 to 20 minutes depending on the machine
+pytest                      # 507 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -402,6 +407,7 @@ pytest -k paired            # a single topic (paired tests)
 | `test_contingency.py` | Fisher, chi-square, odds ratio and relative risk, checked against published results |
 | `test_layout.py` | group names that never overlap, the journal's font and editable text in exported files |
 | `test_fit_compare.py` | curve comparison, checked against the analysis of covariance and on its false-alarm rate |
+| `test_methods.py` | Methods paragraph: the test named is the one that ran, both languages match |
 | `test_stats_fixes.py` | grouped bars, paired tests, missing values |
 | `test_anova.py` | two-way ANOVA, test choice per family |
 | `test_advanced_stats.py` | Dunnett, repeated-measures ANOVA, outliers |

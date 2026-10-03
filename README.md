@@ -52,6 +52,12 @@ tout texte d'interface sans traduction.
 ### Au-delà de Prism
 
 - **Gratuit et sans licence**, code MIT, aucune activation.
+- **Paragraphe « Méthodes » prêt à coller** (onglet Méthodes du panneau
+  Analyses), en français ou en anglais quelle que soit la langue de
+  l'interface : barres d'erreur et effectifs, test réellement exécuté,
+  correction, seuil des étoiles, modèle d'ajustement, versions des
+  logiciels. Il décrit ce que Plotea a calculé, jamais ce qu'il n'a pas
+  fait.
 - **Choix automatique du test** (Shapiro pour la normalité, Levene pour
   l'égalité des variances) avec possibilité de forcer le test.
 - **Bande de confiance 95 %** sur les ajustements non linéaires, calculée par
@@ -398,7 +404,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 479 tests, 5 à 20 minutes selon la machine
+pytest                      # 507 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -411,6 +417,7 @@ pytest -k paired            # un seul sujet (les tests appariés)
 | `test_contingency.py` | Fisher, khi², odds ratio et risque relatif, vérifiés sur des résultats publiés |
 | `test_layout.py` | noms de groupes sans chevauchement, police du journal et texte éditable dans les fichiers exportés |
 | `test_fit_compare.py` | comparaison de courbes, vérifiée contre l'analyse de covariance et sur son taux de fausses alertes |
+| `test_methods.py` | paragraphe Méthodes : le test nommé est celui qui a tourné, les deux langues se correspondent |
 | `test_stats_fixes.py` | barres groupées, tests appariés, valeurs manquantes |
 | `test_anova.py` | ANOVA à deux facteurs, choix de test par famille |
 | `test_advanced_stats.py` | Dunnett, ANOVA à mesures répétées, valeurs aberrantes |

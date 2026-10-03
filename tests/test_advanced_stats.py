@@ -269,3 +269,43 @@ def test_outliers_do_not_wait_for_the_comparisons():
                                      1.01, 0.99, 9.0]})
     info = draw(PlotSpec(plot_type="bar", group="Groupe", y=["Valeur"]), frame)
     assert info.outliers and info.outliers[0]["Valeur"] == 9.0
+
+
+# --------------------------------------------------------------------------
+# Dunn's test, the follow-up of Kruskal-Wallis
+# --------------------------------------------------------------------------
+def test_dunn_on_two_groups_is_the_kruskal_wallis_test():
+    """With two groups Dunn's z squared is Kruskal-Wallis' H, ties
+    included: two derivations that share nothing but the ranks."""
+    rng = np.random.default_rng(1)
+    a = np.round(rng.normal(0, 1, 9), 1)       # rounded: there are ties
+    b = np.round(rng.normal(1, 1, 11), 1)
+    z = st.dunn({"A": a, "B": b}, [("A", "B")])[0].stat
+    assert z ** 2 == pytest.approx(sps.kruskal(a, b).statistic, rel=1e-12)
+
+
+def test_kruskal_dunn_runs_dunn_not_mann_whitney():
+    rng = np.random.default_rng(3)
+    groups = {k: rng.normal(m, 1, 8) for k, m in
+              (("A", 0.0), ("B", 1.5), ("C", 0.2))}
+    comps = st.pairwise(groups, "kruskal_dunn", "holm")
+    assert {c.test for c in comps} == {"Dunn"}
+    raw = [c.p for c in comps]
+    assert [c.p_adj for c in comps] == pytest.approx(st.adjust(raw, "holm"))
+    # ranked once across all three groups, not pair by pair
+    mw = sps.mannwhitneyu(groups["A"], groups["B"]).pvalue
+    assert comps[0].p != pytest.approx(mw)
+
+
+def test_a_test_chosen_by_name_brings_its_own_global_test():
+    # normal by construction: the quantiles of a normal distribution
+    shape = sps.norm.ppf(np.linspace(0.02, 0.98, 30))
+    normal = {k: shape + m for k, m in (("A", 0.0), ("B", 0.5), ("C", 1.0))}
+    assert st.omnibus(normal)[0] == "ANOVA à un facteur"
+    assert st.omnibus(normal, "kruskal_dunn")[0] == "Kruskal-Wallis"
+    assert st.omnibus(normal, "anova_tukey")[0] == "ANOVA à un facteur"
+    # skewed by construction: there, only the choice can bring an ANOVA
+    skew = sps.expon.ppf(np.linspace(0.02, 0.98, 30)) ** 2
+    skewed = {k: skew + m for k, m in (("A", 0.0), ("B", 0.5), ("C", 1.0))}
+    assert st.omnibus(skewed)[0] == "Kruskal-Wallis"
+    assert st.omnibus(skewed, "anova_tukey")[0] == "ANOVA à un facteur"
