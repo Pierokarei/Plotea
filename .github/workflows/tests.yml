@@ -51,7 +51,21 @@ jobs:
       - name: Lint
         run: ruff check plotea tests tools run_plotea.py
 
+      # Les tests macOS ont cesse de finir : ce releve dit en une minute
+      # combien coutent un rendu et chaque export, et quelles polices ont
+      # ete trouvees, en annotations lisibles sans compte.
+      - name: Diagnostic du rendu (macOS)
+        if: runner.os == 'macOS'
+        timeout-minutes: 10
+        env:
+          QT_QPA_PLATFORM: offscreen
+          MPLBACKEND: Agg
+        run: python tools/render_timing.py
+
       - name: Tests
+        # en echec plutot qu'annule au-dela : l'etape suivante peut alors
+        # republier la fin du journal
+        timeout-minutes: 35
         env:
           QT_QPA_PLATFORM: offscreen
           MPLBACKEND: Agg
@@ -66,7 +80,7 @@ jobs:
           set -o pipefail
           # Un test bloque echoue au bout de 10 minutes en affichant la pile
           # de chaque fil : c'est ce que l'etape suivante republie.
-          pytest tests -q --durations=10 --timeout=600 --timeout-method=thread $COV 2>&1 | tee pytest.log
+          pytest tests -v --durations=10 --timeout=600 --timeout-method=thread $COV 2>&1 | tee pytest.log
 
       # GitHub demande maintenant une connexion pour lire les journaux, y
       # compris sur un depot public. La fin de la sortie est donc republiee
