@@ -6,10 +6,19 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Un nouveau commit rend caduc le run precedent de la meme branche : on
+# l'annule plutot que de le laisser occuper des machines pour rien.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python }}
     runs-on: ${{ matrix.os }}
+    # La suite prend 3 a 15 minutes ; au-dela, quelque chose est bloque, et
+    # GitHub attendrait sinon six heures avant de l'arreter.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -55,7 +64,9 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          pytest tests -q --durations=10 $COV 2>&1 | tee pytest.log
+          # Un test bloque echoue au bout de 10 minutes en affichant la pile
+          # de chaque fil : c'est ce que l'etape suivante republie.
+          pytest tests -q --durations=10 --timeout=600 --timeout-method=thread $COV 2>&1 | tee pytest.log
 
       # GitHub demande maintenant une connexion pour lire les journaux, y
       # compris sur un depot public. La fin de la sortie est donc republiee
@@ -65,7 +76,7 @@ jobs:
         shell: bash
         run: |
           test -f pytest.log || exit 0
-          detail=$(tail -n 40 pytest.log | tr -d '\r' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          detail=$(tail -n 80 pytest.log | tr -d '\r' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
           echo "::error title=pytest ${{ matrix.os }} py${{ matrix.python }}::$detail"
 
 
