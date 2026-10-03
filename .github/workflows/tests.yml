@@ -62,6 +62,23 @@ jobs:
           MPLBACKEND: Agg
         run: python tools/render_timing.py
 
+      # Ces tests echouent ou bloquent sous macOS seulement : on les lance a
+      # part, une minute au lieu de trente-cinq, et on republie leurs erreurs.
+      - name: Diagnostic des echecs (macOS)
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          QT_QPA_PLATFORM: offscreen
+          MPLBACKEND: Agg
+        run: >-
+          python tools/ci_diagnose.py
+          tests/test_feedback.py::test_figure_size_does_not_move_the_panels
+          tests/test_feedback.py::test_canvas_shows_the_figure_size
+          tests/test_panels.py::test_panel_tab_workflow
+          tests/test_window_actions.py::test_exporting_every_figure_including_a_composite
+          tests/test_window_actions.py::test_two_figures_never_share_a_file
+
       - name: Tests
         # en echec plutot qu'annule au-dela : l'etape suivante peut alors
         # republier la fin du journal
