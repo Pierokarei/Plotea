@@ -44,7 +44,7 @@ tout texte d'interface sans traduction.
 | **Thématiques** | Nature, Science, Cell, PNAS, Minimal, Grayscale — typographie, largeur de colonne et palette conformes aux instructions aux auteurs |
 | **Export** | SVG, PDF, EPS (vectoriels, texte éditable) · PNG, TIFF, JPEG jusqu'à 1200 dpi (600 dpi par défaut) |
 | **Statistiques** | t de Student / Welch / apparié, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs contrôle**, **ANOVA à mesures répétées** (avec correction de Greenhouse-Geisser), **log-rank** sur les courbes de survie, **test exact de Fisher et khi²** (avec ou sans correction de Yates) sur les tableaux de contingence, avec odds ratio, risque relatif et V de Cramér ; corrections Bonferroni / Holm / FDR ; **détection de valeurs aberrantes (Grubbs)** ; barres de significativité automatiques, y compris sur les barres groupées à deux facteurs |
-| **Ajustements** | linéaire, polynomial, exponentiel, logarithmique, puissance, Michaelis-Menten, Hill 4PL (dose-réponse), gaussienne, sigmoïde — avec R², erreurs types et bande de confiance 95 % ; **comparaison de courbes** par le test F de Prism (« l'EC50 de A diffère-t-elle de celle de B ? », ou une seule courbe pour toutes les séries) |
+| **Ajustements** | linéaire, polynomial, exponentiel, logarithmique, puissance, Michaelis-Menten, Hill 4PL (dose-réponse), gaussienne, sigmoïde — ajustés sur chaque réplicat comme Prism, avec R², erreurs types et bande de confiance 95 % ; **comparaison de courbes** par le test F de Prism (« l'EC50 de A diffère-t-elle de celle de B ? », ou une seule courbe pour toutes les séries) |
 | **Figures composites** | plusieurs graphiques sur une même figure, grille au choix, lettres A/B/C automatiques, axes partageables |
 | **Transformations** | % du contrôle, normalisation 0-100, log10 / ln / log2, score z, soustraction de la ligne de base, rapport à une colonne, moyenne des réplicats |
 | **Projets** | fichiers `.plotea` contenant données + graphiques + figures composites, annuler/rétablir, styles réutilisables, export en lot, **copie de secours toutes les deux minutes** et récupération après incident, liste des projets récents |
@@ -398,7 +398,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 478 tests, 5 à 20 minutes selon la machine
+pytest                      # 479 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```

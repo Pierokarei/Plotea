@@ -692,12 +692,27 @@ def draw_histogram(ax, df, spec, theme, info):
     return {}, {}
 
 
+def replicate_points(df: pd.DataFrame, spec: PlotSpec) -> dict:
+    """Each series as measured: every replicate its own point, no means.
+
+    What the curves are fitted to and compared on, as Prism does by default.
+    The plot itself may show means with error bars, but fitting the means
+    would hide the scatter of the replicates: the parameters would come with
+    errors that ignore it, R2 would flatter the fit, and the confidence band
+    would count fewer points than were measured.
+    """
+    raw = spec.clone()
+    raw.error_type = "none"
+    return {s.label: (s.x, s.y) for s in extract_xy(df, raw)}
+
+
 def draw_xy(ax, df, spec, theme, info):
     series = extract_xy(df, spec)
     info.groups = [s.label for s in series]
     info.series = [s.label for s in series]
     if not series:
         return _no_data(ax)
+    points = replicate_points(df, spec) if spec.fit_model != "none" else {}
     colors = _colors(spec, theme, [s.label for s in series])
     sizes = _sizes(spec, theme)
     scatter_mode = spec.plot_type == "scatter"
@@ -740,7 +755,8 @@ def draw_xy(ax, df, spec, theme, info):
                         rasterized=heavy)
 
         if spec.fit_model != "none":
-            res = fitting.fit(s.x, s.y, spec.fit_model,
+            x_fit, y_fit = points.get(s.label, (s.x, s.y))
+            res = fitting.fit(x_fit, y_fit, spec.fit_model,
                               extrapolate=spec.fit_extrapolate)
             if res and res.ok:
                 info.fits[s.label] = res
@@ -755,7 +771,8 @@ def draw_xy(ax, df, spec, theme, info):
                 info.warnings.append(f"{s.label}: {res.message}")
 
     if spec.fit_model != "none" and spec.fit_compare:
-        info.fit_comparison = compare_series(df, spec)
+        info.fit_comparison = fitting.compare_fits(
+            points, spec.fit_model, spec.fit_compare)
         if not info.fit_comparison.ok:
             info.warnings.append(info.fit_comparison.message)
 
@@ -786,20 +803,6 @@ def draw_xy(ax, df, spec, theme, info):
                 bbox=dict(facecolor="white", alpha=0.75, edgecolor="none",
                           boxstyle="round,pad=0.25"))
     return {}, {}
-
-
-def compare_series(df: pd.DataFrame, spec: PlotSpec):
-    """Compare the fitted curves on every replicate, not on their means.
-
-    The curves on screen may go through the means, but the comparison is a
-    count of residual error: fitting means would hide the scatter of the
-    replicates and claim fewer points than were measured. Prism fits each
-    replicate by default for the same reason.
-    """
-    raw = spec.clone()
-    raw.error_type = "none"
-    series = {s.label: (s.x, s.y) for s in extract_xy(df, raw)}
-    return fitting.compare_fits(series, spec.fit_model, spec.fit_compare)
 
 
 def comparison_line(comparison) -> str:

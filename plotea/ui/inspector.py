@@ -720,7 +720,9 @@ class Inspector(QWidget):
         self.cmb_eqloc = self._bind(QComboBox(), "fit_equation_loc")
         self.fill(self.cmb_eqloc, enums.EQUATION_LOC)
         sec.add_row(tr("Position équation"), self.cmb_eqloc)
-        sec.add_widget(hint(tr("L'ajustement est calculé série par série.")))
+        sec.add_widget(hint(tr("L'ajustement est calculé série par série, sur chaque "
+                "réplicat comme Prism : les points tracés restent les "
+                "moyennes.")))
 
     def _refill_compare(self, keep: str | None = None):
         """Offer the parameters of the chosen model, keeping the choice."""

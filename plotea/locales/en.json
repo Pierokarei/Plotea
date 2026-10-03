@@ -318,7 +318,7 @@
  "Km": "Km",
  "Kruskal-Wallis": "Kruskal-Wallis",
  "Kruskal-Wallis + Dunn": "Kruskal-Wallis + Dunn",
- "L'ajustement est calculé série par série.": "The fit is computed series by series.",
+ "L'ajustement est calculé série par série, sur chaque réplicat comme Prism : les points tracés restent les moyennes.": "Each series is fitted on its own, to every replicate as Prism does: the points drawn are still the means.",
  "La grille {rows}x{cols} ne peut pas contenir {count} graphiques.": "A {rows}x{cols} grid cannot hold {count} plots.",
  "La session précédente ne s'est pas terminée normalement.": "The previous session did not end normally.",
  "La transformation ne produit aucune donnée.": "The transform produces no data.",

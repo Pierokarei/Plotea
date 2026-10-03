@@ -169,9 +169,31 @@ def test_every_replicate_is_compared_not_the_means():
     assert comparison.ok
     per_series = df.groupby("Composé").size().to_dict()
     assert comparison.n == per_series            # 33 each, not 11 means
-    # the curves drawn still go through the means
-    assert all(res.n < n for res, n in zip(info.fits.values(),
-                                            per_series.values()))
+    # and the curves drawn are fitted to the same points: same values
+    for label, res in info.fits.items():
+        assert res.n == per_series[label]
+        assert res.params["logEC50"] == pytest.approx(
+            comparison.free[label]["logEC50"], rel=1e-6)
+
+
+def test_drawn_curves_follow_the_replicates_not_the_means():
+    """Unequal replicates: fitting the means would weigh a dose measured
+    once like one measured five times. The curve must follow the points."""
+    x = np.array([1, 1, 1, 1, 1, 2, 3, 3, 3, 4, 5, 5], dtype=float)
+    y = np.array([1.0, 1.4, 0.6, 1.2, 0.8, 3.1, 2.4, 3.0, 2.7, 4.2, 4.6,
+                  5.4])
+    df = pd.DataFrame({"x": x, "y": y})
+    spec = PlotSpec(plot_type="line", x="x", y=["y"], fit_model="linear",
+                    error_type="sem")
+    drawn = plotting.render(Figure(), spec, df).fits["y"]
+    on_points = ft.fit(x, y, "linear")
+    means = df.groupby("x")["y"].mean()
+    on_means = ft.fit(means.index.to_numpy(), means.to_numpy(), "linear")
+    assert drawn.n == x.size
+    assert drawn.params["a"] == pytest.approx(on_points.params["a"])
+    assert drawn.params["a"] != pytest.approx(on_means.params["a"], rel=1e-3)
+    # the points on the plot are still the means with their error bars
+    assert plotting.extract_xy(df, spec)[0].x.size == means.size
 
 
 def test_the_verdict_is_written_on_the_figure():
