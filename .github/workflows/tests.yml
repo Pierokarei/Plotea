@@ -51,9 +51,9 @@ jobs:
       - name: Lint
         run: ruff check plotea tests tools run_plotea.py
 
-      # Les tests macOS ont cesse de finir : ce releve dit en une minute
-      # combien coutent un rendu et chaque export, et quelles polices ont
-      # ete trouvees, en annotations lisibles sans compte.
+      # Un rendu et chaque export chronometres, et les polices trouvees, en
+      # annotations lisibles sans compte : c'est ce releve qui a montre que
+      # macOS n'etait pas lent mais plantait sur Helvetica.ttc.
       - name: Diagnostic du rendu (macOS)
         if: runner.os == 'macOS'
         timeout-minutes: 10
@@ -61,23 +61,6 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           MPLBACKEND: Agg
         run: python tools/render_timing.py
-
-      # Ces tests echouent ou bloquent sous macOS seulement : on les lance a
-      # part, une minute au lieu de trente-cinq, et on republie leurs erreurs.
-      - name: Diagnostic des echecs (macOS)
-        if: runner.os == 'macOS'
-        continue-on-error: true
-        timeout-minutes: 10
-        env:
-          QT_QPA_PLATFORM: offscreen
-          MPLBACKEND: Agg
-        run: >-
-          python tools/ci_diagnose.py
-          tests/test_feedback.py::test_figure_size_does_not_move_the_panels
-          tests/test_feedback.py::test_canvas_shows_the_figure_size
-          tests/test_panels.py::test_panel_tab_workflow
-          tests/test_window_actions.py::test_exporting_every_figure_including_a_composite
-          tests/test_window_actions.py::test_two_figures_never_share_a_file
 
       - name: Tests
         # en echec plutot qu'annule au-dela : l'etape suivante peut alors
@@ -97,7 +80,7 @@ jobs:
           set -o pipefail
           # Un test bloque echoue au bout de 10 minutes en affichant la pile
           # de chaque fil : c'est ce que l'etape suivante republie.
-          pytest tests -v --durations=10 --timeout=600 --timeout-method=thread $COV 2>&1 | tee pytest.log
+          pytest tests -q --durations=10 --timeout=600 --timeout-method=thread $COV 2>&1 | tee pytest.log
 
       # GitHub demande maintenant une connexion pour lire les journaux, y
       # compris sur un depot public. La fin de la sortie est donc republiee

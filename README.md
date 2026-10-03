@@ -166,8 +166,9 @@ python -m plotea
   Ubuntu). Les polices Helvetica/Arial sont remplacées automatiquement par
   Nimbus Sans ou Liberation Sans ; pour un rendu identique aux revues,
   installez `fonts-liberation`.
-- **macOS** — rien de particulier ; Helvetica est présente nativement, donc
-  les thématiques Nature / Science / PNAS rendent leur typographie exacte.
+- **macOS** — rien de particulier. Helvetica n'y existe que sous forme de
+  collection système (`.ttc`), que matplotlib ne lit pas de façon fiable :
+  Plotea emploie Arial, aux métriques identiques.
 - **Windows** — Arial est utilisée à la place de Helvetica (métriques
   identiques). **Évitez les chemins très longs** : les DLL de Qt échouent à se
   charger au-delà de la limite Windows. Placez l'environnement virtuel dans un
@@ -386,7 +387,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 459 tests, 5 à 20 minutes selon la machine
+pytest                      # 460 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```

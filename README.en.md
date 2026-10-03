@@ -159,8 +159,9 @@ python -m plotea
   `sudo apt install libxcb-cursor0 libxkbcommon-x11-0` (Debian / Ubuntu).
   Helvetica and Arial are replaced automatically by Nimbus Sans or Liberation
   Sans; for output identical to the journals', install `fonts-liberation`.
-- **macOS**: nothing special. Helvetica ships with the system, so the
-  Nature / Science / PNAS themes render their exact typography.
+- **macOS**: nothing special. Helvetica only ships as a system font
+  collection (`.ttc`), which matplotlib does not read reliably: Plotea uses
+  Arial, whose metrics are identical.
 - **Windows**: Arial is used in place of Helvetica (identical metrics).
   **Avoid very long paths**: Qt's DLLs fail to load beyond the Windows path
   limit. Put the virtual environment in a short path, for example
@@ -378,7 +379,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 459 tests, 5 to 20 minutes depending on the machine
+pytest                      # 460 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```

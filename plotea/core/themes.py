@@ -12,6 +12,10 @@ from dataclasses import dataclass, field
 MM = 1.0 / 25.4  # mm -> inch
 
 
+#: Font files holding several faces, which matplotlib does not read reliably.
+COLLECTIONS = (".ttc", ".otc", ".dfont")
+
+
 @functools.lru_cache(maxsize=None)
 def installed_fonts(families: tuple[str, ...]) -> list[str]:
     """The fonts of a theme this machine actually has, in order.
@@ -19,11 +23,24 @@ def installed_fonts(families: tuple[str, ...]) -> list[str]:
     matplotlib warns about every missing family each time a text is drawn;
     asking only for what is installed keeps the log clean. DejaVu Sans ships
     with matplotlib, so the list is never empty.
+
+    A family found only inside a font collection (.ttc, .otc, .dfont) is
+    left out: matplotlib's FreeType fails on some of their glyphs at some
+    sizes - Helvetica.ttc on macOS raised "failed to load glyph" on a "0" in
+    a zoomed preview, and an error while Qt paints aborts the application.
+    On macOS that means Arial, whose widths are Helvetica's.
     """
+    import os
+
     from matplotlib import font_manager
 
-    known = {entry.name for entry in font_manager.fontManager.ttflist}
-    found = [family for family in families if family in known]
+    files: dict[str, list[str]] = {}
+    for entry in font_manager.fontManager.ttflist:
+        files.setdefault(entry.name, []).append(entry.fname)
+    usable = {name for name, paths in files.items()
+              if not any(os.path.splitext(path)[1].lower() in COLLECTIONS
+                         for path in paths)}
+    found = [family for family in families if family in usable]
     return found or ["DejaVu Sans"]
 
 

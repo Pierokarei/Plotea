@@ -182,6 +182,25 @@ def test_only_installed_fonts_are_asked_for():
     assert installed_fonts(("Police imaginaire",)) == ["DejaVu Sans"]
 
 
+def test_a_font_only_found_in_a_collection_is_left_out(monkeypatch):
+    """Helvetica.ttc on macOS: FreeType failed on its glyphs, and an error
+    while Qt paints aborts the whole application."""
+    from types import SimpleNamespace
+
+    from matplotlib import font_manager
+
+    fake = [SimpleNamespace(name="Helvetica",
+                            fname="/System/Library/Fonts/Helvetica.ttc"),
+            SimpleNamespace(name="Arial", fname="/Library/Fonts/Arial.ttf"),
+            SimpleNamespace(name="DejaVu Sans", fname="/mpl/DejaVuSans.ttf")]
+    monkeypatch.setattr(font_manager.fontManager, "ttflist", fake)
+    installed_fonts.cache_clear()
+    try:
+        assert installed_fonts(("Helvetica", "Arial", "DejaVu Sans")) ==             ["Arial", "DejaVu Sans"]
+    finally:
+        installed_fonts.cache_clear()
+
+
 # --------------------------------------------------------------------------
 # Exported files
 # --------------------------------------------------------------------------
