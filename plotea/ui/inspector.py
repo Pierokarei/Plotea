@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core import enums
+from ..core import enums, fitting
 from ..core.plotspec import PLOT_TYPES, PlotSpec
 from ..core.stats import PAIRED_TESTS
 from ..core.themes import LINESTYLES, MARKERS, PALETTES, THEMES
@@ -225,6 +225,9 @@ class Inspector(QWidget):
                 widget.setChecked(bool(value))
             elif isinstance(widget, QLineEdit):
                 widget.setText(str(value or ""))
+
+        # its choices depend on the model, which the loop above just set
+        self._refill_compare(keep=spec.fit_compare)
 
         for btn in self.type_buttons.buttons():
             if btn.property("plot_type") == spec.plot_type:
@@ -689,9 +692,22 @@ class Inspector(QWidget):
     def _build_fit(self):
         sec = self._add(CollapsibleSection(tr("Ajustement de courbe"), False))
         self.sec_fit = sec
-        self.cmb_fit = self._bind(QComboBox(), "fit_model")
+        self.cmb_fit = QComboBox()
+        # connected before the binding: the comparison choices follow the
+        # model before the spec is read back from the widgets
+        self.cmb_fit.currentIndexChanged.connect(
+            lambda *_: self._refill_compare())
+        self._bind(self.cmb_fit, "fit_model")
         self.fill(self.cmb_fit, enums.FIT_MODEL)
         sec.add_row(tr("Modèle"), self.cmb_fit)
+        self.cmb_fit_compare = self._bind(QComboBox(), "fit_compare")
+        sec.add_row(tr("Comparer"), self.cmb_fit_compare)
+        self.hint_compare = hint(
+            tr("Test F, comme Prism : la même courbe avec ce paramètre commun "
+               "à toutes les séries s'ajuste-t-elle nettement moins bien ? "
+               "Calculé sur chaque réplicat."))
+        sec.add_widget(self.hint_compare)
+        self._refill_compare()
         self.chk_fit_ci = self._bind(QCheckBox(tr("Bande de confiance 95 %")),
                                      "fit_ci")
         self.chk_fit_eq = self._bind(QCheckBox(tr("Afficher équation et R2")),
@@ -705,6 +721,28 @@ class Inspector(QWidget):
         self.fill(self.cmb_eqloc, enums.EQUATION_LOC)
         sec.add_row(tr("Position équation"), self.cmb_eqloc)
         sec.add_widget(hint(tr("L'ajustement est calculé série par série.")))
+
+    def _refill_compare(self, keep: str | None = None):
+        """Offer the parameters of the chosen model, keeping the choice."""
+        combo = getattr(self, "cmb_fit_compare", None)
+        if combo is None:                    # still building the panel
+            return
+        if keep is None:
+            keep = combo.currentData() or ""
+        model = fitting.MODELS.get(self.cmb_fit.currentData() or "none")
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem(tr("Ne pas comparer"), "")
+        if model is not None and model.func is not None:
+            combo.addItem(tr("Une seule courbe pour toutes les séries ?"),
+                          fitting.ONE_CURVE)
+            for name in model.params:
+                combo.addItem(tr("{param} différent entre les séries ?"
+                                 ).format(param=tr(name)), name)
+        index = combo.findData(keep)
+        combo.setCurrentIndex(index if index >= 0 else 0)
+        combo.blockSignals(False)
+        self.hint_compare.setVisible(bool(combo.currentData()))
 
     def _build_stats(self):
         sec = self._add(CollapsibleSection(tr("Statistiques"), True))
@@ -794,6 +832,7 @@ class Inspector(QWidget):
             if label is not None:
                 label.setVisible(xy)
         self.sec_fit.setVisible(xy)
+        self.hint_compare.setVisible(bool(self.spec.fit_compare))
         self.sec_stats.setVisible(cat or surv or ct)
         # on a survival plot the only statistic is the log-rank, so the test
         # pickers have nothing to offer

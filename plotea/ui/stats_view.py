@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core import fitting
+from ..core import fitting, plotting
 from ..i18n import tr
 
 
@@ -88,6 +88,35 @@ def _fill(table: QTableWidget, rows: list[dict], highlight: str = ""):
                 else:
                     item.setForeground(QColor("#8A929C"))
             table.setItem(r, c, item)
+
+
+def comparison_block(comparison) -> str:
+    """The fits tab's account of a comparison: the test, then the values."""
+    title = f"=== {tr('Comparaison des courbes')} ==="
+    if not comparison.ok:
+        return f"{title}\n{comparison.message}"
+    what = (tr("Une seule courbe pour toutes les séries ?")
+            if comparison.shared == fitting.ONE_CURVE else
+            tr("{param} différent entre les séries ?").format(
+                param=tr(comparison.shared)))
+    lines = [title, what,
+             tr("Test F des sommes de carrés supplémentaires : F({num}, {den})"
+                " = {F:.4g}, p = {p:.4g}").format(
+                 num=comparison.df_num, den=comparison.df_den,
+                 F=comparison.F, p=comparison.p),
+             tr("Conclusion : différent (p < 0,05).") if comparison.differs
+             else tr("Conclusion : pas de différence démontrée (p >= 0,05).")]
+    names = list(comparison.common)
+    for label, params in comparison.free.items():
+        values = ", ".join(f"{tr(name)} = {params[name]:.4g}"
+                           for name in names)
+        lines.append(tr("  {label} (ajustement libre, n = {n}) : {values}"
+                        ).format(label=label, n=comparison.n.get(label, "?"),
+                                 values=values))
+    common = ", ".join(f"{tr(name)} = {value:.4g}"
+                       for name, value in comparison.common.items())
+    lines.append(tr("  Valeur commune : {values}").format(values=common))
+    return "\n".join(lines)
 
 
 class StatsPanel(QWidget):
@@ -201,6 +230,9 @@ class StatsPanel(QWidget):
                 head.append(f"{tr(name)}: p = {p:.4g}")
             else:
                 head.append(f"{tr(name)}: stat = {stat:.4g}, p = {p:.4g}")
+        comparison = getattr(info, "fit_comparison", None)
+        if comparison is not None and comparison.ok:
+            head.append(plotting.comparison_line(comparison))
         if info.comparisons:
             head.append(tr("{count} comparaison(s)").format(
                 count=len(info.comparisons)))
@@ -222,6 +254,8 @@ class StatsPanel(QWidget):
                 for k, v in res.extra.items():
                     lines.append(f"{tr(k)} = {v:.4g}")
                 blocks.append("\n".join(lines))
+            if comparison is not None:
+                blocks.append(comparison_block(comparison))
             self.fits.setPlainText("\n\n".join(blocks))
         else:
             self.fits.setPlainText(tr("Aucun ajustement actif."))

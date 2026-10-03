@@ -39,7 +39,7 @@ any interface text that has no translation.
 | **Themes** | Nature, Science, Cell, PNAS, Minimal, Grayscale: typography, column width and palette that follow each journal's author guidelines |
 | **Export** | SVG, PDF, EPS (vector, editable text) · PNG, TIFF, JPEG up to 1200 dpi (600 dpi by default) |
 | **Statistics** | Student's / Welch's / paired t-test, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs control**, **repeated-measures ANOVA** (with Greenhouse-Geisser correction), **log-rank** on survival curves, **Fisher's exact test and chi-square** (with or without Yates' correction) on contingency tables, with odds ratio, relative risk and Cramér's V; Bonferroni / Holm / FDR corrections; **outlier detection (Grubbs)**; automatic significance bars, including on bars grouped by two factors |
-| **Fits** | linear, polynomial, exponential, logarithmic, power, Michaelis-Menten, Hill 4PL (dose-response), Gaussian, sigmoid, with R², standard errors and a 95 % confidence band |
+| **Fits** | linear, polynomial, exponential, logarithmic, power, Michaelis-Menten, Hill 4PL (dose-response), Gaussian, sigmoid, with R², standard errors and a 95 % confidence band; **curve comparison** with Prism's F test ("does A's EC50 differ from B's?", or one curve for all series) |
 | **Composite figures** | several plots on one figure, grid of your choice, automatic A/B/C lettering, shared axes |
 | **Transforms** | percent of control, 0-100 normalization, log10 / ln / log2, z-score, baseline subtraction, ratio to a column, mean of replicates |
 | **Projects** | `.plotea` files holding data, plots and composite figures; undo/redo, reusable styles, batch export, **backup copy every two minutes** with recovery after a crash, recent projects list |
@@ -260,6 +260,16 @@ the whole figure.
 plots, transforms and composite figures. A burst of quick edits counts as a
 single step, as in a text editor.
 
+### Comparing fitted curves
+
+With several series (a "Group by" column, or several Y columns) and a fit
+model, the **Compare** list in the Curve fitting section asks the
+question: "logEC50 different between series?", or "One curve for all
+series?". The answer is the extra sum-of-squares F test, Prism's: does the
+same curve with this parameter shared fit clearly worse? It is computed on
+every replicate, and the result shows on the figure and in the Fits tab,
+with each series' value and the shared one.
+
 ### Two-factor designs
 
 With a **Group by** column and a **Subgroup** column, Plotea compares the
@@ -379,7 +389,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 460 tests, 5 to 20 minutes depending on the machine
+pytest                      # 478 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -391,6 +401,7 @@ pytest -k paired            # a single topic (paired tests)
 | `test_pzfx.py` | Prism import, checked on real Prism files |
 | `test_contingency.py` | Fisher, chi-square, odds ratio and relative risk, checked against published results |
 | `test_layout.py` | group names that never overlap, the journal's font and editable text in exported files |
+| `test_fit_compare.py` | curve comparison, checked against the analysis of covariance and on its false-alarm rate |
 | `test_stats_fixes.py` | grouped bars, paired tests, missing values |
 | `test_anova.py` | two-way ANOVA, test choice per family |
 | `test_advanced_stats.py` | Dunnett, repeated-measures ANOVA, outliers |

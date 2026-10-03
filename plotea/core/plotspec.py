@@ -131,6 +131,9 @@ class PlotSpec:
     fit_show_equation: bool = True
     fit_extrapolate: bool = False
     fit_equation_loc: str = "top left"
+    # "" no comparison, "all" one curve for every series, or the name of a
+    # parameter of the model whose value may differ between the series
+    fit_compare: str = ""
 
     # -- statistics --------------------------------------------------------
     stats_enabled: bool = False

@@ -44,7 +44,7 @@ tout texte d'interface sans traduction.
 | **Thématiques** | Nature, Science, Cell, PNAS, Minimal, Grayscale — typographie, largeur de colonne et palette conformes aux instructions aux auteurs |
 | **Export** | SVG, PDF, EPS (vectoriels, texte éditable) · PNG, TIFF, JPEG jusqu'à 1200 dpi (600 dpi par défaut) |
 | **Statistiques** | t de Student / Welch / apparié, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs contrôle**, **ANOVA à mesures répétées** (avec correction de Greenhouse-Geisser), **log-rank** sur les courbes de survie, **test exact de Fisher et khi²** (avec ou sans correction de Yates) sur les tableaux de contingence, avec odds ratio, risque relatif et V de Cramér ; corrections Bonferroni / Holm / FDR ; **détection de valeurs aberrantes (Grubbs)** ; barres de significativité automatiques, y compris sur les barres groupées à deux facteurs |
-| **Ajustements** | linéaire, polynomial, exponentiel, logarithmique, puissance, Michaelis-Menten, Hill 4PL (dose-réponse), gaussienne, sigmoïde — avec R², erreurs types et bande de confiance 95 % |
+| **Ajustements** | linéaire, polynomial, exponentiel, logarithmique, puissance, Michaelis-Menten, Hill 4PL (dose-réponse), gaussienne, sigmoïde — avec R², erreurs types et bande de confiance 95 % ; **comparaison de courbes** par le test F de Prism (« l'EC50 de A diffère-t-elle de celle de B ? », ou une seule courbe pour toutes les séries) |
 | **Figures composites** | plusieurs graphiques sur une même figure, grille au choix, lettres A/B/C automatiques, axes partageables |
 | **Transformations** | % du contrôle, normalisation 0-100, log10 / ln / log2, score z, soustraction de la ligne de base, rapport à une colonne, moyenne des réplicats |
 | **Projets** | fichiers `.plotea` contenant données + graphiques + figures composites, annuler/rétablir, styles réutilisables, export en lot, **copie de secours toutes les deux minutes** et récupération après incident, liste des projets récents |
@@ -273,6 +273,17 @@ création et la suppression de graphiques, les transformations et les figures
 composites. Une série de retouches rapprochées compte pour une seule étape,
 comme dans un éditeur de texte.
 
+### Comparer des courbes ajustées
+
+Avec plusieurs séries (colonne « Grouper par », ou plusieurs colonnes Y) et
+un modèle d'ajustement, la liste **Comparer** de la section Ajustement de
+courbe pose la question : « logEC50 différent entre les séries ? », ou
+« Une seule courbe pour toutes les séries ? ». La réponse est le test F des
+sommes de carrés supplémentaires, celui de Prism : la même courbe avec ce
+paramètre commun s'ajuste-t-elle nettement moins bien ? Il est calculé sur
+chaque réplicat, et le résultat s'affiche sur la figure et dans l'onglet
+Ajustements, avec la valeur de chaque série et la valeur commune.
+
 ### Plans à deux facteurs
 
 Avec une colonne **Grouper par** et une colonne **Sous-groupe**, Plotea compare
@@ -387,7 +398,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 460 tests, 5 à 20 minutes selon la machine
+pytest                      # 478 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -399,6 +410,7 @@ pytest -k paired            # un seul sujet (les tests appariés)
 | `test_pzfx.py` | import Prism, vérifié sur de vrais fichiers Prism |
 | `test_contingency.py` | Fisher, khi², odds ratio et risque relatif, vérifiés sur des résultats publiés |
 | `test_layout.py` | noms de groupes sans chevauchement, police du journal et texte éditable dans les fichiers exportés |
+| `test_fit_compare.py` | comparaison de courbes, vérifiée contre l'analyse de covariance et sur son taux de fausses alertes |
 | `test_stats_fixes.py` | barres groupées, tests appariés, valeurs manquantes |
 | `test_anova.py` | ANOVA à deux facteurs, choix de test par famille |
 | `test_advanced_stats.py` | Dunnett, ANOVA à mesures répétées, valeurs aberrantes |

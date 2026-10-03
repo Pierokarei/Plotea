@@ -289,6 +289,180 @@ def fit(x, y, model_name: str, n_points: int = 200,
                      int(x.size), equation, xf, yf, ci_low, ci_high, extra)
 
 
+# --------------------------------------------------------------------------
+# Comparing curves: does a parameter differ between the series?
+# --------------------------------------------------------------------------
+#: fit_compare value asking whether one curve fits every series at once
+ONE_CURVE = "all"
+
+
+@dataclass
+class FitComparison:
+    """Extra sum-of-squares F test, as Prism runs it.
+
+    The free fit gives every series its own parameters; the constrained one
+    makes `shared` common to all of them (or every parameter, for
+    ONE_CURVE). If sharing costs more residual error than chance explains,
+    the parameter differs between the series.
+    """
+    shared: str
+    model: str
+    F: float = float("nan")
+    df_num: int = 0
+    df_den: int = 0
+    p: float = float("nan")
+    ss_free: float = float("nan")
+    ss_shared: float = float("nan")
+    free: dict = field(default_factory=dict)    # series -> {param: value}
+    common: dict = field(default_factory=dict)  # shared param -> value
+    n: dict = field(default_factory=dict)       # series -> points
+    ok: bool = False
+    message: str = ""
+
+    @property
+    def differs(self) -> bool:
+        return self.ok and self.p < 0.05
+
+
+def _points(x, y):
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    keep = np.isfinite(x) & np.isfinite(y)
+    return x[keep], y[keep]
+
+
+def _free_fit(model: Model, x, y):
+    """One series on its own: (parameters, residual sum of squares)."""
+    p0 = model.guess(x[np.argsort(x)], y[np.argsort(x)])
+    popt, _ = curve_fit(model.func, x, y, p0=p0, maxfev=20000,
+                        bounds=model.bounds)
+    resid = y - model.func(x, *popt)
+    return np.asarray(popt, dtype=float), float(np.sum(resid ** 2))
+
+
+def compare_fits(series: dict, model_name: str, shared: str
+                 ) -> FitComparison:
+    """Test whether `shared` (a parameter name, or ONE_CURVE) differs.
+
+    `series` maps a label to its (x, y) points - every replicate as its own
+    point, as Prism fits them by default. Each series needs more points than
+    the model has parameters.
+    """
+    from scipy.optimize import least_squares
+
+    key = FIT_MODEL.normalise(model_name)
+    model = MODELS.get(key)
+    result = FitComparison(shared=shared, model=key)
+    if model is None or model.func is None:
+        result.message = tr("Choisissez d'abord un modèle d'ajustement.")
+        return result
+    names = list(model.params)
+    if shared != ONE_CURVE and shared not in names:
+        result.message = tr("Paramètre « {name} » inconnu pour ce modèle."
+                            ).format(name=shared)
+        return result
+    data = {label: _points(*xy) for label, xy in series.items()}
+    data = {label: xy for label, xy in data.items() if xy[0].size}
+    if len(data) < 2:
+        result.message = tr("Comparer des courbes demande au moins deux "
+                            "séries.")
+        return result
+    k = len(names)
+    small = [label for label, (x, _y) in data.items() if x.size <= k]
+    if small:
+        result.message = tr("Pas assez de points pour comparer : {names}."
+                            ).format(names=", ".join(map(str, small)))
+        return result
+
+    labels = list(data)
+    m = len(labels)
+    try:
+        free = {label: _free_fit(model, *data[label]) for label in labels}
+    except Exception as exc:
+        result.message = tr("Convergence impossible ({error})."
+                            ).format(error=exc)
+        return result
+    ss_free = sum(ss for _p, ss in free.values())
+    n_total = sum(data[label][0].size for label in labels)
+    df_free = n_total - m * k
+
+    common_idx = list(range(k)) if shared == ONE_CURVE else \
+        [names.index(shared)]
+    own_idx = [i for i in range(k) if i not in common_idx]
+
+    def unpack(theta):
+        """theta = common values, then each series' own values."""
+        common = theta[:len(common_idx)]
+        rest = theta[len(common_idx):].reshape(m, len(own_idx))
+        for j in range(m):
+            params = np.empty(k)
+            params[common_idx] = common
+            params[own_idx] = rest[j]
+            yield params
+
+    def residuals(theta):
+        return np.concatenate([
+            data[label][1] - model.func(data[label][0], *params)
+            for label, params in zip(labels, unpack(theta))])
+
+    # start from the free fits: the others where each series left them, the
+    # common value at their mean - and again at each series' own value. The
+    # constrained error can have several hollows (one per series, when the
+    # curves are far apart); a single start may settle in the wrong one.
+    starts = np.array([free[label][0] for label in labels])
+    candidates = [starts[:, common_idx].mean(axis=0)] + \
+        [starts[j, common_idx] for j in range(m)]
+    low, high = model.bounds
+    lower = np.broadcast_to(low, (k,)) if np.ndim(low) == 0 else \
+        np.asarray(low, dtype=float)
+    upper = np.broadcast_to(high, (k,)) if np.ndim(high) == 0 else \
+        np.asarray(high, dtype=float)
+    lower = np.concatenate([lower[common_idx], np.tile(lower[own_idx], m)])
+    upper = np.concatenate([upper[common_idx], np.tile(upper[own_idx], m)])
+    solution, failure = None, None
+    for common_start in candidates:
+        theta0 = np.clip(np.concatenate([common_start,
+                                         starts[:, own_idx].ravel()]),
+                         lower, upper)
+        try:
+            attempt = least_squares(residuals, theta0, bounds=(lower, upper),
+                                    max_nfev=20000, x_scale="jac")
+        except Exception as exc:
+            failure = exc
+            continue
+        if solution is None or attempt.cost < solution.cost:
+            solution = attempt
+    if solution is None:
+        result.message = tr("Convergence impossible ({error})."
+                            ).format(error=failure)
+        return result
+    ss_shared = float(np.sum(solution.fun ** 2))
+    df_shared = n_total - (len(common_idx) + m * len(own_idx))
+    df_num = df_shared - df_free
+    if df_free <= 0 or df_num <= 0:
+        result.message = tr("Pas assez de points pour comparer.")
+        return result
+
+    # the constrained fit can never truly beat the free one; a hair below
+    # it is the optimiser's rounding, not evidence
+    gain = max(ss_shared - ss_free, 0.0)
+    if ss_free > 0:
+        F = (gain / df_num) / (ss_free / df_free)
+        p = float(sps.f.sf(F, df_num, df_free))
+    else:                              # every series fitted exactly
+        F, p = (float("inf"), 0.0) if gain > 0 else (0.0, 1.0)
+    result.F, result.p = float(F), p
+    result.df_num, result.df_den = int(df_num), int(df_free)
+    result.ss_free, result.ss_shared = ss_free, ss_shared
+    result.free = {label: dict(zip(names, map(float, free[label][0])))
+                   for label in labels}
+    result.common = dict(zip([names[i] for i in common_idx],
+                             map(float, solution.x[:len(common_idx)])))
+    result.n = {label: int(data[label][0].size) for label in labels}
+    result.ok = True
+    return result
+
+
 def correlation(x, y, method: str = "pearson") -> dict:
     """Pearson/Spearman correlation, shown next to scatter plots."""
     x = np.asarray(x, float)

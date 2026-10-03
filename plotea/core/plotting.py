@@ -41,6 +41,7 @@ class RenderInfo:
     anova_title: str = "ANOVA 2 facteurs"
     outliers: list = field(default_factory=list)    # Grubbs, group by group
     contingency: list = field(default_factory=list) # odds ratio, RR, V...
+    fit_comparison: object = None                  # fitting.FitComparison
 
 
 # --------------------------------------------------------------------------
@@ -753,6 +754,11 @@ def draw_xy(ax, df, spec, theme, info):
             elif res:
                 info.warnings.append(f"{s.label}: {res.message}")
 
+    if spec.fit_model != "none" and spec.fit_compare:
+        info.fit_comparison = compare_series(df, spec)
+        if not info.fit_comparison.ok:
+            info.warnings.append(info.fit_comparison.message)
+
     if spec.fit_show_equation and info.fits:
         # One series: the full equation fits. Several: stay compact and let
         # the Analyses panel carry the detail.
@@ -763,6 +769,9 @@ def draw_xy(ax, df, spec, theme, info):
         else:
             for lab, res in info.fits.items():
                 lines.append(f"{lab}: R2 = {res.r2:.4f}")
+        comparison = info.fit_comparison
+        if comparison is not None and comparison.ok:
+            lines.append(comparison_line(comparison))
         anchors = {
             "top left": (0.02, 0.98, "top", "left"),
             "top right": (0.98, 0.98, "top", "right"),
@@ -777,6 +786,31 @@ def draw_xy(ax, df, spec, theme, info):
                 bbox=dict(facecolor="white", alpha=0.75, edgecolor="none",
                           boxstyle="round,pad=0.25"))
     return {}, {}
+
+
+def compare_series(df: pd.DataFrame, spec: PlotSpec):
+    """Compare the fitted curves on every replicate, not on their means.
+
+    The curves on screen may go through the means, but the comparison is a
+    count of residual error: fitting means would hide the scatter of the
+    replicates and claim fewer points than were measured. Prism fits each
+    replicate by default for the same reason.
+    """
+    raw = spec.clone()
+    raw.error_type = "none"
+    series = {s.label: (s.x, s.y) for s in extract_xy(df, raw)}
+    return fitting.compare_fits(series, spec.fit_model, spec.fit_compare)
+
+
+def comparison_line(comparison) -> str:
+    """One line for the figure: what was compared, and the verdict."""
+    what = (tr("une seule courbe") if comparison.shared == fitting.ONE_CURVE
+            else tr(comparison.shared))
+    p = comparison.p
+    shown = f"p = {p:.2g}" if p >= 1e-4 else "p < 0.0001"
+    return tr("{what} : F({num}, {den}) = {F:.3g}, {p}").format(
+        what=what, num=comparison.df_num, den=comparison.df_den,
+        F=comparison.F, p=shown)
 
 
 def draw_survival(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
