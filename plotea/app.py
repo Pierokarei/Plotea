@@ -5,7 +5,7 @@ import os
 import sys
 import traceback
 
-from PyQt6.QtCore import QLibraryInfo, QLocale, Qt, QTranslator
+from PyQt6.QtCore import QEvent, QLibraryInfo, QLocale, Qt, QTranslator
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QApplication
 
@@ -261,6 +261,20 @@ def open_arguments(window, argv: list[str]) -> bool:
     return False
 
 
+def tear_down(app: QApplication, window) -> None:
+    """Destroy the window while the application still exists.
+
+    Left to the interpreter's exit, the two are destroyed in whatever order
+    Python picks; when the application goes first, deleting the window
+    touches freed memory and Windows ends the process with an access
+    violation (0xC0000005) - after everything had gone well, and only now
+    and then.
+    """
+    window.deleteLater()
+    app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    app.processEvents()
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
     app, window = build(argv)
@@ -273,12 +287,15 @@ def main(argv: list[str] | None = None) -> int:
             print(line)
         window.project.dirty = False
         window.close()
+        tear_down(app, window)
         print(f"{APP_NAME} {VERSION} démarré correctement")
         return 0
 
     offer_recovery(window)
     open_arguments(window, argv)
-    return app.exec()
+    code = app.exec()
+    tear_down(app, window)
+    return code
 
 
 if __name__ == "__main__":
