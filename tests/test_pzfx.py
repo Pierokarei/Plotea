@@ -172,11 +172,8 @@ def test_the_example_shipped_with_prism():
 # --------------------------------------------------------------------------
 # Tables Plotea cannot plot yet, and files it cannot read
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("name, kind", [
-    ("contingency.pzfx", "contingence"),
-    ("parts_of_whole.pzfx", "parties d'un tout"),
-])
-def test_unplotted_tables_are_imported_and_said_so(name, kind):
+def test_unplotted_tables_are_imported_and_said_so():
+    name, kind = "parts_of_whole.pzfx", "parties d'un tout"
     result = prism(name)
     table = result.tables[0]
     assert table.plot == {}
@@ -185,10 +182,17 @@ def test_unplotted_tables_are_imported_and_said_so(name, kind):
 
 
 def test_contingency_counts_with_their_row_titles():
-    df = only("contingency.pzfx").dataset.df
+    table = only("contingency.pzfx")
+    df = table.dataset.df
     assert list(df["Ligne"]) == ["a", "b"]
     same(df["A"], [10, 20])
     same(df["B"], [30, 40])
+    # Prism tests every contingency table; so does the plot made from it
+    assert table.plot == {"plot_type": "contingency", "group": "Ligne",
+                          "y": ["A", "B"], "xlabel": "",
+                          "stats_enabled": True}
+    info = renders(table)
+    assert info.omnibus[0] == "Test exact de Fisher"
 
 
 def test_summaries_outside_curves_are_imported_without_a_plot():
@@ -315,7 +319,7 @@ def test_the_window_imports_every_table_with_its_plot(window, quiet):
 
 def test_a_table_without_a_plot_adds_data_only(window, quiet):
     plots_before = len(window.project.plots)
-    assert window.import_prism(os.path.join(DATA, "contingency.pzfx"))
+    assert window.import_prism(os.path.join(DATA, "parts_of_whole.pzfx"))
     assert len(window.project.plots) == plots_before
     assert "0 graphique(s) créé(s)" in quiet[-1]
 

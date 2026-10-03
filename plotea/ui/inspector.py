@@ -245,7 +245,7 @@ class Inspector(QWidget):
     CARD_LABELS = {
         "line": "Courbe", "scatter": "Nuage", "histogram": "Histogramme",
         "box": "Boxplot", "violin": "Violon", "bar": "Barres",
-        "survival": "Survie",
+        "survival": "Survie", "contingency": "Contingence",
     }
     CARD_HEIGHT = 62
 
@@ -334,6 +334,13 @@ class Inspector(QWidget):
         sec.add_row(tr("Grouper par"), self.cmb_group)
         self.cmb_subgroup = self._bind(QComboBox(), "subgroup")
         sec.add_row(tr("Sous-groupe"), self.cmb_subgroup)
+        self.hint_counts = hint(
+            tr("Effectifs déjà comptés : une ligne par groupe, cochez une "
+            "colonne d'effectifs par issue dans « Valeurs Y ». Données "
+            "brutes, une ligne par sujet : laissez « Valeurs Y » vide, "
+            "choisissez le groupe dans « Grouper par » et l'issue dans "
+            "« Sous-groupe »."))
+        sec.add_widget(self.hint_counts)
 
         self.lst_err = self._bind(CheckList(), "error_cols")
         self.lst_err.setMaximumHeight(110)
@@ -664,6 +671,12 @@ class Inspector(QWidget):
         self.r_barw = sec.add_row(tr("Largeur barres"), self.spn_barw)
         self.r_baredge = sec.add_widget(row(self.chk_baredge, self.chk_horiz))
         self._build_survival_rows(sec)
+        self._build_contingency_rows(sec)
+
+    def _build_contingency_rows(self, sec):
+        self.cmb_cview = self._bind(QComboBox(), "contingency_view")
+        self.fill(self.cmb_cview, enums.CONTINGENCY_VIEW)
+        self.r_cview = sec.add_row(tr("Barres"), self.cmb_cview)
 
     def _build_survival_rows(self, sec):
         self.chk_surv_ci = self._bind(
@@ -702,6 +715,10 @@ class Inspector(QWidget):
         self.cmb_test = self._bind(QComboBox(), "stats_test")
         self.fill(self.cmb_test, enums.STATS_TEST)
         sec.add_row(tr("Test"), self.cmb_test)
+        # a table of counts has its own tests: one picker or the other shows
+        self.cmb_ctest = self._bind(QComboBox(), "contingency_test")
+        self.fill(self.cmb_ctest, enums.CONTINGENCY_TEST)
+        sec.add_row(tr("Test"), self.cmb_ctest)
         self.cmb_mode = self._bind(QComboBox(), "stats_mode")
         self.fill(self.cmb_mode, enums.STATS_MODE)
         sec.add_row(tr("Comparaisons"), self.cmb_mode)
@@ -753,6 +770,7 @@ class Inspector(QWidget):
         cat = t in ("bar", "box", "violin")
         hist = t == "histogram"
         surv = t == "survival"
+        ct = t == "contingency"
 
         self.lbl_x.setVisible(xy or surv)
         self.lbl_x.setText(tr("Temps de suivi") if surv else tr("Axe X"))
@@ -762,14 +780,21 @@ class Inspector(QWidget):
         self.hint_event.setVisible(surv)
         for widget in (self.r_surv_ci, self.r_censors):
             self._set_row_visible(widget, surv)
-        self.cmb_subgroup.setVisible(t == "bar")
+        self.cmb_subgroup.setVisible(t in ("bar", "contingency"))
+        self.hint_counts.setVisible(ct)
+        self._set_row_visible(self.r_cview, ct)
+        for picker, shown in ((self.cmb_test, not ct), (self.cmb_ctest, ct)):
+            picker.setVisible(shown)
+            label = self.sec_stats.form.labelForField(picker)
+            if label is not None:
+                label.setVisible(shown)
         for widget in (self.r_err_cols, self.hint_err):
             widget.setVisible(xy)
             label = self.sec_data.form.labelForField(widget)
             if label is not None:
                 label.setVisible(xy)
         self.sec_fit.setVisible(xy)
-        self.sec_stats.setVisible(cat or surv)
+        self.sec_stats.setVisible(cat or surv or ct)
         # on a survival plot the only statistic is the log-rank, so the test
         # pickers have nothing to offer
         for widget in (self.cmb_test, self.cmb_mode, self.cmb_control,
@@ -785,7 +810,8 @@ class Inspector(QWidget):
         for w in (self.r_vinner, self.r_vside, self.r_vbw):
             self._set_row_visible(w, t == "violin")
         for w in (self.r_barw, self.r_baredge):
-            self._set_row_visible(w, t == "bar")
+            self._set_row_visible(w, t in ("bar", "contingency"))
+        self.chk_horiz.setEnabled(t == "bar")
 
         self.chk_band.setEnabled(t == "line")
         self.spn_fill.setEnabled(t == "line" and self.spec.error_band)
@@ -796,7 +822,7 @@ class Inspector(QWidget):
         self.spn_jitter.setEnabled(self.spec.show_points and cat)
         self.cmb_control.setEnabled(
             self.spec.stats_mode == "vs_control")
-        is_paired = self.spec.stats_test in PAIRED_TESTS
+        is_paired = self.spec.stats_test in PAIRED_TESTS and not ct
         for widget in (self.r_pair, self.hint_pair):
             widget.setVisible(is_paired)
             label = self.sec_stats.form.labelForField(widget)

@@ -601,6 +601,9 @@ class MainWindow(QMainWindow):
         numeric = ds.numeric_columns()
         categorical = ds.categorical_columns()
         spec.error_cols = []
+        if spec.plot_type == "contingency":
+            self._map_contingency(spec, ds)
+            return
         if spec.plot_type in ("line", "scatter"):
             spec.x = numeric[0] if numeric else (ds.columns[0] if ds.columns
                                                  else "")
@@ -627,6 +630,36 @@ class MainWindow(QMainWindow):
             spec.ylabel = spec.y[0]
         spec.subgroup = ""
 
+    @staticmethod
+    def _counts(ds, columns: list[str]) -> bool:
+        """Whether these columns hold counts: whole numbers, none negative."""
+        import numpy as np
+        import pandas as pd
+
+        if not columns or not set(columns) <= set(ds.columns):
+            return False
+        values = ds.df[columns].apply(pd.to_numeric, errors="coerce")
+        values = values.to_numpy(dtype=float)
+        values = values[np.isfinite(values)]
+        return bool(values.size) and bool(
+            np.all(values >= 0) and np.all(values == np.round(values)))
+
+    def _map_contingency(self, spec: PlotSpec, ds):
+        """Counts per outcome if the table has them, else two categories."""
+        categorical = ds.categorical_columns()
+        counts = [c for c in ds.numeric_columns() if self._counts(ds, [c])]
+        spec.subgroup = ""
+        if categorical and counts:
+            spec.group, spec.y = categorical[0], counts[:8]
+        elif len(categorical) >= 2:
+            spec.group, spec.subgroup, spec.y = (categorical[0],
+                                                 categorical[1], [])
+        else:
+            spec.group, spec.y = (categorical[0] if categorical else ""), \
+                counts[:8]
+        spec.xlabel = spec.group
+        spec.ylabel = ""
+
     def _on_plot_type_changed(self, plot_type: str):
         """Re-map columns when the new type cannot use the current mapping."""
         spec = self.current_spec()
@@ -638,6 +671,13 @@ class MainWindow(QMainWindow):
         invalid = (not spec.y or not set(spec.y) <= cols
                    or (needs_x and spec.x not in cols)
                    or (not needs_x and spec.group and spec.group not in cols))
+        if plot_type == "contingency" and ds is not None:
+            # counts in Y, or raw data with a group and an outcome column
+            raw = (not spec.y and spec.group in cols
+                   and spec.subgroup in cols and spec.group != spec.subgroup)
+            # one count column is not a table: at least two outcomes
+            invalid = not (raw or (len(spec.y) >= 2
+                                   and self._counts(ds, spec.y)))
         if invalid:
             self._auto_map(spec, ds)
         self._sync_inspector()

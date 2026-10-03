@@ -35,10 +35,10 @@ any interface text that has no translation.
 | | |
 |---|---|
 | **Import** | CSV, TSV, TXT (separator and decimal mark detected), multi-sheet Excel `.xlsx` / `.xlsm` / `.xls`, paste from Excel, **GraphPad Prism `.pzfx` files** |
-| **Plot types** | line, scatter, histogram, box plot, violin plot, bars with error bars (simple, and grouped with two factors), **Kaplan-Meier survival curves** |
+| **Plot types** | line, scatter, histogram, box plot, violin plot, bars with error bars (simple, and grouped with two factors), **Kaplan-Meier survival curves**, **contingency tables** (bars stacked in percentages or counts) |
 | **Themes** | Nature, Science, Cell, PNAS, Minimal, Grayscale: typography, column width and palette that follow each journal's author guidelines |
 | **Export** | SVG, PDF, EPS (vector, editable text) · PNG, TIFF, JPEG up to 1200 dpi (600 dpi by default) |
-| **Statistics** | Student's / Welch's / paired t-test, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs control**, **repeated-measures ANOVA** (with Greenhouse-Geisser correction), **log-rank** on survival curves; Bonferroni / Holm / FDR corrections; **outlier detection (Grubbs)**; automatic significance bars, including on bars grouped by two factors |
+| **Statistics** | Student's / Welch's / paired t-test, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs control**, **repeated-measures ANOVA** (with Greenhouse-Geisser correction), **log-rank** on survival curves, **Fisher's exact test and chi-square** (with or without Yates' correction) on contingency tables, with odds ratio, relative risk and Cramér's V; Bonferroni / Holm / FDR corrections; **outlier detection (Grubbs)**; automatic significance bars, including on bars grouped by two factors |
 | **Fits** | linear, polynomial, exponential, logarithmic, power, Michaelis-Menten, Hill 4PL (dose-response), Gaussian, sigmoid, with R², standard errors and a 95 % confidence band |
 | **Composite figures** | several plots on one figure, grid of your choice, automatic A/B/C lettering, shared axes |
 | **Transforms** | percent of control, 0-100 normalization, log10 / ln / log2, z-score, baseline subtraction, ratio to a column, mean of replicates |
@@ -55,6 +55,9 @@ any interface text that has no translation.
   the column width of the target journal.
 - **SVG/PDF with editable text** (`svg.fonttype: none`, `pdf.fonttype: 42`):
   labels stay editable in Illustrator or Inkscape.
+- **Group names that never overlap**: too long for the room they have,
+  they break between words, or slant at 45° when a single word does not
+  fit. A rotation chosen by hand always wins.
 - **Monochrome mode** (hatching and a grey palette) for black-and-white
   printing.
 - **Dark theme** for the interface; the figure itself always stays on a white
@@ -226,7 +229,8 @@ it when Plotea can draw it:
 | Column | bars, one per group |
 | Grouped | grouped bars (row × column) |
 | Survival | Kaplan-Meier curves with the log-rank test |
-| Contingency, parts of whole… | the data only, for now |
+| Contingency | stacked bars, Fisher's exact test or chi-square |
+| Parts of whole, multiple variables… | the data only, for now |
 
 Values excluded in Prism are left out, as Prism does, and counted in the
 message at the end of the import. Prism's graphs and analyses, stored in a
@@ -374,7 +378,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 416 tests, 5 to 20 minutes depending on the machine
+pytest                      # 459 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -384,6 +388,8 @@ pytest -k paired            # a single topic (paired tests)
 | `test_engine.py` | rendering of every plot type, 6 themes, fits, every export format |
 | `test_import.py` | European CSV, separators, encodings, Excel workbooks |
 | `test_pzfx.py` | Prism import, checked on real Prism files |
+| `test_contingency.py` | Fisher, chi-square, odds ratio and relative risk, checked against published results |
+| `test_layout.py` | group names that never overlap, the journal's font and editable text in exported files |
 | `test_stats_fixes.py` | grouped bars, paired tests, missing values |
 | `test_anova.py` | two-way ANOVA, test choice per family |
 | `test_advanced_stats.py` | Dunnett, repeated-measures ANOVA, outliers |

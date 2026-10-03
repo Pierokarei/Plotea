@@ -40,6 +40,7 @@ class RenderInfo:
     anova_message: str = ""
     anova_title: str = "ANOVA 2 facteurs"
     outliers: list = field(default_factory=list)    # Grubbs, group by group
+    contingency: list = field(default_factory=list) # odds ratio, RR, V...
 
 
 # --------------------------------------------------------------------------
@@ -838,6 +839,130 @@ def draw_survival(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
     return {}, {}
 
 
+def _first_seen(values: pd.Series) -> list:
+    """Distinct values in the order they first appear: the user's order."""
+    return list(dict.fromkeys(values.dropna()))
+
+
+def extract_contingency(df: pd.DataFrame, spec: PlotSpec):
+    """(counts, groups, outcomes, problem) from either layout of the data.
+
+    Counts already totalled, as in Prism: one row per group (named by the
+    "Grouper par" column) and one column of counts per outcome, ticked in
+    "Valeurs Y". Or raw data, one row per subject: "Grouper par" gives the
+    group and "Sous-groupe" the outcome, and the counts are tallied here.
+    """
+    y = [c for c in spec.y if c in df.columns]
+    if y:
+        frame = df[[c for c in [spec.group] if c in df.columns] + y].copy()
+        values = frame[y].apply(pd.to_numeric, errors="coerce")
+        keep = values.notna().any(axis=1)
+        frame, values = frame[keep], values[keep].fillna(0.0)
+        if spec.group in frame.columns:
+            labels = frame[spec.group].astype(str)
+            groups = _first_seen(labels)
+            # a group written on two rows is one group: add its counts up
+            counts = values.groupby(labels, sort=False).sum().loc[groups]
+        else:
+            groups = [tr("Ligne {number}").format(number=i + 1)
+                      for i in range(len(values))]
+            counts = values
+        return counts.to_numpy(dtype=float), groups, y, ""
+    if spec.group in df.columns and spec.subgroup in df.columns \
+            and spec.group != spec.subgroup:
+        frame = df[[spec.group, spec.subgroup]].dropna().astype(str)
+        groups = _first_seen(frame[spec.group])
+        outcomes = _first_seen(frame[spec.subgroup])
+        table = pd.crosstab(frame[spec.group], frame[spec.subgroup])
+        table = table.reindex(index=groups, columns=outcomes, fill_value=0)
+        return table.to_numpy(dtype=float), groups, outcomes, ""
+    return None, [], [], tr(
+        "Contingence : cochez les colonnes d'effectifs dans « Valeurs Y », "
+        "ou, pour des données brutes, choisissez le groupe dans « Grouper "
+        "par » et l'issue dans « Sous-groupe ».")
+
+
+def draw_contingency(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
+                     info: RenderInfo):
+    """Bars of a table of counts: one bar per group, one colour per outcome.
+
+    Shares within each group stacked to 100 % by default - what a reader
+    compares - or the counts themselves, stacked or side by side. The test of
+    independence is drawn as a bracket between two groups; beyond two, each
+    pair of groups is tested on its own and corrected for multiplicity.
+    """
+    counts, groups, outcomes, problem = extract_contingency(df, spec)
+    if problem or counts is None or not len(groups) or not outcomes:
+        info.warnings.append(problem or tr("Aucune donnée"))
+        return _no_data(ax)
+
+    totals = counts.sum(axis=1)
+    view = spec.contingency_view
+    colors = _colors(spec, theme, outcomes)
+    x = np.arange(len(groups), dtype=float)
+    width = spec.bar_width
+    edge = "black" if spec.bar_edge else "none"
+    lw = theme.spine_width if spec.bar_edge else 0
+    if view == "grouped":
+        step = width / len(outcomes)
+        for j, (name, color) in enumerate(zip(outcomes, colors)):
+            ax.bar(x - width / 2 + step * (j + 0.5), counts[:, j], step * 0.95,
+                   color=color, edgecolor=edge, linewidth=lw, label=name,
+                   alpha=spec.alpha, zorder=2)
+        tops = counts.max(axis=1)
+        default_label = tr("Effectif")
+    else:
+        with np.errstate(invalid="ignore", divide="ignore"):
+            shown = (100.0 * counts / totals[:, None] if view == "percent"
+                     else counts)
+        shown = np.nan_to_num(shown)
+        bottom = np.zeros(len(groups))
+        for j, (name, color) in enumerate(zip(outcomes, colors)):
+            ax.bar(x, shown[:, j], width, bottom=bottom, color=color,
+                   edgecolor=edge, linewidth=lw, label=name, alpha=spec.alpha,
+                   zorder=2)
+            bottom = bottom + shown[:, j]
+        tops = bottom
+        if view == "percent":
+            ax.set_ylim(0, 100)
+            default_label = tr("Pourcentage (%)")
+        else:
+            default_label = tr("Effectif")
+    ax.set_xticks(x)
+    ax.set_xticklabels(groups)
+    ax.set_xlim(-0.6, len(groups) - 0.4)
+    ax.set_ylabel(spec.ylabel or default_label)
+    if spec.xlabel or spec.group:
+        ax.set_xlabel(spec.xlabel or spec.group)
+
+    info.series = list(outcomes)
+    info.groups = list(groups)
+    info.stat_groups = {}
+    info.descriptives = st.describe_contingency(counts, groups, outcomes)
+    info.contingency = st.contingency_effects(counts)
+    positions = dict(zip(groups, x))
+    heights = dict(zip(groups, tops))
+    if spec.stats_enabled:
+        result = st.contingency(counts, spec.contingency_test)
+        if result["warning"]:
+            info.warnings.append(result["warning"])
+        if np.isfinite(result["p"]):
+            info.omnibus = (result["test"], result["stat"], result["p"])
+            if len(groups) == 2:
+                info.comparisons = [st.Comparison(
+                    groups[0], groups[1], result["stat"], result["p"],
+                    result["p"], result["test"], int(totals[0]),
+                    int(totals[1]))]
+            else:
+                info.comparisons = st.contingency_pairs(
+                    counts, groups, spec.contingency_test,
+                    spec.stats_correction, spec.stats_mode,
+                    spec.stats_control)
+            draw_brackets(ax, info.comparisons, positions, heights, spec,
+                          theme)
+    return {}, {}
+
+
 # --------------------------------------------------------------------------
 # Main entry point
 # --------------------------------------------------------------------------
@@ -849,7 +974,105 @@ DRAWERS = {
     "line": draw_xy,
     "scatter": draw_xy,
     "survival": draw_survival,
+    "contingency": draw_contingency,
 }
+
+
+#: Plot types whose X axis names categories rather than measuring something.
+CATEGORY_AXES = ("bar", "box", "violin", "contingency")
+
+#: Share of the space between two ticks a label may take: the rest is air.
+LABEL_ROOM = 0.92
+
+#: Beyond this many lines a wrapped name is harder to read than a slanted one.
+MAX_LABEL_LINES = 3
+
+
+def _renderer(fig):
+    canvas = fig.canvas
+    if hasattr(canvas, "get_renderer"):
+        return canvas.get_renderer()
+    return fig._get_renderer()
+
+
+def fit_category_labels(ax, spec: PlotSpec) -> str:
+    """Keep the names under a categorical axis from running into each other.
+
+    Measured, not guessed: the widest name is compared with the room between
+    two ticks once the layout is known. A name that does not fit is broken
+    between words, on up to three lines; when a single word is still too wide
+    every name is slanted at 45 degrees instead. A rotation chosen by the
+    user always wins. Returns what was done: "", "wrap" or "rotate".
+    """
+    if (spec.plot_type not in CATEGORY_AXES or spec.tick_rotation
+            or spec.horizontal):
+        return ""
+    labels = [label for label in ax.get_xticklabels() if label.get_text()]
+    ticks = ax.get_xticks()
+    if len(labels) < 2 or len(ticks) < 2:
+        return ""
+    if any(label.get_rotation() for label in labels):
+        return ""                          # already slanted on a first pass
+    renderer = _renderer(ax.figure)
+    xs = sorted(ax.transData.transform([(t, 0) for t in ticks])[:, 0])
+    room = min(b - a for a, b in zip(xs, xs[1:])) * LABEL_ROOM
+    if room <= 0:
+        return ""
+
+    def widest() -> float:
+        return max(label.get_window_extent(renderer).width
+                   for label in labels)
+
+    if widest() <= room:
+        return ""
+    import textwrap
+
+    # on a second pass the names may already be wrapped: start from whole
+    names = [label.get_text().replace("\n", " ") for label in labels]
+    longest = max(len(name) for name in names)
+    for width in range(longest - 1, 3, -1):
+        wrapped = [textwrap.fill(name, width, break_long_words=False,
+                                 break_on_hyphens=True) for name in names]
+        if max(w.count("\n") for w in wrapped) >= MAX_LABEL_LINES:
+            break
+        for label, text in zip(labels, wrapped):
+            label.set_text(text)
+        if widest() <= room:
+            # through set_xticks: the axis rebuilds its labels at draw time
+            # from what it was given, and would put the long names back
+            ax.set_xticks(ticks, wrapped, multialignment="center")
+            return "wrap"
+    # a word too long to break: slant every name, the end under its tick
+    ax.set_xticks(ticks, names, rotation=45, ha="right",
+                  rotation_mode="anchor")
+    return "rotate"
+
+
+def pin_ticks(ax, theme: Theme):
+    """Give the axes the theme's ticks for good, not only while drawing it.
+
+    Ticks are made again whenever the axis is drawn, and they read their
+    style from matplotlib's settings of that moment - by then the theme's
+    context has closed, so the preview and the export used to get
+    matplotlib's defaults. Worse than a wrong font: the number of ticks
+    depends on the label size, so the export drew other ticks (17.5 instead
+    of 18) than the layout had made room for, and they spilled over the
+    edge. Stored on the axes, the style survives any later redraw.
+    """
+    rc = theme.rc()
+    for axis in ("x", "y"):
+        for which in ("major", "minor"):
+            settings = dict(
+                direction=rc[f"{axis}tick.direction"],
+                length=rc[f"{axis}tick.{which}.size"],
+                width=rc[f"{axis}tick.{which}.width"],
+                labelsize=rc[f"{axis}tick.labelsize"])
+            ax.tick_params(axis=axis, which=which, **settings)
+            try:
+                ax.tick_params(axis=axis, which=which,
+                               labelfontfamily=theme.fonts)
+            except (TypeError, ValueError):       # matplotlib < 3.8
+                pass
 
 
 def render(fig, spec: PlotSpec, df: pd.DataFrame) -> RenderInfo:
@@ -869,10 +1092,26 @@ def render(fig, spec: PlotSpec, df: pd.DataFrame) -> RenderInfo:
         ax = fig.add_subplot(111)
         draw_into(ax, spec, df, info, theme)
         try:
-            fig.tight_layout(pad=0.4)
+            settle_layout(fig, [(ax, spec)])
         except Exception:
             pass
     return info
+
+
+def settle_layout(fig, placed, layout=None):
+    """Lay the figure out, fit the category names, and lay out again.
+
+    The room under each bar is only known once the layout is, and the
+    layout depends on the labels: a few passes settle both. When no name had
+    to change, the first pass is the only one - most figures, and every
+    curve, pay for a single layout as before.
+    """
+    layout = layout or (lambda: fig.tight_layout(pad=0.4))
+    layout()
+    for _ in range(4):
+        if not any([fit_category_labels(ax, spec) for ax, spec in placed]):
+            break
+        layout()
 
 
 def draw_into(ax, spec: PlotSpec, df: pd.DataFrame,
@@ -904,6 +1143,7 @@ def draw_into(ax, spec: PlotSpec, df: pd.DataFrame,
         positions, tops = {}, {}
 
     _finish_axes(ax, spec, theme, info)
+    pin_ticks(ax, theme)
 
     if spec.is_categorical:
         groups = info.stat_groups or extract_groups(df, spec)
@@ -1028,11 +1268,18 @@ def _finish_legend(ax, spec: PlotSpec, theme: Theme):
     kwargs = dict(title=spec.legend_title or None, ncol=max(spec.legend_ncol, 1),
                   fontsize=theme.base_size, markerscale=1.3,
                   borderpad=0.2, borderaxespad=0.4)
-    if spec.legend_loc == "outside right":
+    loc = spec.legend_loc
+    if spec.is_contingency and spec.contingency_view != "grouped":
+        # read like the bars, top segment first; and stacked to the top,
+        # the bars leave no corner where "best" could put the legend
+        handles, labels = handles[::-1], labels[::-1]
+        if loc == "best":
+            loc = "outside right"
+    if loc == "outside right":
         ax.legend(handles, labels, loc="center left",
                   bbox_to_anchor=(1.02, 0.5), **kwargs)
-    elif spec.legend_loc == "outside top":
+    elif loc == "outside top":
         ax.legend(handles, labels, loc="lower center",
                   bbox_to_anchor=(0.5, 1.02), **kwargs)
     else:
-        ax.legend(handles, labels, loc=spec.legend_loc, **kwargs)
+        ax.legend(handles, labels, loc=loc, **kwargs)

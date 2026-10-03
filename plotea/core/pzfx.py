@@ -43,7 +43,6 @@ SYMMETRIC_ERROR = {"SDN", "SEN", "SD", "SE"}
 
 #: Prism table types Plotea has no plot for yet, as the user calls them.
 UNPLOTTED = {
-    "Contingency": "contingence",
     "PartsOfWhole": "parties d'un tout",
     "MultipleVariables": "variables multiples",
     "Nested": "imbriqué",
@@ -353,6 +352,15 @@ def _survival(table: _Table) -> tuple[pd.DataFrame, dict]:
                 "event_col": event, "xlabel": time, "stats_enabled": True}
 
 
+def _contingency(table: _Table) -> tuple[pd.DataFrame, dict]:
+    """Counts, one row per group: Plotea's own contingency layout."""
+    df, _plot = _as_is(table)
+    groups = tr("Ligne") if tr("Ligne") in df.columns else ""
+    outcomes = [c for c in df.columns if c != groups]
+    return df, {"plot_type": "contingency", "group": groups, "y": outcomes,
+                "xlabel": "", "stats_enabled": True}
+
+
 def _as_is(table: _Table) -> tuple[pd.DataFrame, dict]:
     """Any other table, column by column, without a plot."""
     frame = {}
@@ -386,6 +394,8 @@ def _convert(table: _Table) -> tuple[pd.DataFrame, dict, list[str]]:
         df, plot = _xy(table)
     elif table.kind == "Survival":
         df, plot = _survival(table)
+    elif table.kind == "Contingency" and not summary:
+        df, plot = _contingency(table)
     elif table.kind == "OneWay" and not summary:
         df, plot = _column(table)
     elif table.kind == "TwoWay" and not summary:

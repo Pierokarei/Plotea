@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+import matplotlib as mpl
 from matplotlib.figure import Figure
 
 #: label -> (extension, matplotlib format, vector?)
@@ -50,6 +51,14 @@ def is_vector(fmt: str) -> bool:
     return FORMATS.get(fmt, (".png", "png", False))[2]
 
 
+#: Read by matplotlib when the file is written, not when the figure is
+#: drawn: a theme's context has long closed by then. Text kept as text in
+#: SVG and as TrueType in PDF/EPS, so it stays editable in Illustrator or
+#: Inkscape, and no journal's checker meets a Type 3 font.
+EDITABLE_TEXT = {"svg.fonttype": "none", "pdf.fonttype": 42,
+                 "ps.fonttype": 42}
+
+
 def save_figure(fig: Figure, options: ExportOptions) -> str:
     """Write `fig` to disk, returning the final path."""
     ext, mpl_fmt, vector = FORMATS.get(options.fmt, (".png", "png", False))
@@ -75,7 +84,8 @@ def save_figure(fig: Figure, options: ExportOptions) -> str:
         kwargs["metadata"] = {"Creator": "Plotea", "Producer": "matplotlib"}
 
     try:
-        fig.savefig(path, **kwargs)
+        with mpl.rc_context(EDITABLE_TEXT):
+            fig.savefig(path, **kwargs)
     finally:
         fig.set_size_inches(original_size)
     return path
@@ -100,13 +110,15 @@ def figure_to_png_bytes(fig: Figure, dpi: int = 300,
     """Rasterise to memory, used for 'copy to clipboard'."""
     import io
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
-                pad_inches=0.02, transparent=transparent)
+    with mpl.rc_context(EDITABLE_TEXT):
+        fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
+                    pad_inches=0.02, transparent=transparent)
     return buf.getvalue()
 
 
 def figure_to_svg_text(fig: Figure) -> str:
     import io
     buf = io.StringIO()
-    fig.savefig(buf, format="svg", bbox_inches="tight", pad_inches=0.02)
+    with mpl.rc_context(EDITABLE_TEXT):
+        fig.savefig(buf, format="svg", bbox_inches="tight", pad_inches=0.02)
     return buf.getvalue()

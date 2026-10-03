@@ -692,6 +692,166 @@ def describe_survival(curves: dict) -> list[dict]:
 
 
 # --------------------------------------------------------------------------
+# Contingency tables
+# --------------------------------------------------------------------------
+CONTINGENCY_LABELS = {
+    "fisher": "Test exact de Fisher",
+    "chi2": "Khi² de Pearson",
+    "chi2_yates": "Khi² avec correction de Yates",
+}
+
+
+def _trimmed(table) -> np.ndarray:
+    """Counts as floats, without the rows and columns that hold nothing.
+
+    An empty row or column has no expected count and would make the
+    chi-square divide by zero; it carries no information either.
+    """
+    table = np.asarray(table, dtype=float)
+    table = np.where(np.isfinite(table), table, 0.0)
+    return table[table.sum(axis=1) > 0][:, table.sum(axis=0) > 0]
+
+
+def contingency(table, test: str = "auto") -> dict:
+    """Test of independence between the rows and the columns of a table.
+
+    "auto" follows Prism: Fisher's exact test on a 2 x 2 table, Pearson's
+    chi-square on anything larger. Fisher is offered on 2 x 2 tables only;
+    asked of a larger one, the chi-square is run and the result says so.
+    Returns the test's name, its statistic (NaN for Fisher, which has none),
+    degrees of freedom, p, the total and a warning to show, if any.
+    """
+    counts = _trimmed(table)
+    result = {"test": "", "stat": float("nan"), "df": float("nan"),
+              "p": float("nan"), "n": int(counts.sum()), "warning": ""}
+    if counts.ndim != 2 or min(counts.shape) < 2:
+        result["warning"] = tr(
+            "Contingence : il faut au moins deux groupes et deux issues "
+            "non vides.")
+        return result
+    if np.any(counts < 0) or np.any(counts != np.round(counts)):
+        result["warning"] = tr(
+            "Contingence : les effectifs doivent être des nombres entiers "
+            "positifs.")
+        return result
+    two_by_two = counts.shape == (2, 2)
+    if test == "auto":
+        test = "fisher" if two_by_two else "chi2"
+    if test == "fisher" and not two_by_two:
+        result["warning"] = tr(
+            "Le test exact de Fisher ne s'applique ici qu'à un tableau "
+            "2 x 2 : khi² de Pearson utilisé.")
+        test = "chi2"
+    if test == "chi2_yates" and not two_by_two:
+        test = "chi2"                 # Yates only exists for one ddl
+
+    if test == "fisher":
+        _odds, p = sps.fisher_exact(counts.astype(int))
+        result.update(test=CONTINGENCY_LABELS["fisher"], p=float(p))
+        return result
+
+    stat, p, dof, expected = sps.chi2_contingency(
+        counts, correction=(test == "chi2_yates"))
+    result.update(test=CONTINGENCY_LABELS[test], stat=float(stat),
+                  df=int(dof), p=float(p))
+    # Cochran's rule: the chi-square is an approximation that fails on
+    # small expected counts, which is exactly when Fisher is needed
+    if (expected < 1).any() or (expected < 5).mean() > 0.2:
+        result["warning"] = result["warning"] or tr(
+            "Effectifs attendus faibles : le khi² n'est qu'approximatif ici"
+            "{advice}.").format(advice=tr(" ; préférez le test exact de "
+                                          "Fisher") if two_by_two else "")
+    return result
+
+
+def contingency_effects(table) -> list[dict]:
+    """Effect sizes: odds ratio and relative risk on 2 x 2, Cramér's V always.
+
+    On a 2 x 2 table, the first row is compared with the second for the
+    outcome in the first column: an odds ratio of 2 means the odds of that
+    outcome are twice as high in the first group. The intervals are Woolf's
+    (log odds ratio) and Katz's (log relative risk), the textbook ones; a
+    table with an empty cell gets 0.5 added to every cell (Haldane), without
+    which neither ratio exists.
+    """
+    counts = _trimmed(table)
+    rows = []
+    if counts.ndim != 2 or min(counts.shape) < 2:
+        return rows
+    if counts.shape == (2, 2):
+        a, b, c, d = counts.ravel()
+        # the difference of proportions needs no correction: from raw counts
+        difference = a / (a + b) - c / (c + d)
+        note = ""
+        if 0 in (a, b, c, d):
+            a, b, c, d = a + 0.5, b + 0.5, c + 0.5, d + 0.5
+            note = "Haldane"
+        z = sps.norm.ppf(0.975)
+        odds = (a * d) / (b * c)
+        se = np.sqrt(1 / a + 1 / b + 1 / c + 1 / d)
+        rows.append({"Mesure": "Odds ratio", "Valeur": float(odds),
+                     "IC95 bas": float(odds * np.exp(-z * se)),
+                     "IC95 haut": float(odds * np.exp(z * se)),
+                     "Correction": note})
+        risk_1, risk_2 = a / (a + b), c / (c + d)
+        ratio = risk_1 / risk_2
+        se = np.sqrt(1 / a - 1 / (a + b) + 1 / c - 1 / (c + d))
+        rows.append({"Mesure": "Risque relatif", "Valeur": float(ratio),
+                     "IC95 bas": float(ratio * np.exp(-z * se)),
+                     "IC95 haut": float(ratio * np.exp(z * se)),
+                     "Correction": note})
+        rows.append({"Mesure": "Différence de proportions",
+                     "Valeur": float(difference),
+                     "IC95 bas": float("nan"), "IC95 haut": float("nan"),
+                     "Correction": ""})
+    chi2 = sps.chi2_contingency(counts, correction=False)[0]
+    v = np.sqrt(chi2 / (counts.sum() * (min(counts.shape) - 1)))
+    rows.append({"Mesure": "V de Cramér", "Valeur": float(v),
+                 "IC95 bas": float("nan"), "IC95 haut": float("nan"),
+                 "Correction": ""})
+    return rows
+
+
+def contingency_pairs(table, labels: list[str], test: str = "auto",
+                      correction: str = "holm", mode: str = "all_pairs",
+                      control: str = "") -> list[Comparison]:
+    """Every pair of groups (rows) tested on its own 2-row sub-table."""
+    counts = np.asarray(table, dtype=float)
+    if mode == "vs_control" and control in labels:
+        pairs = [(control, other) for other in labels if other != control]
+    else:
+        pairs = list(itertools.combinations(labels, 2))
+    raw = []
+    for a, b in pairs:
+        sub = counts[[labels.index(a), labels.index(b)]]
+        result = contingency(sub, test)
+        if not np.isfinite(result["p"]):
+            continue
+        raw.append(Comparison(a, b, result["stat"], result["p"], result["p"],
+                              result["test"],
+                              int(np.nansum(sub[0])), int(np.nansum(sub[1]))))
+    for comp, adjusted in zip(raw, adjust([c.p for c in raw], correction)):
+        comp.p_adj = adjusted
+    return raw
+
+
+def describe_contingency(table, labels: list[str],
+                         outcomes: list[str]) -> list[dict]:
+    """The table itself: counts and shares of each outcome, group by group."""
+    counts = np.asarray(table, dtype=float)
+    rows = []
+    for label, line in zip(labels, counts):
+        total = float(np.nansum(line))
+        row = {"Groupe": label, "n": int(total)}
+        for outcome, count in zip(outcomes, line):
+            row[outcome] = int(count) if np.isfinite(count) else count
+            row[f"{outcome} (%)"] = (100.0 * count / total if total
+                                     else float("nan"))
+        rows.append(row)
+    return rows
+
+
+# --------------------------------------------------------------------------
 # Outliers
 # --------------------------------------------------------------------------
 def grubbs(values, alpha: float = 0.05) -> list[dict]:

@@ -136,6 +136,13 @@ def runtime_keys() -> set[str]:
                  stats.describe_survival({"A": ([1, 2, 3], [1, 0, 1])})):
         for row in rows:
             keys.update(row)
+    # contingency: the effect table's headers and measure names, and the
+    # descriptive columns that are Plotea's own (not the outcome names)
+    for row in stats.contingency_effects([[3, 1], [1, 3]]):
+        keys.update(row)
+        keys.add(row["Mesure"])
+    keys.update({"Groupe", "n"})
+    keys.update(stats.CONTINGENCY_LABELS.values())
     cells = {(a, b): rng.normal(0, 1, 6) for a in "xy" for b in "uv"}
     anova, _ = stats.two_way_anova(cells)
     paired = {c: {f"s{i}": float(rng.normal()) for i in range(8)}

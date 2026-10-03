@@ -43,7 +43,7 @@ def _table() -> QTableWidget:
 #: Columns whose values are Plotea's own words (test names, ANOVA sources)
 #: rather than the user's: only these are translated. A group the user named
 #: "Contrôle" stays "Contrôle" whatever the interface language.
-VOCABULARY = ("Test", "Source")
+VOCABULARY = ("Test", "Source", "Mesure")
 
 
 def _shown(value, key: str) -> str:
@@ -104,11 +104,13 @@ class StatsPanel(QWidget):
                                 else "monospace", 10))
         self.anova = _table()
         self.outliers = _table()
+        self.effects = _table()
         self.tabs.addTab(self.desc, tr("Descriptives"))
         self.tabs.addTab(self.tests, tr("Comparaisons"))
         self.tabs.addTab(self.anova, tr("ANOVA 2 facteurs"))
         self.tabs.addTab(self.fits, tr("Ajustements"))
         self.tabs.addTab(self.outliers, tr("Aberrantes"))
+        self.tabs.addTab(self.effects, tr("Effets"))
 
         self.header = QLabel(tr("Aucune analyse"))
         self.header.setProperty("hint", True)
@@ -141,7 +143,9 @@ class StatsPanel(QWidget):
         self._test_rows: list[dict] = []
         self._anova_rows: list[dict] = []
         self._outlier_rows: list[dict] = []
+        self._effect_rows: list[dict] = []
         self.tabs.setTabVisible(2, False)
+        self.tabs.setTabVisible(self.tabs.indexOf(self.effects), False)
 
     # ------------------------------------------------------------------
     def update_from(self, info):
@@ -169,6 +173,11 @@ class StatsPanel(QWidget):
         self._outlier_rows = list(info.outliers)
         self.tabs.setTabVisible(self.tabs.indexOf(self.outliers),
                                 bool(info.outliers))
+        effects = list(getattr(info, "contingency", []) or [])
+        _fill(self.effects, effects)
+        self._effect_rows = effects
+        self.tabs.setTabVisible(self.tabs.indexOf(self.effects),
+                                bool(effects))
 
         head = []
         if info.anova:
@@ -187,7 +196,11 @@ class StatsPanel(QWidget):
             head.append(info.anova_message)
         if info.omnibus and info.omnibus[0]:
             name, stat, p = info.omnibus
-            head.append(f"{tr(name)}: stat = {stat:.4g}, p = {p:.4g}")
+            # Fisher's exact test has a p-value and no statistic
+            if isinstance(stat, float) and math.isnan(stat):
+                head.append(f"{tr(name)}: p = {p:.4g}")
+            else:
+                head.append(f"{tr(name)}: stat = {stat:.4g}, p = {p:.4g}")
         if info.comparisons:
             head.append(tr("{count} comparaison(s)").format(
                 count=len(info.comparisons)))
@@ -223,7 +236,8 @@ class StatsPanel(QWidget):
         return {id(self.desc): self._desc_rows,
                 id(self.tests): self._test_rows,
                 id(self.anova): self._anova_rows,
-                id(self.outliers): self._outlier_rows}.get(
+                id(self.outliers): self._outlier_rows,
+                id(self.effects): self._effect_rows}.get(
                     id(self.tabs.currentWidget()), [])
 
     def copy_current(self):

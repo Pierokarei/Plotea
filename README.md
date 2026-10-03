@@ -40,10 +40,10 @@ tout texte d'interface sans traduction.
 | | |
 |---|---|
 | **Import** | CSV, TSV, TXT (séparateur et décimale détectés), Excel `.xlsx` / `.xlsm` / `.xls` multi-feuilles, collage depuis Excel, **fichiers GraphPad Prism `.pzfx`** |
-| **Types de graphiques** | courbes, nuages de points, histogrammes, boxplots, violin plots, barres avec erreurs (simples et groupées à deux facteurs), **courbes de survie Kaplan-Meier** |
+| **Types de graphiques** | courbes, nuages de points, histogrammes, boxplots, violin plots, barres avec erreurs (simples et groupées à deux facteurs), **courbes de survie Kaplan-Meier**, **tableaux de contingence** (barres empilées en pourcentages ou en effectifs) |
 | **Thématiques** | Nature, Science, Cell, PNAS, Minimal, Grayscale — typographie, largeur de colonne et palette conformes aux instructions aux auteurs |
 | **Export** | SVG, PDF, EPS (vectoriels, texte éditable) · PNG, TIFF, JPEG jusqu'à 1200 dpi (600 dpi par défaut) |
-| **Statistiques** | t de Student / Welch / apparié, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs contrôle**, **ANOVA à mesures répétées** (avec correction de Greenhouse-Geisser), **log-rank** sur les courbes de survie ; corrections Bonferroni / Holm / FDR ; **détection de valeurs aberrantes (Grubbs)** ; barres de significativité automatiques, y compris sur les barres groupées à deux facteurs |
+| **Statistiques** | t de Student / Welch / apparié, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs contrôle**, **ANOVA à mesures répétées** (avec correction de Greenhouse-Geisser), **log-rank** sur les courbes de survie, **test exact de Fisher et khi²** (avec ou sans correction de Yates) sur les tableaux de contingence, avec odds ratio, risque relatif et V de Cramér ; corrections Bonferroni / Holm / FDR ; **détection de valeurs aberrantes (Grubbs)** ; barres de significativité automatiques, y compris sur les barres groupées à deux facteurs |
 | **Ajustements** | linéaire, polynomial, exponentiel, logarithmique, puissance, Michaelis-Menten, Hill 4PL (dose-réponse), gaussienne, sigmoïde — avec R², erreurs types et bande de confiance 95 % |
 | **Figures composites** | plusieurs graphiques sur une même figure, grille au choix, lettres A/B/C automatiques, axes partageables |
 | **Transformations** | % du contrôle, normalisation 0-100, log10 / ln / log2, score z, soustraction de la ligne de base, rapport à une colonne, moyenne des réplicats |
@@ -60,6 +60,10 @@ tout texte d'interface sans traduction.
   millimètres, à la largeur de colonne du journal visé.
 - **SVG/PDF à texte éditable** (`svg.fonttype: none`, `pdf.fonttype: 42`) :
   les étiquettes restent modifiables dans Illustrator ou Inkscape.
+- **Noms de groupes qui ne se chevauchent jamais** : trop longs pour la
+  place disponible, ils passent à la ligne entre les mots, ou s'inclinent à
+  45° quand un seul mot ne tient pas. Une inclinaison choisie à la main
+  reste prioritaire.
 - **Mode monochrome** (hachures + palette de gris) pour l'impression N&B.
 - **Thème sombre** pour l'interface, la figure restant toujours sur fond blanc.
 - **Interface en français ou en anglais**, jusqu'aux dialogues standards de
@@ -235,7 +239,8 @@ graphique que Prism en aurait tiré quand Plotea sait le tracer :
 | Colonnes | barres, une par groupe |
 | Groupé | barres groupées (ligne × colonne) |
 | Survie | courbes de Kaplan-Meier avec le log-rank |
-| Contingence, parties d'un tout… | les données seules, pour l'instant |
+| Contingence | barres empilées, test exact de Fisher ou khi² |
+| Parties d'un tout, variables multiples… | les données seules, pour l'instant |
 
 Les valeurs exclues dans Prism sont laissées de côté, comme Prism le fait,
 et comptées dans le message de fin d'import. Les graphiques et analyses de
@@ -381,7 +386,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 416 tests, 5 à 20 minutes selon la machine
+pytest                      # 459 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -391,6 +396,8 @@ pytest -k paired            # un seul sujet (les tests appariés)
 | `test_engine.py` | rendu de chaque type de graphique, 6 thématiques, ajustements, tous les formats d'export |
 | `test_import.py` | CSV européens, séparateurs, encodages, classeurs Excel |
 | `test_pzfx.py` | import Prism, vérifié sur de vrais fichiers Prism |
+| `test_contingency.py` | Fisher, khi², odds ratio et risque relatif, vérifiés sur des résultats publiés |
+| `test_layout.py` | noms de groupes sans chevauchement, police du journal et texte éditable dans les fichiers exportés |
 | `test_stats_fixes.py` | barres groupées, tests appariés, valeurs manquantes |
 | `test_anova.py` | ANOVA à deux facteurs, choix de test par famille |
 | `test_advanced_stats.py` | Dunnett, ANOVA à mesures répétées, valeurs aberrantes |

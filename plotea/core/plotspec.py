@@ -110,6 +110,9 @@ class PlotSpec:
     survival_ci: bool = False         # 95 % band around the curve
     show_censors: bool = True         # ticks where follow-up stopped
 
+    contingency_view: str = "percent"   # percent / stacked / grouped
+    contingency_test: str = "auto"      # Fisher on 2 x 2, chi-square beyond
+
     bar_width: float = 0.7
     bar_edge: bool = True
     horizontal: bool = False
@@ -181,6 +184,10 @@ class PlotSpec:
     @property
     def is_survival(self) -> bool:
         return self.plot_type == "survival"
+
+    @property
+    def is_contingency(self) -> bool:
+        return self.plot_type == "contingency"
 
     def series_names(self) -> list[str]:
         return list(self.y)

@@ -121,6 +121,7 @@ def render_panel(fig, panel: Panel, specs: dict, frames: dict) -> PanelInfo:
     gs = fig.add_gridspec(rows, cols)
 
     first = None
+    placed = []
     for index, spec in enumerate(chosen):
         row, col = divmod(index, cols)
         if row >= rows:
@@ -139,10 +140,19 @@ def render_panel(fig, panel: Panel, specs: dict, frames: dict) -> PanelInfo:
                     shared["sharey"] = first
             ax = fig.add_subplot(gs[row, col], **shared)
             first = first or ax
+            placed.append((ax, spec))
             sub = plotting.draw_into(ax, spec, frames.get(spec.dataset))
             info.warnings.extend(sub.warnings)
             if panel.letters != "none":
                 ax.set_title(letter_for(index, panel.letters), loc="left",
                              fontweight="bold", fontsize=panel.letter_size)
             info.drawn += 1
+    # each panel's names fitted to the room its tile actually got
+    try:
+        engine = fig.get_layout_engine()
+        if engine is not None:
+            plotting.settle_layout(fig, placed,
+                                   layout=lambda: engine.execute(fig))
+    except Exception:
+        pass
     return info

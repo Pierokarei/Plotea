@@ -110,6 +110,19 @@ def survival(seed: int = 21) -> Dataset:
     return Dataset(tr("Essai de survie"), pd.DataFrame(rows))
 
 
+def contingency() -> Dataset:
+    """Responders per arm, already counted - the way Prism enters them.
+
+    Three arms, so the chi-square tests the whole table and each pair of
+    arms gets its own Fisher test.
+    """
+    arms = {tr("Médicament A"): (28, 12), tr("Médicament B"): (21, 19),
+            tr("Placebo"): (14, 26)}
+    rows = [{tr("Traitement"): arm, tr("Répondeurs"): yes,
+             tr("Non-répondeurs"): no} for arm, (yes, no) in arms.items()]
+    return Dataset(tr("Réponse au traitement"), pd.DataFrame(rows))
+
+
 EXAMPLES = {
     "Viabilité cellulaire (barres, stats)": viability,
     "Courbe de croissance (courbes + SD)": growth,
@@ -118,6 +131,7 @@ EXAMPLES = {
     "Corrélation (nuage + régression)": correlation,
     "Plan à deux facteurs (barres groupées)": two_factor,
     "Essai de survie (Kaplan-Meier)": survival,
+    "Réponse au traitement (contingence)": contingency,
 }
 
 

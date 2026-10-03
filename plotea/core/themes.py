@@ -6,9 +6,25 @@ how instructions-to-authors specify them.
 """
 from __future__ import annotations
 
+import functools
 from dataclasses import dataclass, field
 
 MM = 1.0 / 25.4  # mm -> inch
+
+
+@functools.lru_cache(maxsize=None)
+def installed_fonts(families: tuple[str, ...]) -> list[str]:
+    """The fonts of a theme this machine actually has, in order.
+
+    matplotlib warns about every missing family each time a text is drawn;
+    asking only for what is installed keeps the log clean. DejaVu Sans ships
+    with matplotlib, so the list is never empty.
+    """
+    from matplotlib import font_manager
+
+    known = {entry.name for entry in font_manager.fontManager.ttflist}
+    found = [family for family in families if family in known]
+    return found or ["DejaVu Sans"]
 
 
 # --------------------------------------------------------------------------
@@ -83,6 +99,11 @@ class Theme:
     extra: dict = field(default_factory=dict)
 
     # -- derived -----------------------------------------------------------
+    @property
+    def fonts(self) -> list[str]:
+        """font_family narrowed to what is installed, first choice first."""
+        return installed_fonts(tuple(self.font_family))
+
     def figsize(self, span: str = "single", height_mm: float | None = None):
         width_mm = self.col1_mm if span == "single" else self.col2_mm
         h = height_mm if height_mm else width_mm * self.default_height_ratio
@@ -92,7 +113,12 @@ class Theme:
         """Return the matplotlib rcParams dict for this theme."""
         s = self.base_size
         rc = {
-            "font.family": "sans-serif",
+            # The fonts themselves, not the word "sans-serif": a text keeps
+            # its family and resolves it when it is drawn, and the preview
+            # and the export draw after this context has closed. With the
+            # generic word every figure came out in matplotlib's default
+            # DejaVu Sans, whatever the journal asked for.
+            "font.family": self.fonts,
             "font.sans-serif": self.font_family,
             "font.size": s,
             "axes.labelsize": s + 1,
@@ -153,7 +179,8 @@ THEMES: dict[str, Theme] = {
     "Nature": Theme(
         name="Nature",
         description="Helvetica 7 pt - colonne 89 mm - traits fins, ticks sortants",
-        font_family=["Helvetica", "Arial", "Nimbus Sans", "DejaVu Sans"],
+        font_family=["Helvetica", "Arial", "Nimbus Sans",
+                     "Liberation Sans", "DejaVu Sans"],
         base_size=7.0,
         palette="Nature (NPG)",
         col1_mm=89.0,
@@ -168,7 +195,8 @@ THEMES: dict[str, Theme] = {
     "Science": Theme(
         name="Science",
         description="Helvetica 8 pt - colonne 55 mm - ticks rentrants",
-        font_family=["Helvetica", "Arial", "Nimbus Sans", "DejaVu Sans"],
+        font_family=["Helvetica", "Arial", "Nimbus Sans",
+                     "Liberation Sans", "DejaVu Sans"],
         base_size=8.0,
         palette="Science (AAAS)",
         col1_mm=55.0,
@@ -198,7 +226,8 @@ THEMES: dict[str, Theme] = {
     "PNAS": Theme(
         name="PNAS",
         description="Helvetica 8 pt - colonne 87 mm - axes sobres",
-        font_family=["Helvetica", "Arial", "Nimbus Sans", "DejaVu Sans"],
+        font_family=["Helvetica", "Arial", "Nimbus Sans",
+                     "Liberation Sans", "DejaVu Sans"],
         base_size=8.0,
         palette="PNAS (NEJM)",
         col1_mm=87.0,
@@ -212,7 +241,8 @@ THEMES: dict[str, Theme] = {
     "Minimal": Theme(
         name="Minimal",
         description="Sans-serif 9 pt - axes épurés, grille horizontale légère",
-        font_family=["Inter", "Helvetica", "Arial", "DejaVu Sans"],
+        font_family=["Inter", "Helvetica", "Arial",
+                     "Liberation Sans", "DejaVu Sans"],
         base_size=9.0,
         palette="Okabe-Ito (CB-safe)",
         col1_mm=100.0,
@@ -227,7 +257,7 @@ THEMES: dict[str, Theme] = {
     "Grayscale": Theme(
         name="Grayscale",
         description="Noir & blanc - impression monochrome / daltonisme",
-        font_family=["Helvetica", "Arial", "DejaVu Sans"],
+        font_family=["Helvetica", "Arial", "Liberation Sans", "DejaVu Sans"],
         base_size=8.0,
         palette="Grayscale",
         col1_mm=89.0,

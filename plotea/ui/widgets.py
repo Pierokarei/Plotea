@@ -180,6 +180,17 @@ def make_icon(name: str, color: str = "", size: int = 22) -> QIcon:
             QPointF(s * 0.34, s * 0.48), QPointF(s * 0.58, s * 0.48),
             QPointF(s * 0.58, s * 0.74), QPointF(s - m, s * 0.74)]))
         p.drawLine(QPointF(s * 0.46, s * 0.40), QPointF(s * 0.46, s * 0.56))
+    elif name == "contingency":
+        # two bars stacked from two outcomes, the lower part filled
+        width = (s - 2 * m) * 0.34
+        for left, split in ((m + width * 0.25, 0.55), (s - m - width * 1.25,
+                                                       0.30)):
+            top, bottom = m * 1.2, s - m
+            cut = bottom - (bottom - top) * split
+            p.drawRect(QRectF(left, top, width, bottom - top))
+            p.setBrush(col_fill)
+            p.drawRect(QRectF(left, cut, width, bottom - cut))
+            p.setBrush(Qt.BrushStyle.NoBrush)
     elif name == "composite":
         # Four separate tiles with the first one filled: a figure made of
         # panels, and nothing like the single framed grid of "table".
@@ -218,7 +229,7 @@ def make_icon(name: str, color: str = "", size: int = 22) -> QIcon:
 
 PLOT_ICONS = {"line": "line", "scatter": "scatter", "histogram": "histogram",
               "box": "box", "violin": "violin", "bar": "bar",
-              "survival": "survival"}
+              "survival": "survival", "contingency": "contingency"}
 
 
 def tag_icon(target, name: str):

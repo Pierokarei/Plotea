@@ -97,6 +97,7 @@ PLOT_TYPE = Enum("plot_type", [
     ("violin", "Violin plot"),
     ("bar", "Barres + erreurs"),
     ("survival", "Survie (Kaplan-Meier)"),
+    ("contingency", "Contingence (effectifs)"),
 ])
 
 ERROR_TYPE = Enum("error_type", [
@@ -146,6 +147,23 @@ STATS_TEST = Enum("stats_test", [
     ("kruskal_dunn", "Kruskal-Wallis + Dunn"),
     ("dunnett", "Dunnett (vs contrôle)"),
     ("rm_anova", "ANOVA à mesures répétées"),
+])
+
+#: Tests of independence on a table of counts. Fisher is exact but defined
+#: here on 2 x 2 tables only, as in Prism; the chi-square covers the rest.
+CONTINGENCY_TEST = Enum("contingency_test", [
+    ("auto", "Auto"),
+    ("fisher", "Test exact de Fisher"),
+    ("chi2", "Khi² de Pearson"),
+    ("chi2_yates", "Khi² avec correction de Yates"),
+])
+
+#: How the counts are drawn: shares within each group, raw counts stacked,
+#: or raw counts side by side.
+CONTINGENCY_VIEW = Enum("contingency_view", [
+    ("percent", "Pourcentages empilés"),
+    ("stacked", "Effectifs empilés"),
+    ("grouped", "Effectifs côte à côte"),
 ])
 
 STATS_MODE = Enum("stats_mode", [
@@ -251,6 +269,8 @@ SPEC_FIELDS = {
     "fit_model": FIT_MODEL,
     "fit_equation_loc": EQUATION_LOC,
     "stats_test": STATS_TEST,
+    "contingency_test": CONTINGENCY_TEST,
+    "contingency_view": CONTINGENCY_VIEW,
     "stats_mode": STATS_MODE,
     "stats_format": STATS_FORMAT,
     "stats_correction": CORRECTION,
