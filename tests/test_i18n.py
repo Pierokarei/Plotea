@@ -183,7 +183,7 @@ def test_the_english_window_has_no_french_left(english, catalogue, closer):
     try:
         window.show()
         for plot_type in ("bar", "line", "histogram", "box", "violin",
-                          "survival", "contingency"):
+                          "survival", "contingency", "paired", "bland_altman"):
             window.current_spec().plot_type = plot_type
             window._sync_inspector()
             window._render_now()

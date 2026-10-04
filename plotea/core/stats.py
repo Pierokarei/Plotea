@@ -118,7 +118,11 @@ def equal_variance(groups: list[np.ndarray], alpha: float = 0.05) -> bool:
     if not HAVE_SCIPY or len(clean) < 2:
         return True
     try:
-        return float(sps.levene(*clean, center="median").pvalue) > alpha
+        # groups without any spread give no p-value (0/0): read as unequal,
+        # which sends them to Welch, without the warning
+        with np.errstate(divide="ignore", invalid="ignore"):
+            p = float(sps.levene(*clean, center="median").pvalue)
+        return p > alpha
     except Exception:
         return True
 
@@ -912,6 +916,76 @@ def describe_contingency(table, labels: list[str],
             row[f"{outcome} (%)"] = (100.0 * count / total if total
                                      else float("nan"))
         rows.append(row)
+    return rows
+
+
+# --------------------------------------------------------------------------
+# Agreement between two methods (Bland-Altman)
+# --------------------------------------------------------------------------
+def bland_altman(a, b, percent: bool = False, z: float = 1.96) -> dict:
+    """Bias and limits of agreement of method `a` against method `b`.
+
+    Bland & Altman (Lancet 1986): each subject measured by both methods
+    gives a mean and a difference (a - b, or a percentage of the mean); the
+    bias is the mean difference and the limits of agreement bias +/- z SD,
+    within which 95 % of the differences fall for z = 1.96 (the 1986 paper
+    rounded it to 2). Confidence intervals follow their 1999 paper: the
+    bias's from its standard error s/sqrt(n), each limit's from
+    sqrt(3 s^2 / n), both with Student's t on n - 1 degrees of freedom.
+    The p-value tests the bias against zero (a paired t test).
+    """
+    a = np.asarray(a, dtype=float)
+    b = np.asarray(b, dtype=float)
+    keep = np.isfinite(a) & np.isfinite(b)
+    a, b = a[keep], b[keep]
+    mean = (a + b) / 2.0
+    diff = a - b
+    if percent:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            diff = 100.0 * diff / mean
+        usable = np.isfinite(diff)
+        mean, diff = mean[usable], diff[usable]
+    n = int(diff.size)
+    out = {"n": n, "mean": mean, "diff": diff, "bias": float("nan"),
+           "sd": float("nan"), "low": float("nan"), "high": float("nan"),
+           "bias_ci": (float("nan"),) * 2, "low_ci": (float("nan"),) * 2,
+           "high_ci": (float("nan"),) * 2, "p": float("nan"), "z": z}
+    if n < 3:
+        return out
+    bias = float(diff.mean())
+    sd = float(diff.std(ddof=1))
+    t = float(sps.t.ppf(0.975, n - 1))
+    se_bias = sd / np.sqrt(n)
+    se_limit = np.sqrt(3.0 * sd ** 2 / n)
+    low, high = bias - z * sd, bias + z * sd
+    out.update(
+        bias=bias, sd=sd, low=low, high=high,
+        bias_ci=(bias - t * se_bias, bias + t * se_bias),
+        low_ci=(low - t * se_limit, low + t * se_limit),
+        high_ci=(high - t * se_limit, high + t * se_limit),
+        p=float(sps.ttest_1samp(diff, 0.0).pvalue) if sd > 0 else
+        float("nan"))
+    return out
+
+
+def agreement_rows(result: dict) -> list[dict]:
+    """The Effects tab's account of a Bland-Altman analysis."""
+    rows = [
+        {"Mesure": "Biais (moyenne des différences)",
+         "Valeur": result["bias"], "IC95 bas": result["bias_ci"][0],
+         "IC95 haut": result["bias_ci"][1]},
+        {"Mesure": "Écart-type des différences", "Valeur": result["sd"],
+         "IC95 bas": float("nan"), "IC95 haut": float("nan")},
+        {"Mesure": "Limite d'agrément basse", "Valeur": result["low"],
+         "IC95 bas": result["low_ci"][0], "IC95 haut": result["low_ci"][1]},
+        {"Mesure": "Limite d'agrément haute", "Valeur": result["high"],
+         "IC95 bas": result["high_ci"][0],
+         "IC95 haut": result["high_ci"][1]},
+        {"Mesure": "p (biais différent de 0)", "Valeur": result["p"],
+         "IC95 bas": float("nan"), "IC95 haut": float("nan")},
+        {"Mesure": "n", "Valeur": float(result["n"]),
+         "IC95 bas": float("nan"), "IC95 haut": float("nan")},
+    ]
     return rows
 
 

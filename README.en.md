@@ -35,7 +35,7 @@ any interface text that has no translation.
 | | |
 |---|---|
 | **Import** | CSV, TSV, TXT (separator and decimal mark detected), multi-sheet Excel `.xlsx` / `.xlsm` / `.xls`, paste from Excel, **GraphPad Prism `.pzfx` files** |
-| **Plot types** | line, scatter, histogram, box plot, violin plot, bars with error bars (simple, and grouped with two factors), **Kaplan-Meier survival curves**, **contingency tables** (bars stacked in percentages or counts), **paired before-after** (one line per subject) |
+| **Plot types** | line, scatter, histogram, box plot, violin plot, bars with error bars (simple, and grouped with two factors), **Kaplan-Meier survival curves**, **contingency tables** (bars stacked in percentages or counts), **paired before-after** (one line per subject), **Bland-Altman** (agreement of two measurement methods) |
 | **Themes** | Nature, Science, Cell, PNAS, Minimal, Grayscale: typography, column width and palette that follow each journal's author guidelines |
 | **Export** | SVG, PDF, EPS (vector, editable text) · PNG, TIFF, JPEG up to 1200 dpi (600 dpi by default) |
 | **Statistics** | Student's / Welch's / paired t-test, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs control**, **repeated-measures ANOVA** (with Greenhouse-Geisser correction), **log-rank** on survival curves, **Fisher's exact test and chi-square** (with or without Yates' correction) on contingency tables, with odds ratio, relative risk and Cramér's V; Bonferroni / Holm / FDR corrections; **outlier detection (Grubbs)**; automatic significance bars, including on bars grouped by two factors |
@@ -271,6 +271,15 @@ the whole figure.
 plots, transforms and composite figures. A burst of quick edits counts as a
 single step, as in a text editor.
 
+### Agreement of two methods (Bland-Altman)
+
+Two columns, one per method, one row per subject: the **Bland-Altman**
+plot shows for each subject the difference of the two measurements against
+their mean, with the bias and the 95% limits of agreement (bias ± 1.96
+SD), and optionally their confidence intervals and the difference as a
+percentage of the mean. The "Two peak flow meters" example uses the data
+of the original paper (Bland and Altman, *Lancet*, 1986).
+
 ### Comparing fitted curves
 
 With several series (a "Group by" column, or several Y columns) and a fit
@@ -400,7 +409,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 525 tests, 5 to 20 minutes depending on the machine
+pytest                      # 541 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -415,6 +424,7 @@ pytest -k paired            # a single topic (paired tests)
 | `test_fit_compare.py` | curve comparison, checked against the analysis of covariance and on its false-alarm rate |
 | `test_methods.py` | Methods paragraph: the test named is the one that ran, both languages match |
 | `test_paired.py` | before-after: one line per subject, paired test chosen on the differences |
+| `test_bland_altman.py` | Bland-Altman: the bias and limits of the 1986 paper recovered |
 | `test_stats_fixes.py` | grouped bars, paired tests, missing values |
 | `test_anova.py` | two-way ANOVA, test choice per family |
 | `test_advanced_stats.py` | Dunnett, repeated-measures ANOVA, outliers |

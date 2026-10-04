@@ -604,8 +604,12 @@ class MainWindow(QMainWindow):
         if spec.plot_type == "contingency":
             self._map_contingency(spec, ds)
             return
-        if spec.plot_type == "paired":
+        if spec.plot_type in ("paired", "bland_altman"):
             self._map_paired(spec, ds)
+            if spec.plot_type == "bland_altman":
+                if not spec.group:
+                    spec.y = spec.y[:2]       # two methods, not more
+                spec.xlabel = spec.ylabel = ""
             return
         if spec.plot_type in ("line", "scatter"):
             spec.x = numeric[0] if numeric else (ds.columns[0] if ds.columns
@@ -699,7 +703,7 @@ class MainWindow(QMainWindow):
         invalid = (not spec.y or not set(spec.y) <= cols
                    or (needs_x and spec.x not in cols)
                    or (not needs_x and spec.group and spec.group not in cols))
-        if plot_type == "paired" and ds is not None:
+        if plot_type in ("paired", "bland_altman") and ds is not None:
             # two conditions at least: Y columns, or a condition column - and
             # not a subject identifier, which would make every subject a
             # "condition" of one value (what the bar chart left behind)

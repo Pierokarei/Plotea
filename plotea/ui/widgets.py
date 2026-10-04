@@ -180,6 +180,19 @@ def make_icon(name: str, color: str = "", size: int = 22) -> QIcon:
             QPointF(s * 0.34, s * 0.48), QPointF(s * 0.58, s * 0.48),
             QPointF(s * 0.58, s * 0.74), QPointF(s - m, s * 0.74)]))
         p.drawLine(QPointF(s * 0.46, s * 0.40), QPointF(s * 0.46, s * 0.56))
+    elif name == "bland_altman":
+        # scattered points around a bias line, between two dashed limits
+        p.drawLine(QPointF(m, s * 0.50), QPointF(s - m, s * 0.50))
+        dashed = QPen(p.pen())
+        dashed.setStyle(Qt.PenStyle.DashLine)
+        p.setPen(dashed)
+        p.drawLine(QPointF(m, s * 0.24), QPointF(s - m, s * 0.24))
+        p.drawLine(QPointF(m, s * 0.76), QPointF(s - m, s * 0.76))
+        p.setPen(QPen(col, dashed.widthF()))
+        p.setBrush(col)
+        for x, y in ((0.25, 0.42), (0.40, 0.60), (0.55, 0.45), (0.72, 0.56)):
+            p.drawEllipse(QPointF(s * x, s * y), 1.6, 1.6)
+        p.setBrush(Qt.BrushStyle.NoBrush)
     elif name == "paired":
         # two columns of points, each pair joined: one line per subject
         left, right = s * 0.28, s * 0.72
@@ -240,7 +253,7 @@ def make_icon(name: str, color: str = "", size: int = 22) -> QIcon:
 PLOT_ICONS = {"line": "line", "scatter": "scatter", "histogram": "histogram",
               "box": "box", "violin": "violin", "bar": "bar",
               "survival": "survival", "contingency": "contingency",
-              "paired": "paired"}
+              "paired": "paired", "bland_altman": "bland_altman"}
 
 
 def tag_icon(target, name: str):

@@ -97,6 +97,18 @@ PHRASES = {
                         "with the Shapiro-Wilk test; on that basis, "),
         "paired_rows": ", each row of the table being one subject",
         "rows": "the rows of the table",
+        "ba": ("Agreement between {a} and {b} was assessed with the "
+               "Bland-Altman method: for each subject (n = {n}), the "
+               "difference between the two measurements ({diff}) is "
+               "plotted against their mean. The bias is the mean "
+               "difference, and the 95% limits of agreement are the bias "
+               "± 1.96 SD of the differences{ci}."),
+        "ba_abs": "{a} - {b}",
+        "ba_pct": "{a} - {b}, as a percentage of their mean",
+        "ba_ci": ("; their 95% confidence intervals follow Bland and "
+                  "Altman (1999)"),
+        "ba_p": ("Whether the bias differs from zero was tested with a "
+                 "one-sample t test on the differences."),
         "semicolon": "; ",
     },
     "fr": {
@@ -189,6 +201,18 @@ PHRASES = {
                         "conséquence, "),
         "paired_rows": ", chaque ligne du tableau étant un sujet",
         "rows": "les lignes du tableau",
+        "ba": ("La concordance entre {a} et {b} a été évaluée par la "
+               "méthode de Bland-Altman : pour chaque sujet (n = {n}), la "
+               "différence entre les deux mesures ({diff}) est portée en "
+               "fonction de leur moyenne. Le biais est la moyenne des "
+               "différences, et les limites d'agrément à 95 % sont le biais "
+               "± 1,96 écart-type des différences{ci}."),
+        "ba_abs": "{a} - {b}",
+        "ba_pct": "{a} - {b}, en pourcentage de leur moyenne",
+        "ba_ci": (" ; leurs intervalles de confiance à 95 % suivent Bland et "
+                  "Altman (1999)"),
+        "ba_p": ("L'écart du biais à zéro a été testé par un test t à un "
+                 "échantillon sur les différences."),
         "semicolon": " ; ",
     },
 }
@@ -446,6 +470,18 @@ def _xy(spec, info, say, language) -> list[str]:
     return out
 
 
+def _agreement(spec, info, say) -> list[str]:
+    result = info.bland_altman or {}
+    if result.get("n", 0) < 3 or len(info.groups) != 2:
+        return []
+    a, b = info.groups
+    diff = say["ba_pct" if spec.ba_view == "percent" else "ba_abs"].format(
+        a=a, b=b)
+    return [say["ba"].format(a=a, b=b, n=result["n"], diff=diff,
+                             ci=say["ba_ci"] if spec.ba_ci else ""),
+            say["ba_p"]]
+
+
 def methods_text(spec, info, language: str = "en") -> str:
     """The paragraph for one figure, in "en" or "fr"."""
     language = language if language in LANGUAGES else "en"
@@ -457,6 +493,8 @@ def methods_text(spec, info, language: str = "en") -> str:
         sentences = _survival(spec, info, say)
     elif spec.plot_type == "contingency":
         sentences = _contingency(spec, info, say)
+    elif spec.plot_type == "bland_altman":
+        sentences = _agreement(spec, info, say)
     elif spec.plot_type in ("line", "scatter"):
         sentences = _xy(spec, info, say, language)
     else:

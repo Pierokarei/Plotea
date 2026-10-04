@@ -137,6 +137,26 @@ def paired() -> Dataset:
         tr("Avant"): before.round(1), tr("Après"): after.round(1)}))
 
 
+#: Peak expiratory flow rate (l/min) of 17 subjects, first reading on each
+#: meter: Bland JM, Altman DG. Statistical methods for assessing agreement
+#: between two methods of clinical measurement. Lancet 1986;i:307-310,
+#: table 1. Their published bias is -2.1 l/min, SD 38.8.
+PEAK_FLOW = {
+    "Wright": [494, 395, 516, 434, 476, 557, 413, 442, 650, 433, 417, 656,
+               267, 478, 178, 423, 427],
+    "Mini-Wright": [512, 430, 520, 428, 500, 600, 364, 380, 658, 445, 432,
+                    626, 260, 477, 259, 350, 451],
+}
+
+
+def agreement() -> Dataset:
+    """Two peak flow meters on the same subjects: the Bland-Altman classic."""
+    data = {tr("Sujet"): [f"S{i:02d}" for i in range(1, 18)]}
+    data.update({name: [float(v) for v in values]
+                 for name, values in PEAK_FLOW.items()})
+    return Dataset(tr("Débit expiratoire de pointe"), pd.DataFrame(data))
+
+
 EXAMPLES = {
     "Viabilité cellulaire (barres, stats)": viability,
     "Courbe de croissance (courbes + SD)": growth,
@@ -147,6 +167,7 @@ EXAMPLES = {
     "Essai de survie (Kaplan-Meier)": survival,
     "Réponse au traitement (contingence)": contingency,
     "Pression artérielle (avant/après)": paired,
+    "Deux débitmètres (Bland-Altman)": agreement,
 }
 
 

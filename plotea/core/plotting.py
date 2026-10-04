@@ -44,6 +44,8 @@ class RenderInfo:
     fit_comparison: object = None                  # fitting.FitComparison
     test_used: str = ""          # the test that ran ("auto" resolved)
     subjects: int = 0            # before-after: subjects drawn as lines
+    agreement: list = field(default_factory=list)   # Bland-Altman rows
+    bland_altman: dict = field(default_factory=dict)
 
 
 # --------------------------------------------------------------------------
@@ -1078,6 +1080,83 @@ def draw_paired(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
     return positions, tops
 
 
+def draw_bland_altman(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
+                       info: RenderInfo):
+    """Agreement of two methods: difference against mean, per subject.
+
+    The bias (mean difference) and the 95 % limits of agreement are lines
+    across the plot, labelled at its right edge; their confidence intervals
+    are bands when asked for. Wide format - two columns, one row per
+    subject - or long format with a two-level group and a pairing column.
+    """
+    groups = extract_groups(df, spec)
+    labels = list(groups)
+    if len(labels) != 2:
+        info.warnings.append(tr(
+            "Bland-Altman : choisissez exactement deux méthodes - deux "
+            "colonnes Y, ou une colonne « Grouper par » à deux valeurs et "
+            "la colonne du sujet dans « Appariement »."))
+        return _no_data(ax)
+    paired = extract_paired(df, spec)
+    if paired is None:
+        info.warnings.append(tr(
+            "Bland-Altman : choisissez la colonne du sujet dans "
+            "« Appariement » pour savoir quelles mesures vont ensemble."))
+        return _no_data(ax)
+    a, b = st.matched(paired, labels[0], labels[1])
+    percent = spec.ba_view == "percent"
+    result = st.bland_altman(a, b, percent=percent)
+    info.groups = info.series = labels
+    info.bland_altman = result
+    if result["n"] < 3:
+        info.warnings.append(tr(
+            "Bland-Altman : il faut au moins trois sujets mesurés par les "
+            "deux méthodes."))
+        return _no_data(ax)
+    info.agreement = st.agreement_rows(result)
+
+    sizes = _sizes(spec, theme)
+    color = _colors(spec, theme, labels)[0]
+    ax.axhline(0.0, color="#B0B5BB", lw=sizes["lw"] * 0.8, ls=":", zorder=1)
+    # "1.96 SD" as the numbers beside it are written, in either language
+    lines = (("bias", "bias_ci", "-", tr("Biais")),
+             ("low", "low_ci", "--", "-1.96 SD"),
+             ("high", "high_ci", "--", "+1.96 SD"))
+    label_axis = ax.get_yaxis_transform()     # x in axes, y in data
+    for key, ci_key, style, name in lines:
+        value = result[key]
+        if spec.ba_ci:
+            ax.axhspan(*result[ci_key], color=color if key == "bias"
+                       else "#9AA0A6", alpha=0.15, lw=0, zorder=0)
+        ax.axhline(value, color="black" if key == "bias" else "#5F6368",
+                   lw=sizes["lw"] * (1.3 if key == "bias" else 1.0),
+                   ls=style, zorder=2)
+        # a few points above its line, so the dashes do not cross it
+        ax.annotate(f"{name} {value:.3g}", xy=(0.99, value),
+                    xycoords=label_axis, xytext=(0, 2),
+                    textcoords="offset points", ha="right", va="bottom",
+                    fontsize=theme.base_size * 0.85, color="#3C4043",
+                    zorder=5)
+    ax.scatter(result["mean"], result["diff"], s=sizes["ps"], color=color,
+               edgecolors="white", linewidths=0.5, alpha=spec.point_alpha,
+               zorder=4)
+    first, second = labels
+    ax.set_xlabel(spec.xlabel or tr("Moyenne de {a} et {b}").format(
+        a=first, b=second))
+    default_y = (tr("({a} - {b}) / moyenne (%)") if percent
+                 else tr("{a} - {b}")).format(a=first, b=second)
+    ax.set_ylabel(spec.ylabel or default_y)
+    # room above the upper limit for its label, below the lower one
+    span = (result["high"] - result["low"]) or 1.0
+    low = min(result["low"], float(np.min(result["diff"])))
+    high = max(result["high"], float(np.max(result["diff"])))
+    if spec.ba_ci:                       # the bands whole, not cut off
+        low = min(low, result["low_ci"][0])
+        high = max(high, result["high_ci"][1])
+    ax.set_ylim(low - 0.12 * span, high + 0.12 * span)
+    return {}, {}
+
+
 # --------------------------------------------------------------------------
 # Main entry point
 # --------------------------------------------------------------------------
@@ -1091,6 +1170,7 @@ DRAWERS = {
     "survival": draw_survival,
     "contingency": draw_contingency,
     "paired": draw_paired,
+    "bland_altman": draw_bland_altman,
 }
 
 
@@ -1305,9 +1385,11 @@ def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
                     df: pd.DataFrame, info: RenderInfo):
     """Compare the groups and draw the brackets, or explain why it cannot."""
     test = effective_test(spec, groups, df)
-    # "auto" resolved the way pairwise() resolves it, so the record names
-    # the test that ran
-    info.test_used = st.pick_family_test(groups) if test == "auto" else test
+    # "auto" resolved once, here, the way pairwise() would: the comparisons
+    # and the record then name the same test
+    if test == "auto" and len(groups) >= 2:
+        test = st.pick_family_test(groups)
+    info.test_used = test
     if test in st.CONTROL_TESTS:
         if spec.stats_mode != "vs_control" or spec.stats_control not in groups:
             info.warnings.append(

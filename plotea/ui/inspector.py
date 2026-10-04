@@ -249,7 +249,7 @@ class Inspector(QWidget):
         "line": "Courbe", "scatter": "Nuage", "histogram": "Histogramme",
         "box": "Boxplot", "violin": "Violon", "bar": "Barres",
         "survival": "Survie", "contingency": "Contingence",
-        "paired": "Avant/après",
+        "paired": "Avant/après", "bland_altman": "Bland-Altman",
     }
     CARD_HEIGHT = 62
 
@@ -676,6 +676,15 @@ class Inspector(QWidget):
         self.r_baredge = sec.add_widget(row(self.chk_baredge, self.chk_horiz))
         self._build_survival_rows(sec)
         self._build_contingency_rows(sec)
+        self._build_agreement_rows(sec)
+
+    def _build_agreement_rows(self, sec):
+        self.cmb_ba_view = self._bind(QComboBox(), "ba_view")
+        self.fill(self.cmb_ba_view, enums.BA_VIEW)
+        self.r_ba_view = sec.add_row(tr("Différence"), self.cmb_ba_view)
+        self.chk_ba_ci = self._bind(
+            QCheckBox(tr("IC 95 % du biais et des limites")), "ba_ci")
+        self.r_ba_ci = sec.add_row(tr("Incertitude"), self.chk_ba_ci)
 
     def _build_contingency_rows(self, sec):
         self.cmb_cview = self._bind(QComboBox(), "contingency_view")
@@ -824,7 +833,11 @@ class Inspector(QWidget):
         self.cmb_subgroup.setVisible(t in ("bar", "contingency"))
         self.hint_counts.setVisible(ct)
         self._set_row_visible(self.r_cview, ct)
-        for picker, shown in ((self.cmb_test, not ct), (self.cmb_ctest, ct)):
+        for widget in (self.r_ba_view, self.r_ba_ci):
+            self._set_row_visible(widget, t == "bland_altman")
+        ba = t == "bland_altman"
+        for picker, shown in ((self.cmb_test, not ct and not ba),
+                              (self.cmb_ctest, ct)):
             picker.setVisible(shown)
             label = self.sec_stats.form.labelForField(picker)
             if label is not None:
@@ -836,7 +849,15 @@ class Inspector(QWidget):
                 label.setVisible(xy)
         self.sec_fit.setVisible(xy)
         self.hint_compare.setVisible(bool(self.spec.fit_compare))
-        self.sec_stats.setVisible(cat or surv or ct)
+        # Bland-Altman has no test to choose, but needs the pairing row
+        self.sec_stats.setVisible(cat or surv or ct or t == "bland_altman")
+        for widget in (self.chk_stats, self.cmb_mode, self.cmb_control,
+                       self.cmb_corr, self.cmb_format, self.chk_hide_ns,
+                       self.spn_gap):
+            widget.setVisible(t != "bland_altman")
+            label = self.sec_stats.form.labelForField(widget)
+            if label is not None:
+                label.setVisible(t != "bland_altman")
         # on a survival plot the only statistic is the log-rank, so the test
         # pickers have nothing to offer
         for widget in (self.cmb_test, self.cmb_mode, self.cmb_control,
@@ -866,10 +887,10 @@ class Inspector(QWidget):
         self.spn_jitter.setEnabled(scattered)
         self.cmb_control.setEnabled(
             self.spec.stats_mode == "vs_control")
-        # a before-after plot needs the subject column to draw its lines,
-        # whatever the test
+        # a before-after or Bland-Altman plot needs the subject column to
+        # match its measurements, whatever the test
         is_paired = ((self.spec.stats_test in PAIRED_TESTS and not ct)
-                     or t == "paired")
+                     or t in ("paired", "bland_altman"))
         for widget in (self.r_pair, self.hint_pair):
             widget.setVisible(is_paired)
             label = self.sec_stats.form.labelForField(widget)

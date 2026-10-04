@@ -142,6 +142,11 @@ def runtime_keys() -> set[str]:
         keys.update(row)
         keys.add(row["Mesure"])
     keys.update({"Groupe", "n"})
+    # Bland-Altman: the agreement rows of the Effects tab
+    for row in stats.agreement_rows(stats.bland_altman([1, 2, 3, 4],
+                                                       [1.5, 2, 2.5, 4.2])):
+        keys.update(row)
+        keys.add(row["Mesure"])
     keys.update(stats.CONTINGENCY_LABELS.values())
     cells = {(a, b): rng.normal(0, 1, 6) for a in "xy" for b in "uv"}
     anova, _ = stats.two_way_anova(cells)

@@ -111,6 +111,8 @@ class PlotSpec:
     show_censors: bool = True         # ticks where follow-up stopped
 
     contingency_view: str = "percent"   # percent / stacked / grouped
+    ba_view: str = "difference"         # Bland-Altman: difference / percent
+    ba_ci: bool = False                 # CIs of the bias and of the limits
     contingency_test: str = "auto"      # Fisher on 2 x 2, chi-square beyond
 
     bar_width: float = 0.7

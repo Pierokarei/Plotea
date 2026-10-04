@@ -250,7 +250,7 @@ class StatsPanel(QWidget):
         self._outlier_rows = list(info.outliers)
         self.tabs.setTabVisible(self.tabs.indexOf(self.outliers),
                                 bool(info.outliers))
-        effects = list(getattr(info, "contingency", []) or [])
+        effects = list(getattr(info, "contingency", []) or []) +             list(getattr(info, "agreement", []) or [])
         _fill(self.effects, effects)
         self._effect_rows = effects
         self.tabs.setTabVisible(self.tabs.indexOf(self.effects),
@@ -278,6 +278,12 @@ class StatsPanel(QWidget):
                 head.append(f"{tr(name)}: p = {p:.4g}")
             else:
                 head.append(f"{tr(name)}: stat = {stat:.4g}, p = {p:.4g}")
+        agreement = getattr(info, "bland_altman", None) or {}
+        if agreement.get("n", 0) >= 3:
+            head.append(tr("Biais {bias:.3g} ; limites d'agrément {low:.3g} "
+                           "à {high:.3g} (n = {n})").format(**{
+                               k: agreement[k] for k in ("bias", "low", "high",
+                                                         "n")}))
         comparison = getattr(info, "fit_comparison", None)
         if comparison is not None and comparison.ok:
             head.append(plotting.comparison_line(comparison))

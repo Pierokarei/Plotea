@@ -99,6 +99,13 @@ PLOT_TYPE = Enum("plot_type", [
     ("survival", "Survie (Kaplan-Meier)"),
     ("contingency", "Contingence (effectifs)"),
     ("paired", "Avant/après apparié"),
+    ("bland_altman", "Bland-Altman (concordance)"),
+])
+
+#: What a Bland-Altman plot puts on its Y axis.
+BA_VIEW = Enum("ba_view", [
+    ("difference", "Différence (A - B)"),
+    ("percent", "Différence en % de la moyenne"),
 ])
 
 ERROR_TYPE = Enum("error_type", [
@@ -272,6 +279,7 @@ SPEC_FIELDS = {
     "stats_test": STATS_TEST,
     "contingency_test": CONTINGENCY_TEST,
     "contingency_view": CONTINGENCY_VIEW,
+    "ba_view": BA_VIEW,
     "stats_mode": STATS_MODE,
     "stats_format": STATS_FORMAT,
     "stats_correction": CORRECTION,
