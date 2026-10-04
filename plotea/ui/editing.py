@@ -86,7 +86,9 @@ class EditHistory(QObject):
             window.project.panels = [Panel.from_dict(d)
                                      for d in snapshot.panels]
             window.project.datasets = [
-                Dataset(name, df, notes=notes)
+                # a copy: editing the restored table must not rewrite the
+                # snapshot that history keeps for the next undo or redo
+                Dataset(name, df.copy(), notes=notes)
                 for name, df, notes in snapshot.datasets]
             window.data_panel.set_datasets(window.project.datasets,
                                            snapshot.current_dataset)

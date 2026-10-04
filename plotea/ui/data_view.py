@@ -30,6 +30,7 @@ from .widgets import follow_sections, tag_icon
 class DataFrameModel(QAbstractTableModel):
     """Editable Qt model over a pandas DataFrame."""
 
+    aboutToChange = pyqtSignal()          # before an edit: undo starts here
     dataChangedExternally = pyqtSignal()
 
     def __init__(self, df: pd.DataFrame | None = None, parent=None):
@@ -69,6 +70,7 @@ class DataFrameModel(QAbstractTableModel):
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole) -> bool:
         if role != Qt.ItemDataRole.EditRole or not index.isValid():
             return False
+        self.aboutToChange.emit()
         col = self._df.columns[index.column()]
         text = str(value).strip().replace(",", ".")
         if text == "":
@@ -116,6 +118,7 @@ class DataFrameModel(QAbstractTableModel):
                       role=Qt.ItemDataRole.EditRole) -> bool:
         if orientation != Qt.Orientation.Horizontal:
             return False
+        self.aboutToChange.emit()
         cols = list(self._df.columns)
         cols[section] = str(value)
         self._df.columns = cols
@@ -133,6 +136,7 @@ class DataFrameModel(QAbstractTableModel):
         self.endResetModel()
 
     def add_rows(self, count: int = 1):
+        self.aboutToChange.emit()
         self.beginInsertRows(QModelIndex(), len(self._df),
                              len(self._df) + count - 1)
         extra = pd.DataFrame({c: [np.nan] * count for c in self._df.columns})
@@ -141,6 +145,7 @@ class DataFrameModel(QAbstractTableModel):
         self.dataChangedExternally.emit()
 
     def add_column(self, name: str | None = None):
+        self.aboutToChange.emit()
         n = len(self._df.columns)
         name = name or f"Col{n + 1}"
         while name in self._df.columns:
@@ -152,6 +157,7 @@ class DataFrameModel(QAbstractTableModel):
         self.dataChangedExternally.emit()
 
     def remove_columns(self, indexes: list[int]):
+        self.aboutToChange.emit()
         for idx in sorted(set(indexes), reverse=True):
             if 0 <= idx < len(self._df.columns):
                 self.beginRemoveColumns(QModelIndex(), idx, idx)
@@ -160,6 +166,7 @@ class DataFrameModel(QAbstractTableModel):
         self.dataChangedExternally.emit()
 
     def remove_rows(self, indexes: list[int]):
+        self.aboutToChange.emit()
         keep = [i for i in range(len(self._df)) if i not in set(indexes)]
         self.beginResetModel()
         self._df = self._df.iloc[keep].reset_index(drop=True)
@@ -167,6 +174,7 @@ class DataFrameModel(QAbstractTableModel):
         self.dataChangedExternally.emit()
 
     def clear_cells(self, cells: list[tuple[int, int]]):
+        self.aboutToChange.emit()
         for r, c in cells:
             self._df.iat[r, c] = np.nan
         self.beginResetModel()
@@ -182,6 +190,8 @@ class DataPanel(QWidget):
     """Left dock: the dataset list on top, the editable table below."""
 
     datasetChanged = pyqtSignal()        # active dataset switched
+    datasetRenamed = pyqtSignal(str, str)  # old name, new name
+    aboutToEdit = pyqtSignal()           # cells about to change -> undo
     dataEdited = pyqtSignal()            # cells changed -> re-render
     importRequested = pyqtSignal()
     addTableRequested = pyqtSignal()
@@ -191,7 +201,8 @@ class DataPanel(QWidget):
         super().__init__(parent)
         self.datasets: list[Dataset] = []
         self.model = DataFrameModel()
-        self.model.dataChangedExternally.connect(self.dataEdited)
+        self.model.aboutToChange.connect(self.aboutToEdit)
+        self.model.dataChangedExternally.connect(self._on_model_edited)
 
         self.list = QListWidget()
         self.list.setMaximumHeight(122)
@@ -313,19 +324,36 @@ class DataPanel(QWidget):
         if ds is None:
             return
         self.model.set_dataframe(ds.df)
+        self.refresh_current_label()
+        self.datasetChanged.emit()
+
+    def _on_model_edited(self):
+        """The table on screen is the dataset: keep them one and the same.
+
+        Adding or removing rows and columns builds a new DataFrame inside
+        the model; the dataset must follow, or the plot, the saved file and
+        the size shown would go on with the table as it was.
+        """
+        ds = self.current_dataset()
+        if ds is not None:
+            ds.df = self.model.dataframe()
+        self.refresh_current_label()
+        self.dataEdited.emit()
+
+    def refresh_current_label(self):
+        """The size shown in the list and under the table."""
+        i = self.list.currentRow()
+        ds = self.current_dataset()
+        if ds is None:
+            return
+        if 0 <= i < self.list.count():
+            self.list.item(i).setText(
+                f"{ds.name}   ({len(ds.df)}x{len(ds.df.columns)})")
         num = len(ds.numeric_columns())
         self.info.setText(
             tr("{rows} lignes - {cols} colonnes ({numeric} numériques)"
                ).format(rows=len(ds.df), cols=len(ds.df.columns), numeric=num)
             + (f" - {ds.source}" if ds.source else ""))
-        self.datasetChanged.emit()
-
-    def refresh_current_label(self):
-        i = self.list.currentRow()
-        ds = self.current_dataset()
-        if ds and 0 <= i < self.list.count():
-            self.list.item(i).setText(
-                f"{ds.name}   ({len(ds.df)}x{len(ds.df.columns)})")
 
     # -- clipboard ----------------------------------------------------------
     def copy_selection(self):
@@ -352,6 +380,7 @@ class DataPanel(QWidget):
         text = QApplication.clipboard().text()
         if not text.strip():
             return
+        self.aboutToEdit.emit()
         sel = self.table.selectedIndexes()
         r0 = sel[0].row() if sel else 0
         c0 = sel[0].column() if sel else 0
@@ -376,7 +405,7 @@ class DataPanel(QWidget):
                         df[df.columns[c]] = df[df.columns[c]].astype(object)
                         df.iat[r, c] = cell
         self.model.set_dataframe(df)
-        self.dataEdited.emit()
+        self._on_model_edited()
 
     def _clear_selection(self):
         cells = [(i.row(), i.column()) for i in self.table.selectedIndexes()]
@@ -405,12 +434,13 @@ class DataPanel(QWidget):
                 self.model.setHeaderData(col, Qt.Orientation.Horizontal,
                                          new.strip())
         elif act is to_num:
+            self.aboutToEdit.emit()
             name = df.columns[col]
             df[name] = pd.to_numeric(
                 df[name].astype(str).str.replace(",", ".", regex=False),
                 errors="coerce")
             self.model.set_dataframe(df)
-            self.dataEdited.emit()
+            self._on_model_edited()
         elif act is insert:
             self.model.add_column()
         elif act is delete:
@@ -451,10 +481,10 @@ class DataPanel(QWidget):
         if act is a_rename:
             new, ok = QInputDialog.getText(self, tr("Renommer la table"),
                                            tr("Nom :"), text=ds.name)
-            if ok and new.strip():
-                ds.name = new.strip()
+            if ok and new.strip() and new.strip() != ds.name:
+                old, ds.name = ds.name, new.strip()
                 self.refresh_current_label()
-                self.datasetChanged.emit()
+                self.datasetRenamed.emit(old, ds.name)
         elif act is a_dup:
             self.datasets.append(ds.copy())
             self.set_datasets(self.datasets, len(self.datasets) - 1)
@@ -462,12 +492,12 @@ class DataPanel(QWidget):
             # The first column keeps its name: the old headers become its
             # values, and transposing a second time gives the table back
             # exactly. Renaming it is one double-click away.
+            self.aboutToEdit.emit()
             first = str(ds.df.columns[0])
             turned = ds.df.set_index(ds.df.columns[0]).T.reset_index()
             turned.columns = [first] + [str(c) for c in turned.columns[1:]]
-            ds.df = turned
-            self.model.set_dataframe(ds.df)
-            self.dataEdited.emit()
+            self.model.set_dataframe(turned)
+            self._on_model_edited()
         elif act is a_del:
             if len(self.datasets) == 1:
                 QMessageBox.information(self, tr("Plotea"),

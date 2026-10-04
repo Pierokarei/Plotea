@@ -164,6 +164,10 @@ class MainWindow(QMainWindow):
     def _build_docks(self):
         self.data_panel = DataPanel()
         self.data_panel.datasetChanged.connect(self._on_dataset_changed)
+        self.data_panel.datasetRenamed.connect(self._on_dataset_renamed)
+        # the copy for undo is taken before the cells change, not after
+        self.data_panel.aboutToEdit.connect(
+            lambda: self._begin_edit("Modification des données", deep=True))
         self.data_panel.dataEdited.connect(
             lambda: self._begin_edit("Modification des données", deep=True))
         self.data_panel.dataEdited.connect(self.schedule_render)
@@ -486,8 +490,7 @@ class MainWindow(QMainWindow):
                                      self.project.datasets.index(first))
         spec = self.current_spec()
         if spec and first is not None:
-            spec.dataset = first.name
-            self._auto_map(spec, first)
+            self._show_table(spec, first)
         self._sync_inspector()
         self.schedule_render()
         self._record("Import de données", before)
@@ -585,8 +588,7 @@ class MainWindow(QMainWindow):
                                      len(self.project.datasets) - 1)
         spec = self.current_spec()
         if spec:
-            spec.dataset = ds.name
-            self._auto_map(spec, ds)
+            self._show_table(spec, ds)
             self._sync_inspector()
             self.schedule_render()
         self._record("Jeu de données d'exemple", before)
@@ -626,12 +628,16 @@ class MainWindow(QMainWindow):
                 spec.y = rest[:4] or numeric[:1]
             spec.xlabel = spec.x
         else:
-            if categorical and numeric:
+            by = categorical[0] if categorical else ""
+            # a replicate or row number is not a measurement
+            values = [c for c in numeric
+                      if not self._numbering(ds, c, by)] or numeric
+            if categorical and values:
                 spec.group = categorical[0]
-                spec.y = numeric[:1]
+                spec.y = values[:1]
             else:
                 spec.group = ""
-                spec.y = numeric[:4]
+                spec.y = values[:4]
             spec.xlabel = spec.group if spec.plot_type != "histogram" else (
                 spec.y[0] if spec.y else "")
         if spec.plot_type == "histogram":
@@ -639,6 +645,21 @@ class MainWindow(QMainWindow):
         elif spec.y:
             spec.ylabel = spec.y[0]
         spec.subgroup = ""
+
+    @staticmethod
+    def _numbering(ds, column: str, by: str = "") -> bool:
+        """Whether a column only numbers the rows: 1, 2, 3... in each group."""
+        import pandas as pd
+
+        values = pd.to_numeric(ds.df[column], errors="coerce")
+        parts = values.groupby(ds.df[by]) if by in ds.df else [("", values)]
+        for _, part in parts:
+            part = sorted(part.dropna())
+            if len(part) < 2 or part[0] not in (0, 1):
+                return False
+            if part != list(range(int(part[0]), int(part[0]) + len(part))):
+                return False
+        return True
 
     @staticmethod
     def _counts(ds, columns: list[str]) -> bool:
@@ -718,6 +739,13 @@ class MainWindow(QMainWindow):
         if spec is None:
             return
         ds = self.project.get_dataset(spec.dataset)
+        if not self._mapping_fits(spec, ds, plot_type):
+            self._auto_map(spec, ds)
+        self._sync_inspector()
+        self.schedule_render()
+
+    def _mapping_fits(self, spec: PlotSpec, ds, plot_type: str) -> bool:
+        """Whether this plot type can draw the columns the plot points at."""
         cols = set(ds.columns) if ds else set()
         needs_x = plot_type in ("line", "scatter")
         invalid = (not spec.y or not set(spec.y) <= cols
@@ -747,17 +775,36 @@ class MainWindow(QMainWindow):
             # one count column is not a table: at least two outcomes
             invalid = not (raw or (len(spec.y) >= 2
                                    and self._counts(ds, spec.y)))
-        if invalid:
+        return not invalid
+
+    def _show_table(self, spec: PlotSpec, ds):
+        """Point the plot at another table, as that table was last shown.
+
+        A table this plot has shown before comes back with its plot type,
+        columns, titles and statistics; a new one gets its columns chosen.
+        Choosing them again for a table already set up is what turned the
+        cell viability bars into bars of replicate numbers on the way back
+        from a contingency table.
+        """
+        if ds is None or spec.dataset == ds.name:
+            return
+        restored = spec.switch_table(ds.name)
+        if not restored or not self._mapping_fits(spec, ds, spec.plot_type):
             self._auto_map(spec, ds)
-        self._sync_inspector()
-        self.schedule_render()
 
     def _on_dataset_changed(self):
         ds = self.data_panel.current_dataset()
         spec = self.current_spec()
-        if ds and spec and spec.dataset != ds.name:
-            spec.dataset = ds.name
-            self._auto_map(spec, ds)
+        if ds and spec:
+            self._show_table(spec, ds)
+        self._sync_inspector()
+        self.schedule_render()
+
+    def _on_dataset_renamed(self, old: str, new: str):
+        """A new name, not a new table: every plot keeps its settings."""
+        for spec in self.project.plots:
+            spec.rename_table(old, new)
+        self.project.dirty = True
         self._sync_inspector()
         self.schedule_render()
 
@@ -768,8 +815,7 @@ class MainWindow(QMainWindow):
         ds = self.project.get_dataset(name)
         if ds is None:
             return
-        spec.dataset = name
-        self._auto_map(spec, ds)
+        self._show_table(spec, ds)
         idx = self.project.datasets.index(ds)
         self.data_panel.list.setCurrentRow(idx)
         self._sync_inspector()

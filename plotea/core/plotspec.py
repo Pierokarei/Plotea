@@ -5,12 +5,27 @@ PlotSpecs plus the datasets. Nothing in this module imports matplotlib.
 """
 from __future__ import annotations
 
+import copy
 from dataclasses import asdict, dataclass, field
 
 from .enums import PLOT_TYPE, SPEC_FIELDS
 
 #: Kept for convenience: plot type key -> label shown in the interface.
 PLOT_TYPES = {choice.key: choice.label for choice in PLOT_TYPE}
+
+#: How a figure looks whatever table it shows: "Apply style" and the presets
+#: carry these, and they stay put when a plot moves to another table.
+STYLE_FIELDS = [
+    "theme", "palette", "span", "width_mm", "height_mm", "line_width",
+    "marker", "marker_size", "line_style", "alpha", "fill_alpha",
+    "error_type", "error_capsize", "show_points", "point_style",
+    "point_alpha", "jitter_width", "bar_width", "bar_edge", "box_width",
+    "notch", "violin_inner", "despine", "grid_x", "grid_y", "minor_ticks",
+    "show_legend", "legend_loc", "monochrome_hatch", "transparent_bg",
+]
+
+#: The plot itself, not the way one of its tables is shown.
+_OWN_FIELDS = {"name", "dataset", "per_table", "dpi_preview", "notes"}
 
 
 @dataclass
@@ -162,6 +177,11 @@ class PlotSpec:
     dpi_preview: int = 110
     notes: str = ""
 
+    # -- how each table was last shown -------------------------------------
+    # table name -> its plot type, columns, titles, statistics..., so that
+    # coming back to a table gives back the plot it had
+    per_table: dict = field(default_factory=dict)
+
     # ---------------------------------------------------------------------
     def __setattr__(self, name, value):
         """Accept a key, a current label or a legacy one; store the key.
@@ -186,6 +206,36 @@ class PlotSpec:
         spec = PlotSpec.from_dict(self.to_dict())
         spec.name = name or f"{self.name} (copie)"
         return spec
+
+    # -- moving between tables ---------------------------------------------
+    def table_settings(self) -> dict:
+        """Everything that describes how the current table is shown."""
+        return {k: v for k, v in asdict(self).items()
+                if k not in _OWN_FIELDS and k not in STYLE_FIELDS}
+
+    def switch_table(self, name: str) -> bool:
+        """Leave the current table for `name`, remembering how it was shown.
+
+        True when `name` was shown before and its settings are back; False
+        when it is new to this plot, whose columns are then to be chosen.
+        The style stays: a plot keeps its look from one table to the next.
+        """
+        if self.dataset:
+            self.per_table[self.dataset] = self.table_settings()
+        self.dataset = name
+        saved = self.per_table.get(name)
+        if saved is None:
+            return False
+        for key, value in saved.items():
+            if key in self.__dataclass_fields__:
+                setattr(self, key, copy.deepcopy(value))
+        return True
+
+    def rename_table(self, old: str, new: str):
+        if self.dataset == old:
+            self.dataset = new
+        if old in self.per_table:
+            self.per_table[new] = self.per_table.pop(old)
 
     # -- convenience -------------------------------------------------------
     @property

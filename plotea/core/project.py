@@ -18,7 +18,7 @@ import pandas as pd
 from ..i18n import tr
 from .dataset import Dataset
 from .panel import Panel
-from .plotspec import PlotSpec
+from .plotspec import STYLE_FIELDS, PlotSpec
 
 FORMAT_VERSION = 1
 EXTENSION = ".plotea"
@@ -230,16 +230,6 @@ class Project:
 # --------------------------------------------------------------------------
 # Style presets: reusable appearance snapshots, stored next to the config
 # --------------------------------------------------------------------------
-STYLE_FIELDS = [
-    "theme", "palette", "span", "width_mm", "height_mm", "line_width",
-    "marker", "marker_size", "line_style", "alpha", "fill_alpha",
-    "error_type", "error_capsize", "show_points", "point_style",
-    "point_alpha", "jitter_width", "bar_width", "bar_edge", "box_width",
-    "notch", "violin_inner", "despine", "grid_x", "grid_y", "minor_ticks",
-    "show_legend", "legend_loc", "monochrome_hatch", "transparent_bg",
-]
-
-
 def extract_style(spec: PlotSpec) -> dict:
     data = spec.to_dict()
     return {k: data[k] for k in STYLE_FIELDS if k in data}
