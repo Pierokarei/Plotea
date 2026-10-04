@@ -180,6 +180,16 @@ def make_icon(name: str, color: str = "", size: int = 22) -> QIcon:
             QPointF(s * 0.34, s * 0.48), QPointF(s * 0.58, s * 0.48),
             QPointF(s * 0.58, s * 0.74), QPointF(s - m, s * 0.74)]))
         p.drawLine(QPointF(s * 0.46, s * 0.40), QPointF(s * 0.46, s * 0.56))
+    elif name == "paired":
+        # two columns of points, each pair joined: one line per subject
+        left, right = s * 0.28, s * 0.72
+        for y0, y1 in ((0.30, 0.42), (0.52, 0.36), (0.70, 0.60)):
+            p.drawLine(QPointF(left, s * y0), QPointF(right, s * y1))
+        p.setBrush(col)
+        for y0, y1 in ((0.30, 0.42), (0.52, 0.36), (0.70, 0.60)):
+            p.drawEllipse(QPointF(left, s * y0), 1.7, 1.7)
+            p.drawEllipse(QPointF(right, s * y1), 1.7, 1.7)
+        p.setBrush(Qt.BrushStyle.NoBrush)
     elif name == "contingency":
         # two bars stacked from two outcomes, the lower part filled
         width = (s - 2 * m) * 0.34
@@ -229,7 +239,8 @@ def make_icon(name: str, color: str = "", size: int = 22) -> QIcon:
 
 PLOT_ICONS = {"line": "line", "scatter": "scatter", "histogram": "histogram",
               "box": "box", "violin": "violin", "bar": "bar",
-              "survival": "survival", "contingency": "contingency"}
+              "survival": "survival", "contingency": "contingency",
+              "paired": "paired"}
 
 
 def tag_icon(target, name: str):

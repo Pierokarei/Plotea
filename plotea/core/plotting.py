@@ -42,6 +42,8 @@ class RenderInfo:
     outliers: list = field(default_factory=list)    # Grubbs, group by group
     contingency: list = field(default_factory=list) # odds ratio, RR, V...
     fit_comparison: object = None                  # fitting.FitComparison
+    test_used: str = ""          # the test that ran ("auto" resolved)
+    subjects: int = 0            # before-after: subjects drawn as lines
 
 
 # --------------------------------------------------------------------------
@@ -1000,6 +1002,82 @@ def draw_contingency(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
     return {}, {}
 
 
+def draw_paired(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
+                info: RenderInfo):
+    """Before-after: one line per subject across the conditions.
+
+    What a bar chart of means hides, this shows: whether every subject moved
+    the same way or a few carried the mean. The points sit exactly on their
+    condition - jitter would leave the lines ending beside them - and the
+    mean with its error stands just outside them, when asked for.
+    """
+    groups = extract_groups(df, spec)
+    labels = list(groups)
+    info.groups = info.series = labels
+    info.stat_groups = groups
+    if len(labels) < 2:
+        info.warnings.append(tr(
+            "Avant/après : il faut au moins deux conditions - deux colonnes "
+            "Y en format large, ou une colonne « Grouper par » en format "
+            "long."))
+        return _no_data(ax)
+    colors = _colors(spec, theme, labels)
+    sizes = _sizes(spec, theme)
+    pos = np.arange(len(labels), dtype=float)
+
+    paired = extract_paired(df, spec)
+    if paired is None:
+        info.warnings.append(tr(
+            "Avant/après : choisissez la colonne du sujet dans « Appariement »"
+            " pour relier les mesures d'un même sujet."))
+    else:
+        subjects = list(dict.fromkeys(s for lab in labels
+                                      for s in paired.get(lab, {})))
+        drawn = 0
+        for subject in subjects:
+            ys = np.array([paired.get(lab, {}).get(subject, np.nan)
+                           for lab in labels], dtype=float)
+            present = np.flatnonzero(np.isfinite(ys))
+            if present.size < 2:
+                continue
+            drawn += 1
+            # neighbours measured: a solid line; a condition missing in
+            # between: dotted, so the subject stays visible without a
+            # measurement being implied where there is none
+            for a, b in zip(present, present[1:]):
+                ax.plot(pos[[a, b]], ys[[a, b]], color="#9AA0A6",
+                        lw=sizes["lw"] * 0.8, alpha=0.75, zorder=2,
+                        ls="-" if b == a + 1 else ":",
+                        solid_capstyle="round")
+        info.subjects = drawn
+
+    positions, tops = {}, {}
+    for i, lab in enumerate(labels):
+        values = groups[lab]
+        ax.scatter(np.full(values.size, pos[i]), values, s=sizes["ps"],
+                   color=colors[i], edgecolors="white", linewidths=0.5,
+                   alpha=spec.point_alpha, zorder=4)
+        positions[lab] = pos[i]
+        tops[lab] = float(np.max(values))
+        if spec.error_type != "none":
+            low, high = st.error_value(values, spec.error_type)
+            side = -0.16 if i == 0 else 0.16
+            ax.errorbar(pos[i] + side, float(values.mean()),
+                        yerr=[[low], [high]], fmt="_", color="black",
+                        markersize=sizes["ms"] * 2.2, capsize=sizes["cap"],
+                        elinewidth=sizes["lw"] * 1.3,
+                        markeredgewidth=sizes["lw"] * 1.6, zorder=6)
+    if spec.connect_means:
+        ax.plot(pos, [float(groups[lab].mean()) for lab in labels],
+                color="black", lw=sizes["lw"] * 1.6, zorder=5)
+    ax.set_xticks(pos)
+    ax.set_xticklabels(labels)
+    ax.set_xlim(-0.6, len(labels) - 0.4)
+    if spec.ylabel or spec.y:
+        ax.set_ylabel(spec.ylabel or ("" if not spec.group else spec.y[0]))
+    return positions, tops
+
+
 # --------------------------------------------------------------------------
 # Main entry point
 # --------------------------------------------------------------------------
@@ -1012,6 +1090,7 @@ DRAWERS = {
     "scatter": draw_xy,
     "survival": draw_survival,
     "contingency": draw_contingency,
+    "paired": draw_paired,
 }
 
 
@@ -1207,10 +1286,29 @@ def draw_into(ax, spec: PlotSpec, df: pd.DataFrame,
     return info
 
 
+def effective_test(spec: PlotSpec, groups: dict, df: pd.DataFrame) -> str:
+    """The test that will run: "auto" on a before-after plot means paired.
+
+    Everywhere else "auto" picks among unpaired tests; on a plot drawn to
+    show the same subjects twice, comparing them as strangers would throw
+    the pairing away - and with it most of the power.
+    """
+    if spec.plot_type != "paired" or spec.stats_test != "auto":
+        return spec.stats_test
+    paired = extract_paired(df, spec)
+    if paired is None:
+        return "paired_t"            # _run_statistics says what is missing
+    return st.pick_paired_test(paired, list(groups))
+
+
 def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
                     df: pd.DataFrame, info: RenderInfo):
     """Compare the groups and draw the brackets, or explain why it cannot."""
-    if spec.stats_test in st.CONTROL_TESTS:
+    test = effective_test(spec, groups, df)
+    # "auto" resolved the way pairwise() resolves it, so the record names
+    # the test that ran
+    info.test_used = st.pick_family_test(groups) if test == "auto" else test
+    if test in st.CONTROL_TESTS:
         if spec.stats_mode != "vs_control" or spec.stats_control not in groups:
             info.warnings.append(
                 tr("Dunnett compare chaque groupe au contrôle : choisissez "
@@ -1223,7 +1321,7 @@ def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
             return
 
     paired = None
-    if spec.stats_test in st.PAIRED_TESTS:
+    if test in st.PAIRED_TESTS:
         if info.stat_pairs is not None:
             info.warnings.append(
                 tr("Test apparié indisponible sur des barres groupées à deux "
@@ -1236,7 +1334,7 @@ def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
                 "(sujet, patient, réplicat) dans la section Statistiques."))
             return
 
-    if spec.stats_test == "rm_anova":
+    if test == "rm_anova":
         rows, message = st.repeated_measures_anova(paired)
         info.anova, info.anova_message = rows, message
         info.anova_title = "ANOVA à mesures répétées"
@@ -1247,8 +1345,8 @@ def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
         elif message:
             info.warnings.append(message)
     elif len(groups) > 2 and info.stat_pairs is None:
-        info.omnibus = st.omnibus(groups, spec.stats_test)
-    comps = st.pairwise(groups, spec.stats_test, spec.stats_correction,
+        info.omnibus = st.omnibus(groups, test)
+    comps = st.pairwise(groups, test, spec.stats_correction,
                         spec.stats_mode, spec.stats_control,
                         pairs=info.stat_pairs, paired=paired)
     info.comparisons = comps

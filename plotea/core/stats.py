@@ -217,6 +217,22 @@ def pick_family_test(groups: dict[str, np.ndarray]) -> str:
     return "student" if equal_variance(data) else "welch"
 
 
+def pick_paired_test(paired: dict, labels: list[str]) -> str:
+    """The paired test "auto" means on a before-after plot.
+
+    More than two conditions: a repeated-measures ANOVA. Two: a paired t
+    test if the differences look normal - their normality is what the t
+    test assumes, not that of each condition - and Wilcoxon's signed-rank
+    test otherwise.
+    """
+    if len(labels) > 2:
+        return "rm_anova"
+    a, b = matched(paired, labels[0], labels[1])
+    if a.size < 3:
+        return "paired_t"
+    return "paired_t" if is_normal(b - a) else "wilcoxon"
+
+
 def _run_pair(a: np.ndarray, b: np.ndarray, test: str):
     """Run one test. Paired tests receive arrays already matched element-wise."""
     if test == "auto":

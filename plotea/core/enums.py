@@ -98,6 +98,7 @@ PLOT_TYPE = Enum("plot_type", [
     ("bar", "Barres + erreurs"),
     ("survival", "Survie (Kaplan-Meier)"),
     ("contingency", "Contingence (effectifs)"),
+    ("paired", "Avant/après apparié"),
 ])
 
 ERROR_TYPE = Enum("error_type", [

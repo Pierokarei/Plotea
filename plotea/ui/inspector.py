@@ -249,6 +249,7 @@ class Inspector(QWidget):
         "line": "Courbe", "scatter": "Nuage", "histogram": "Histogramme",
         "box": "Boxplot", "violin": "Violon", "bar": "Barres",
         "survival": "Survie", "contingency": "Contingence",
+        "paired": "Avant/après",
     }
     CARD_HEIGHT = 62
 
@@ -807,7 +808,7 @@ class Inspector(QWidget):
             return
         t = self.spec.plot_type
         xy = t in ("line", "scatter")
-        cat = t in ("bar", "box", "violin")
+        cat = t in ("bar", "box", "violin", "paired")
         hist = t == "histogram"
         surv = t == "survival"
         ct = t == "contingency"
@@ -859,11 +860,16 @@ class Inspector(QWidget):
         self.chk_line.setEnabled(xy)
         self.chk_markers.setEnabled(xy)
         self.cmb_ls.setEnabled(xy)
-        self.cmb_pstyle.setEnabled(self.spec.show_points and cat)
-        self.spn_jitter.setEnabled(self.spec.show_points and cat)
+        # before-after points sit on their condition so the lines reach them
+        scattered = self.spec.show_points and cat and t != "paired"
+        self.cmb_pstyle.setEnabled(scattered)
+        self.spn_jitter.setEnabled(scattered)
         self.cmb_control.setEnabled(
             self.spec.stats_mode == "vs_control")
-        is_paired = self.spec.stats_test in PAIRED_TESTS and not ct
+        # a before-after plot needs the subject column to draw its lines,
+        # whatever the test
+        is_paired = ((self.spec.stats_test in PAIRED_TESTS and not ct)
+                     or t == "paired")
         for widget in (self.r_pair, self.hint_pair):
             widget.setVisible(is_paired)
             label = self.sec_stats.form.labelForField(widget)

@@ -123,6 +123,20 @@ def contingency() -> Dataset:
     return Dataset(tr("Réponse au traitement"), pd.DataFrame(rows))
 
 
+def paired() -> Dataset:
+    """Blood pressure of the same patients before and after a treatment.
+
+    Most drop, a few do not - what a before-after plot shows and a bar
+    chart of two means hides.
+    """
+    rng = np.random.default_rng(31)
+    before = rng.normal(148, 11, 12)
+    after = before - rng.normal(9, 7, 12)
+    return Dataset(tr("Pression artérielle"), pd.DataFrame({
+        tr("Patient"): [f"P{i:02d}" for i in range(1, 13)],
+        tr("Avant"): before.round(1), tr("Après"): after.round(1)}))
+
+
 EXAMPLES = {
     "Viabilité cellulaire (barres, stats)": viability,
     "Courbe de croissance (courbes + SD)": growth,
@@ -132,6 +146,7 @@ EXAMPLES = {
     "Plan à deux facteurs (barres groupées)": two_factor,
     "Essai de survie (Kaplan-Meier)": survival,
     "Réponse au traitement (contingence)": contingency,
+    "Pression artérielle (avant/après)": paired,
 }
 
 

@@ -178,7 +178,7 @@ class PlotSpec:
     # -- convenience -------------------------------------------------------
     @property
     def is_categorical(self) -> bool:
-        return self.plot_type in ("bar", "box", "violin")
+        return self.plot_type in ("bar", "box", "violin", "paired")
 
     @property
     def is_xy(self) -> bool:

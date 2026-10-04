@@ -604,6 +604,9 @@ class MainWindow(QMainWindow):
         if spec.plot_type == "contingency":
             self._map_contingency(spec, ds)
             return
+        if spec.plot_type == "paired":
+            self._map_paired(spec, ds)
+            return
         if spec.plot_type in ("line", "scatter"):
             spec.x = numeric[0] if numeric else (ds.columns[0] if ds.columns
                                                  else "")
@@ -660,6 +663,31 @@ class MainWindow(QMainWindow):
         spec.xlabel = spec.group
         spec.ylabel = ""
 
+    @staticmethod
+    def _map_paired(spec: PlotSpec, ds):
+        """Wide (a column per condition) or long (condition + subject).
+
+        A text column with a different value on every row names the
+        subjects of a wide table; otherwise the text column with the fewest
+        values holds the conditions and the one with the most the subjects.
+        """
+        numeric = ds.numeric_columns()
+        categorical = ds.categorical_columns()
+        rows = len(ds.df)
+        ids = [c for c in categorical if ds.df[c].nunique() == rows]
+        spec.subgroup = ""
+        if len(numeric) >= 2 and (ids or not categorical):
+            spec.group, spec.y = "", numeric[:6]
+            spec.stats_pair_by = ids[0] if ids else ""
+        elif categorical and numeric:
+            by_size = sorted(categorical, key=lambda c: ds.df[c].nunique())
+            spec.group, spec.y = by_size[0], numeric[:1]
+            spec.stats_pair_by = by_size[-1] if len(by_size) > 1 else ""
+        else:
+            spec.group, spec.y = "", numeric[:6]
+        spec.xlabel = spec.group
+        spec.ylabel = spec.y[0] if spec.group and spec.y else ""
+
     def _on_plot_type_changed(self, plot_type: str):
         """Re-map columns when the new type cannot use the current mapping."""
         spec = self.current_spec()
@@ -671,6 +699,16 @@ class MainWindow(QMainWindow):
         invalid = (not spec.y or not set(spec.y) <= cols
                    or (needs_x and spec.x not in cols)
                    or (not needs_x and spec.group and spec.group not in cols))
+        if plot_type == "paired" and ds is not None:
+            # two conditions at least: Y columns, or a condition column - and
+            # not a subject identifier, which would make every subject a
+            # "condition" of one value (what the bar chart left behind)
+            long = False
+            if spec.group in cols and spec.y and set(spec.y) <= cols:
+                levels = ds.df[spec.group].nunique()
+                long = 2 <= levels < len(ds.df)
+            invalid = not (long or (not spec.group and len(spec.y) >= 2
+                                    and set(spec.y) <= cols))
         if plot_type == "contingency" and ds is not None:
             # counts in Y, or raw data with a group and an outcome column
             raw = (not spec.y and spec.group in cols

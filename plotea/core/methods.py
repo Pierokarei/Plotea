@@ -90,6 +90,13 @@ PHRASES = {
                      "matplotlib {mpl})."),
         "and": "and",
         "series_all": "the {count} series",
+        "paired_lines": ("Each line joins the values of one subject "
+                         "(n = {n} subjects)"),
+        "paired_mean": "; the marks beside show the mean ± {error}",
+        "auto_paired": ("Normality of the paired differences was assessed "
+                        "with the Shapiro-Wilk test; on that basis, "),
+        "paired_rows": ", each row of the table being one subject",
+        "rows": "the rows of the table",
         "semicolon": "; ",
     },
     "fr": {
@@ -174,6 +181,14 @@ PHRASES = {
                      "{scipy}, matplotlib {mpl})."),
         "and": "et",
         "series_all": "les {count} séries",
+        "paired_lines": ("Chaque ligne relie les valeurs d'un même sujet "
+                         "(n = {n} sujets)"),
+        "paired_mean": " ; les marques à côté montrent la moyenne ± {error}",
+        "auto_paired": ("La normalité des différences appariées a été "
+                        "évaluée par le test de Shapiro-Wilk ; en "
+                        "conséquence, "),
+        "paired_rows": ", chaque ligne du tableau étant un sujet",
+        "rows": "les lignes du tableau",
         "semicolon": " ; ",
     },
 }
@@ -296,7 +311,12 @@ def _sentence(text: str) -> str:
 def _categorical(spec, info, say, tests, language) -> list[str]:
     out = []
     sizes = _sizes(info.descriptives)
-    if spec.plot_type == "box":
+    paired_plot = spec.plot_type == "paired"
+    if paired_plot:
+        lead = say["paired_lines"].format(n=info.subjects)
+        if spec.error_type in ("sem", "sd", "ci95", "minmax"):
+            lead += say["paired_mean"].format(error=say[spec.error_type])
+    elif spec.plot_type == "box":
         lead = say["box"]
     elif spec.plot_type == "violin":
         lead = say["violin"]
@@ -304,9 +324,12 @@ def _categorical(spec, info, say, tests, language) -> list[str]:
         lead = say["mean_error"].format(error=say[spec.error_type])
     else:
         lead = say["mean_only"]
-    if spec.show_points:
-        lead += say["points"]
-    out.append(lead + _n_clause(say, sizes))
+    if paired_plot:
+        out.append(lead + ".")
+    else:
+        if spec.show_points:
+            lead += say["points"]
+        out.append(lead + _n_clause(say, sizes))
 
     comparisons = list(info.comparisons)
     if not spec.stats_enabled or not (comparisons or info.anova):
@@ -316,14 +339,18 @@ def _categorical(spec, info, say, tests, language) -> list[str]:
 
     if info.anova and info.anova_title == "ANOVA à mesures répétées":
         out.append(say["rm"].format(factor=spec.group or "condition",
-                                    subject=spec.stats_pair_by)
+                                    subject=spec.stats_pair_by or say["rows"])
                    + pairwise_text + ".")
     elif info.anova and spec.subgroup:
         out.append(say["two_way"].format(a=spec.group, b=spec.subgroup)
                    + pairwise_text + ".")
     else:
-        lead = say["auto"] + say["auto_lead"] if spec.stats_test == "auto" \
-            else say["chosen_lead"]
+        if spec.stats_test != "auto":
+            lead = say["chosen_lead"]
+        elif paired_plot:
+            lead = say["auto_paired"] + say["auto_lead"]
+        else:
+            lead = say["auto"] + say["auto_lead"]
         if info.omnibus and info.omnibus[0]:
             name = info.omnibus[0]
             omnibus = tests.get(name, name)
@@ -341,9 +368,11 @@ def _categorical(spec, info, say, tests, language) -> list[str]:
             scope = say["pairs_all"]
         # French sets a space before a semicolon
         text = f"{lead}{body}{say['semicolon']}{scope}"
-        if pairwise in ("t apparié", "Wilcoxon apparié") and \
-                spec.stats_pair_by:
-            text += say["paired_by"].format(column=spec.stats_pair_by)
+        if pairwise in ("t apparié", "Wilcoxon apparié"):
+            # long format pairs by a subject column, wide format by row
+            text += (say["paired_by"].format(column=spec.stats_pair_by)
+                     if spec.stats_pair_by and spec.group
+                     else say["paired_rows"])
         out.append(_sentence(text) + ".")
 
     if len(comparisons) > 1 and pairwise not in SELF_CORRECTING \
@@ -422,7 +451,7 @@ def methods_text(spec, info, language: str = "en") -> str:
     language = language if language in LANGUAGES else "en"
     say = PHRASES[language]
     tests = TESTS[language]
-    if spec.plot_type in ("bar", "box", "violin"):
+    if spec.plot_type in ("bar", "box", "violin", "paired"):
         sentences = _categorical(spec, info, say, tests, language)
     elif spec.plot_type == "survival":
         sentences = _survival(spec, info, say)

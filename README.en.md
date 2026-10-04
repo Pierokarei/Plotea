@@ -35,7 +35,7 @@ any interface text that has no translation.
 | | |
 |---|---|
 | **Import** | CSV, TSV, TXT (separator and decimal mark detected), multi-sheet Excel `.xlsx` / `.xlsm` / `.xls`, paste from Excel, **GraphPad Prism `.pzfx` files** |
-| **Plot types** | line, scatter, histogram, box plot, violin plot, bars with error bars (simple, and grouped with two factors), **Kaplan-Meier survival curves**, **contingency tables** (bars stacked in percentages or counts) |
+| **Plot types** | line, scatter, histogram, box plot, violin plot, bars with error bars (simple, and grouped with two factors), **Kaplan-Meier survival curves**, **contingency tables** (bars stacked in percentages or counts), **paired before-after** (one line per subject) |
 | **Themes** | Nature, Science, Cell, PNAS, Minimal, Grayscale: typography, column width and palette that follow each journal's author guidelines |
 | **Export** | SVG, PDF, EPS (vector, editable text) · PNG, TIFF, JPEG up to 1200 dpi (600 dpi by default) |
 | **Statistics** | Student's / Welch's / paired t-test, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs control**, **repeated-measures ANOVA** (with Greenhouse-Geisser correction), **log-rank** on survival curves, **Fisher's exact test and chi-square** (with or without Yates' correction) on contingency tables, with odds ratio, relative risk and Cramér's V; Bonferroni / Holm / FDR corrections; **outlier detection (Grubbs)**; automatic significance bars, including on bars grouped by two factors |
@@ -210,6 +210,12 @@ For curves whose standard deviations are already computed, tick the matching
 columns under **Error columns**, in the same order as the Y series.
 
 ### Paired tests
+
+The **Before-after** plot shows what a bar chart of two means hides: a
+line joins each subject's measurements, and you see whether all of them
+moved the same way. In Auto mode it compares the conditions with a paired
+test: paired t if the differences are normal, Wilcoxon otherwise, a
+repeated-measures ANOVA beyond two conditions.
 
 A paired test compares two measurements of the **same** subject, so Plotea
 needs to know which is which:
@@ -394,7 +400,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 507 tests, 5 to 20 minutes depending on the machine
+pytest                      # 525 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -408,6 +414,7 @@ pytest -k paired            # a single topic (paired tests)
 | `test_layout.py` | group names that never overlap, the journal's font and editable text in exported files |
 | `test_fit_compare.py` | curve comparison, checked against the analysis of covariance and on its false-alarm rate |
 | `test_methods.py` | Methods paragraph: the test named is the one that ran, both languages match |
+| `test_paired.py` | before-after: one line per subject, paired test chosen on the differences |
 | `test_stats_fixes.py` | grouped bars, paired tests, missing values |
 | `test_anova.py` | two-way ANOVA, test choice per family |
 | `test_advanced_stats.py` | Dunnett, repeated-measures ANOVA, outliers |

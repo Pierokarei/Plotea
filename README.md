@@ -40,7 +40,7 @@ tout texte d'interface sans traduction.
 | | |
 |---|---|
 | **Import** | CSV, TSV, TXT (séparateur et décimale détectés), Excel `.xlsx` / `.xlsm` / `.xls` multi-feuilles, collage depuis Excel, **fichiers GraphPad Prism `.pzfx`** |
-| **Types de graphiques** | courbes, nuages de points, histogrammes, boxplots, violin plots, barres avec erreurs (simples et groupées à deux facteurs), **courbes de survie Kaplan-Meier**, **tableaux de contingence** (barres empilées en pourcentages ou en effectifs) |
+| **Types de graphiques** | courbes, nuages de points, histogrammes, boxplots, violin plots, barres avec erreurs (simples et groupées à deux facteurs), **courbes de survie Kaplan-Meier**, **tableaux de contingence** (barres empilées en pourcentages ou en effectifs), **avant/après apparié** (une ligne par sujet) |
 | **Thématiques** | Nature, Science, Cell, PNAS, Minimal, Grayscale — typographie, largeur de colonne et palette conformes aux instructions aux auteurs |
 | **Export** | SVG, PDF, EPS (vectoriels, texte éditable) · PNG, TIFF, JPEG jusqu'à 1200 dpi (600 dpi par défaut) |
 | **Statistiques** | t de Student / Welch / apparié, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs contrôle**, **ANOVA à mesures répétées** (avec correction de Greenhouse-Geisser), **log-rank** sur les courbes de survie, **test exact de Fisher et khi²** (avec ou sans correction de Yates) sur les tableaux de contingence, avec odds ratio, risque relatif et V de Cramér ; corrections Bonferroni / Holm / FDR ; **détection de valeurs aberrantes (Grubbs)** ; barres de significativité automatiques, y compris sur les barres groupées à deux facteurs |
@@ -221,6 +221,12 @@ correspondantes dans **Colonnes d'erreur**, dans le même ordre que les
 séries Y.
 
 ### Tests appariés
+
+Le graphique **Avant/après** montre ce qu'un graphique en barres de deux
+moyennes cache : une ligne relie les mesures de chaque sujet, et l'on voit si
+tous ont évolué dans le même sens. En mode Auto, il compare les conditions par
+un test apparié : t apparié si les différences suivent une loi normale,
+Wilcoxon sinon, ANOVA à mesures répétées au-delà de deux conditions.
 
 Un test apparié compare deux mesures du **même** sujet. Plotea a donc besoin
 de savoir qui est qui :
@@ -404,7 +410,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 507 tests, 5 à 20 minutes selon la machine
+pytest                      # 525 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -418,6 +424,7 @@ pytest -k paired            # un seul sujet (les tests appariés)
 | `test_layout.py` | noms de groupes sans chevauchement, police du journal et texte éditable dans les fichiers exportés |
 | `test_fit_compare.py` | comparaison de courbes, vérifiée contre l'analyse de covariance et sur son taux de fausses alertes |
 | `test_methods.py` | paragraphe Méthodes : le test nommé est celui qui a tourné, les deux langues se correspondent |
+| `test_paired.py` | avant/après : une ligne par sujet, test apparié choisi sur les différences |
 | `test_stats_fixes.py` | barres groupées, tests appariés, valeurs manquantes |
 | `test_anova.py` | ANOVA à deux facteurs, choix de test par famille |
 | `test_advanced_stats.py` | Dunnett, ANOVA à mesures répétées, valeurs aberrantes |
