@@ -47,6 +47,7 @@ class RenderInfo:
     agreement: list = field(default_factory=list)   # Bland-Altman rows
     bland_altman: dict = field(default_factory=dict)
     heatmap: dict = field(default_factory=dict)     # rows, cols, settings
+    broken: bool = False         # drawn on two axes, the Y axis cut
 
 
 # --------------------------------------------------------------------------
@@ -1467,11 +1468,121 @@ def render(fig, spec: PlotSpec, df: pd.DataFrame) -> RenderInfo:
     with mpl.rc_context(theme.rc()):
         ax = fig.add_subplot(111)
         draw_into(ax, spec, df, info, theme)
+        if spec.y_break:
+            problem = break_problem(spec, ax.get_ylim())
+            if problem:
+                info.warnings.append(problem)
+            else:
+                fig.clear()
+                info = RenderInfo()
+                top, bottom = draw_broken(fig, spec, df, info, theme)
+                try:
+                    settle_layout(fig, [(bottom, spec)])
+                    restack(top, bottom, spec)
+                except Exception:
+                    pass
+                return info
         try:
             settle_layout(fig, [(ax, spec)])
         except Exception:
             pass
     return info
+
+
+#: Plot types whose Y axis measures something and can be cut.
+BREAKABLE = ("bar", "box", "violin", "paired", "line", "scatter",
+             "histogram")
+
+#: Room between the two parts of a broken axis, as a share of its height.
+BREAK_GAP = 0.03
+
+
+def break_problem(spec: PlotSpec, natural: tuple) -> str:
+    """Why this axis cannot be cut where asked, or "" if it can."""
+    if spec.plot_type not in BREAKABLE:
+        return tr("Axe interrompu indisponible pour ce type de graphique.")
+    if spec.log_y:
+        return tr("Axe interrompu indisponible avec une échelle log Y.")
+    low, high = spec.y_break_from, spec.y_break_to
+    if low is None or high is None:
+        return tr("Axe interrompu : indiquez où la coupure commence et où "
+                  "elle finit.")
+    bottom, top = natural
+    if not (bottom < low < high < top):
+        return tr("Axe interrompu : la coupure doit tomber entre {low:g} "
+                  "et {high:g}, son début avant sa fin.").format(
+                      low=bottom, high=top)
+    return ""
+
+
+def draw_broken(fig, spec: PlotSpec, df: pd.DataFrame, info: RenderInfo,
+                theme: Theme):
+    """The plot twice, on two stacked axes that share their X.
+
+    The lower part runs up to the start of the cut and carries the X axis;
+    the upper part starts at its end and carries what is drawn once - the
+    statistics and their brackets, the legend, the title. Each part keeps
+    the limit of its far side from the plot's own scaling.
+    """
+    share = min(max(spec.y_break_top, 0.1), 0.9)
+    # no hspace here: tight_layout refuses a grid that sets its own, and
+    # restack() closes the gap once the layout is done
+    top, bottom = fig.subplots(2, 1, sharex=True, gridspec_kw={
+        "height_ratios": [share, 1 - share]})
+    lower = spec.clone(spec.name)
+    lower.stats_enabled = False
+    lower.show_legend = False
+    lower.title = ""
+    lower.annotations = []
+    lower.ymax = None
+    draw_into(bottom, lower, df, RenderInfo(), theme)
+    upper = spec.clone(spec.name)
+    upper.ymin = None
+    draw_into(top, upper, df, info, theme)
+
+    bottom.set_ylim(bottom.get_ylim()[0], spec.y_break_from)
+    top.set_ylim(spec.y_break_to, top.get_ylim()[1])
+    top.spines["bottom"].set_visible(False)
+    bottom.spines["top"].set_visible(False)
+    top.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
+    top.set_xlabel("")
+    bottom.set_title("")
+    label = top.get_ylabel() or bottom.get_ylabel()
+    top.set_ylabel("")
+    bottom.set_ylabel(label)
+
+    # the cut, drawn as two short slants on each spine that is shown
+    sides = [0.0] if spec.despine else [0.0, 1.0]
+    slant = dict(marker=[(-1, -0.5), (1, 0.5)], markersize=7,
+                 linestyle="none", color="black", mec="black",
+                 mew=theme.spine_width, clip_on=False, zorder=30)
+    top.plot(sides, [0.0] * len(sides), transform=top.transAxes, **slant)
+    bottom.plot(sides, [1.0] * len(sides), transform=bottom.transAxes,
+                **slant)
+    info.broken = True
+    return top, bottom
+
+
+def restack(top, bottom, spec: PlotSpec):
+    """Put the two parts back against each other after the layout.
+
+    tight_layout spaces axes as if they were separate plots; a cut axis
+    wants its two halves a hair apart, the upper one taking its share of
+    the height. The Y title is then centred on the whole.
+    """
+    lower = bottom.get_position()
+    upper = top.get_position()
+    y0, y1 = lower.y0, upper.y1
+    height = y1 - y0
+    gap = BREAK_GAP * height
+    share = min(max(spec.y_break_top, 0.1), 0.9)
+    upper_height = (height - gap) * share
+    lower_height = height - gap - upper_height
+    bottom.set_position([lower.x0, y0, lower.width, lower_height])
+    top.set_position([lower.x0, y0 + lower_height + gap, lower.width,
+                      upper_height])
+    # only the height: matplotlib keeps placing it beside the tick labels
+    bottom.yaxis.label.set_y((height / 2) / lower_height)
 
 
 def settle_layout(fig, placed, layout=None):

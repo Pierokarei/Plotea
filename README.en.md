@@ -63,6 +63,9 @@ any interface text that has no translation.
 - **Group names that never overlap**: too long for the room they have,
   they break between words, or slant at 45° when a single word does not
   fit. A rotation chosen by hand always wins.
+- **Broken Y axis** (Axes section) to show small and very large values
+  together: two parts that read as one plot, break marks, statistics and
+  legend drawn once.
 - **Monochrome mode** (hatching and a grey palette) for black-and-white
   printing.
 - **Dark theme** for the interface; the figure itself always stays on a white
@@ -420,7 +423,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 558 tests, 5 to 20 minutes depending on the machine
+pytest                      # 577 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -437,6 +440,7 @@ pytest -k paired            # a single topic (paired tests)
 | `test_paired.py` | before-after: one line per subject, paired test chosen on the differences |
 | `test_bland_altman.py` | Bland-Altman: the bias and limits of the 1986 paper recovered |
 | `test_heatmap.py` | heat maps: z-scores, correlation, clustering, colour scales |
+| `test_broken_axis.py` | broken axis: two parts, one legend, impossible breaks refused |
 | `test_stats_fixes.py` | grouped bars, paired tests, missing values |
 | `test_anova.py` | two-way ANOVA, test choice per family |
 | `test_advanced_stats.py` | Dunnett, repeated-measures ANOVA, outliers |

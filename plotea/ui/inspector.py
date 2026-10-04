@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 
 from ..core import enums, fitting
 from ..core.plotspec import PLOT_TYPES, PlotSpec
+from ..core.plotting import BREAKABLE
 from ..core.stats import PAIRED_TESTS
 from ..core.themes import LINESTYLES, MARKERS, PALETTES, THEMES
 from ..i18n import tr
@@ -575,6 +576,17 @@ class Inspector(QWidget):
         self.chk_zero = self._bind(QCheckBox(tr("Barres ancrées à zéro")),
                                    "y_from_zero")
         sec.add_widget(self.chk_zero)
+        self.chk_ybreak = self._bind(QCheckBox(tr("Axe Y interrompu")),
+                                     "y_break")
+        sec.add_widget(self.chk_ybreak)
+        self.f_break_from = self._bind(OptionalFloat(tr("début")),
+                                       "y_break_from")
+        self.f_break_to = self._bind(OptionalFloat(tr("fin")), "y_break_to")
+        sec.add_row(tr("Coupure de / à"),
+                    row(self.f_break_from, self.f_break_to))
+        self.spn_break_top = self._bind(_spin(0.1, 0.9, 0.05, 2),
+                                        "y_break_top")
+        sec.add_row(tr("Part du haut"), self.spn_break_top)
 
     def _build_series(self):
         sec = self._add(CollapsibleSection(tr("Apparence des séries"), False))
@@ -921,6 +933,11 @@ class Inspector(QWidget):
         self.spn_w.setEnabled(self.spec.span == "custom")
         self.spn_h.setEnabled(self.spec.span == "custom")
         self.chk_zero.setEnabled(t == "bar")
+        breakable = t in BREAKABLE
+        self.chk_ybreak.setEnabled(breakable)
+        for widget in (self.f_break_from, self.f_break_to,
+                       self.spn_break_top):
+            widget.setEnabled(breakable and self.spec.y_break)
         self.chk_connect.setEnabled(cat)
 
     def _set_row_visible(self, widget, visible: bool):

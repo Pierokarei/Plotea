@@ -70,6 +70,9 @@ tout texte d'interface sans traduction.
   place disponible, ils passent à la ligne entre les mots, ou s'inclinent à
   45° quand un seul mot ne tient pas. Une inclinaison choisie à la main
   reste prioritaire.
+- **Axe Y interrompu** (section Axes) pour montrer ensemble de petites et de
+  très grandes valeurs : deux parties qui se lisent comme un seul graphique,
+  marques de coupure, statistiques et légende dessinées une seule fois.
 - **Mode monochrome** (hachures + palette de gris) pour l'impression N&B.
 - **Thème sombre** pour l'interface, la figure restant toujours sur fond blanc.
 - **Interface en français ou en anglais**, jusqu'aux dialogues standards de
@@ -432,7 +435,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 558 tests, 5 à 20 minutes selon la machine
+pytest                      # 577 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -449,6 +452,7 @@ pytest -k paired            # un seul sujet (les tests appariés)
 | `test_paired.py` | avant/après : une ligne par sujet, test apparié choisi sur les différences |
 | `test_bland_altman.py` | Bland-Altman : biais et limites de l'article de 1986 retrouvés |
 | `test_heatmap.py` | cartes de chaleur : scores z, corrélation, regroupement, échelles |
+| `test_broken_axis.py` | axe interrompu : deux parties, une seule légende, coupures impossibles refusées |
 | `test_stats_fixes.py` | barres groupées, tests appariés, valeurs manquantes |
 | `test_anova.py` | ANOVA à deux facteurs, choix de test par famille |
 | `test_advanced_stats.py` | Dunnett, ANOVA à mesures répétées, valeurs aberrantes |

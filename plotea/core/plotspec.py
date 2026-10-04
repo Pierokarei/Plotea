@@ -73,6 +73,12 @@ class PlotSpec:
     minor_ticks: bool = False
     despine: bool = True
     tick_rotation: float = 0.0
+    # broken Y axis: the values between y_break_from and y_break_to are cut
+    # out, the upper part taking y_break_top of the height
+    y_break: bool = False
+    y_break_from: float | None = None
+    y_break_to: float | None = None
+    y_break_top: float = 0.35
     y_from_zero: bool = True          # bar charts anchored at zero
 
     # -- series appearance -------------------------------------------------

@@ -142,6 +142,10 @@ def render_panel(fig, panel: Panel, specs: dict, frames: dict) -> PanelInfo:
             first = first or ax
             placed.append((ax, spec))
             sub = plotting.draw_into(ax, spec, frames.get(spec.dataset))
+            if spec.y_break:
+                info.warnings.append(tr(
+                    "« {name} » : l'axe interrompu n'est pas encore repris "
+                    "dans les figures composites.").format(name=spec.name))
             info.warnings.extend(sub.warnings)
             if panel.letters != "none":
                 ax.set_title(letter_for(index, panel.letters), loc="left",
