@@ -157,6 +157,31 @@ def agreement() -> Dataset:
     return Dataset(tr("Débit expiratoire de pointe"), pd.DataFrame(data))
 
 
+def heatmap() -> Dataset:
+    """Expression of 12 genes in 3 control and 3 treated samples.
+
+    Two blocks of genes answer the treatment in opposite directions and a
+    third does not move: what a clustered, row-scaled heat map brings out.
+    """
+    rng = np.random.default_rng(17)
+    samples = [f"{tr('Contrôle')} {i}" for i in (1, 2, 3)] + \
+        [f"{tr('Traité')} {i}" for i in (1, 2, 3)]
+    effect = {"up": 2.2, "down": -1.8, "flat": 0.0}
+    genes = (["IL6", "CXCL8", "TNF", "CCL2"], ["PPARG", "ADIPOQ", "LPL",
+             "FABP4"], ["GAPDH", "ACTB", "TBP", "HPRT1"])
+    rows = []
+    for block, names in zip(("up", "down", "flat"), genes):
+        for gene in names:
+            base = rng.uniform(5, 11)
+            values = [base + rng.normal(0, 0.25) for _ in range(3)] + \
+                [base + effect[block] + rng.normal(0, 0.25) for _ in range(3)]
+            rows.append({tr("Gène"): gene,
+                         **{s: round(v, 2) for s, v in zip(samples, values)}})
+    order = rng.permutation(len(rows))          # as a table arrives
+    return Dataset(tr("Expression (log2)"),
+                   pd.DataFrame([rows[i] for i in order]))
+
+
 EXAMPLES = {
     "Viabilité cellulaire (barres, stats)": viability,
     "Courbe de croissance (courbes + SD)": growth,
@@ -168,6 +193,7 @@ EXAMPLES = {
     "Réponse au traitement (contingence)": contingency,
     "Pression artérielle (avant/après)": paired,
     "Deux débitmètres (Bland-Altman)": agreement,
+    "Expression de gènes (carte de chaleur)": heatmap,
 }
 
 

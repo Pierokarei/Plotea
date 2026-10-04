@@ -113,6 +113,10 @@ class PlotSpec:
     contingency_view: str = "percent"   # percent / stacked / grouped
     ba_view: str = "difference"         # Bland-Altman: difference / percent
     ba_ci: bool = False                 # CIs of the bias and of the limits
+    heat_values: str = "values"         # values / z_rows / z_columns / corr.
+    heat_cmap: str = "auto"
+    heat_cluster: str = "none"          # none / rows / columns / both
+    heat_annotate: bool = False         # write each value in its cell
     contingency_test: str = "auto"      # Fisher on 2 x 2, chi-square beyond
 
     bar_width: float = 0.7

@@ -100,6 +100,33 @@ PLOT_TYPE = Enum("plot_type", [
     ("contingency", "Contingence (effectifs)"),
     ("paired", "Avant/après apparié"),
     ("bland_altman", "Bland-Altman (concordance)"),
+    ("heatmap", "Carte de chaleur"),
+])
+
+#: What the cells of a heat map show.
+HEAT_VALUES = Enum("heat_values", [
+    ("values", "Valeurs brutes"),
+    ("z_rows", "Score z par ligne"),
+    ("z_columns", "Score z par colonne"),
+    ("correlation", "Corrélation entre colonnes (Pearson)"),
+])
+
+#: Colour scales of a heat map. "auto" diverges around 0 when the values
+#: are centred (z-scores, correlations) and is sequential otherwise.
+HEAT_CMAP = Enum("heat_cmap", [
+    ("auto", "Automatique"),
+    ("viridis", "Viridis"),
+    ("magma", "Magma"),
+    ("blues", "Bleus"),
+    ("rdbu", "Rouge-bleu (divergente)"),
+])
+
+#: Which axes a heat map reorders by hierarchical clustering.
+HEAT_CLUSTER = Enum("heat_cluster", [
+    ("none", "Aucun"),
+    ("rows", "Lignes"),
+    ("columns", "Colonnes"),
+    ("both", "Lignes et colonnes"),
 ])
 
 #: What a Bland-Altman plot puts on its Y axis.
@@ -280,6 +307,9 @@ SPEC_FIELDS = {
     "contingency_test": CONTINGENCY_TEST,
     "contingency_view": CONTINGENCY_VIEW,
     "ba_view": BA_VIEW,
+    "heat_values": HEAT_VALUES,
+    "heat_cmap": HEAT_CMAP,
+    "heat_cluster": HEAT_CLUSTER,
     "stats_mode": STATS_MODE,
     "stats_format": STATS_FORMAT,
     "stats_correction": CORRECTION,

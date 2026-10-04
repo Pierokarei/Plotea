@@ -604,6 +604,9 @@ class MainWindow(QMainWindow):
         if spec.plot_type == "contingency":
             self._map_contingency(spec, ds)
             return
+        if spec.plot_type == "heatmap":
+            self._map_heatmap(spec, ds)
+            return
         if spec.plot_type in ("paired", "bland_altman"):
             self._map_paired(spec, ds)
             if spec.plot_type == "bland_altman":
@@ -668,6 +671,23 @@ class MainWindow(QMainWindow):
         spec.ylabel = ""
 
     @staticmethod
+    def _map_heatmap(spec: PlotSpec, ds):
+        """Rows named by a text column, every numeric column a column - or,
+        with a single number to show, a long table pivoted on two texts."""
+        numeric = ds.numeric_columns()
+        categorical = ds.categorical_columns()
+        spec.subgroup = ""
+        if len(numeric) >= 2 or (numeric and len(categorical) < 2):
+            spec.group = categorical[0] if categorical else ""
+            spec.y = numeric[:60]
+        elif numeric and len(categorical) >= 2:
+            spec.group, spec.subgroup = categorical[0], categorical[1]
+            spec.y = numeric[:1]
+        else:
+            spec.group, spec.y = "", []
+        spec.xlabel = spec.ylabel = ""
+
+    @staticmethod
     def _map_paired(spec: PlotSpec, ds):
         """Wide (a column per condition) or long (condition + subject).
 
@@ -703,6 +723,13 @@ class MainWindow(QMainWindow):
         invalid = (not spec.y or not set(spec.y) <= cols
                    or (needs_x and spec.x not in cols)
                    or (not needs_x and spec.group and spec.group not in cols))
+        if plot_type == "heatmap" and ds is not None:
+            # numbers to show: checked columns, or a long table's two texts
+            long = (spec.group in cols and spec.subgroup in cols
+                    and spec.group != spec.subgroup and bool(spec.y))
+            invalid = not (long or (spec.y and set(spec.y) <= cols
+                                    and not spec.subgroup
+                                    and len(spec.y) >= 2))
         if plot_type in ("paired", "bland_altman") and ds is not None:
             # two conditions at least: Y columns, or a condition column - and
             # not a subject identifier, which would make every subject a

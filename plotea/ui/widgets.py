@@ -180,6 +180,18 @@ def make_icon(name: str, color: str = "", size: int = 22) -> QIcon:
             QPointF(s * 0.34, s * 0.48), QPointF(s * 0.58, s * 0.48),
             QPointF(s * 0.58, s * 0.74), QPointF(s - m, s * 0.74)]))
         p.drawLine(QPointF(s * 0.46, s * 0.40), QPointF(s * 0.46, s * 0.56))
+    elif name == "heatmap":
+        # a three-by-three grid of cells in three shades
+        cell = (s - 2 * m) / 3
+        shades = (0.85, 0.35, 0.60, 0.20, 0.95, 0.45, 0.55, 0.15, 0.75)
+        p.setPen(Qt.PenStyle.NoPen)
+        for k, alpha in enumerate(shades):
+            tone = QColor(col)
+            tone.setAlphaF(alpha)
+            p.setBrush(tone)
+            p.drawRect(QRectF(m + (k % 3) * cell, m + (k // 3) * cell,
+                              cell - 0.6, cell - 0.6))
+        p.setBrush(Qt.BrushStyle.NoBrush)
     elif name == "bland_altman":
         # scattered points around a bias line, between two dashed limits
         p.drawLine(QPointF(m, s * 0.50), QPointF(s - m, s * 0.50))
@@ -253,7 +265,8 @@ def make_icon(name: str, color: str = "", size: int = 22) -> QIcon:
 PLOT_ICONS = {"line": "line", "scatter": "scatter", "histogram": "histogram",
               "box": "box", "violin": "violin", "bar": "bar",
               "survival": "survival", "contingency": "contingency",
-              "paired": "paired", "bland_altman": "bland_altman"}
+              "paired": "paired", "bland_altman": "bland_altman",
+              "heatmap": "heatmap"}
 
 
 def tag_icon(target, name: str):

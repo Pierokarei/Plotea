@@ -250,6 +250,7 @@ class Inspector(QWidget):
         "box": "Boxplot", "violin": "Violon", "bar": "Barres",
         "survival": "Survie", "contingency": "Contingence",
         "paired": "Avant/après", "bland_altman": "Bland-Altman",
+        "heatmap": "Chaleur",
     }
     CARD_HEIGHT = 62
 
@@ -677,6 +678,24 @@ class Inspector(QWidget):
         self._build_survival_rows(sec)
         self._build_contingency_rows(sec)
         self._build_agreement_rows(sec)
+        self._build_heatmap_rows(sec)
+
+    def _build_heatmap_rows(self, sec):
+        self.cmb_heat_values = self._bind(QComboBox(), "heat_values")
+        self.fill(self.cmb_heat_values, enums.HEAT_VALUES)
+        self.r_heat_values = sec.add_row(tr("Valeurs"), self.cmb_heat_values)
+        self.cmb_heat_cmap = self._bind(QComboBox(), "heat_cmap")
+        self.fill(self.cmb_heat_cmap, enums.HEAT_CMAP)
+        self.r_heat_cmap = sec.add_row(tr("Couleurs"), self.cmb_heat_cmap)
+        self.cmb_heat_cluster = self._bind(QComboBox(), "heat_cluster")
+        self.fill(self.cmb_heat_cluster, enums.HEAT_CLUSTER)
+        self.r_heat_cluster = sec.add_row(tr("Regroupement"),
+                                          self.cmb_heat_cluster)
+        self.chk_heat_annotate = self._bind(
+            QCheckBox(tr("Écrire les valeurs dans les cases")),
+            "heat_annotate")
+        self.r_heat_annotate = sec.add_row(tr("Valeurs écrites"),
+                                           self.chk_heat_annotate)
 
     def _build_agreement_rows(self, sec):
         self.cmb_ba_view = self._bind(QComboBox(), "ba_view")
@@ -830,11 +849,14 @@ class Inspector(QWidget):
         self.hint_event.setVisible(surv)
         for widget in (self.r_surv_ci, self.r_censors):
             self._set_row_visible(widget, surv)
-        self.cmb_subgroup.setVisible(t in ("bar", "contingency"))
+        self.cmb_subgroup.setVisible(t in ("bar", "contingency", "heatmap"))
         self.hint_counts.setVisible(ct)
         self._set_row_visible(self.r_cview, ct)
         for widget in (self.r_ba_view, self.r_ba_ci):
             self._set_row_visible(widget, t == "bland_altman")
+        for widget in (self.r_heat_values, self.r_heat_cmap,
+                       self.r_heat_cluster, self.r_heat_annotate):
+            self._set_row_visible(widget, t == "heatmap")
         ba = t == "bland_altman"
         for picker, shown in ((self.cmb_test, not ct and not ba),
                               (self.cmb_ctest, ct)):

@@ -109,6 +109,21 @@ PHRASES = {
                   "Altman (1999)"),
         "ba_p": ("Whether the bias differs from zero was tested with a "
                  "one-sample t test on the differences."),
+        "heat_values": ("The heat map shows the values of {rows} rows by "
+                        "{cols} columns."),
+        "heat_z_rows": ("The heat map shows {rows} rows by {cols} columns, "
+                        "each row standardised to a mean of 0 and an SD of 1 "
+                        "(z-scores)."),
+        "heat_z_columns": ("The heat map shows {rows} rows by {cols} "
+                           "columns, each column standardised to a mean of 0 "
+                           "and an SD of 1 (z-scores)."),
+        "heat_correlation": ("The heat map shows Pearson's correlation "
+                             "coefficients between the {cols} columns."),
+        "heat_cluster": ("{what} were ordered by hierarchical clustering "
+                         "(average linkage, Euclidean distance, optimal leaf "
+                         "ordering)."),
+        "heat_rows": "Rows", "heat_columns": "Columns",
+        "heat_both": "Rows and columns",
         "semicolon": "; ",
     },
     "fr": {
@@ -213,6 +228,22 @@ PHRASES = {
                   "Altman (1999)"),
         "ba_p": ("L'écart du biais à zéro a été testé par un test t à un "
                  "échantillon sur les différences."),
+        "heat_values": ("La carte de chaleur montre les valeurs de {rows} "
+                        "lignes sur {cols} colonnes."),
+        "heat_z_rows": ("La carte de chaleur montre {rows} lignes sur {cols} "
+                        "colonnes, chaque ligne étant centrée et réduite "
+                        "(scores z)."),
+        "heat_z_columns": ("La carte de chaleur montre {rows} lignes sur "
+                           "{cols} colonnes, chaque colonne étant centrée et "
+                           "réduite (scores z)."),
+        "heat_correlation": ("La carte de chaleur montre les coefficients de "
+                             "corrélation de Pearson entre les {cols} "
+                             "colonnes."),
+        "heat_cluster": ("{what} ont été ordonnées par classification "
+                         "hiérarchique (lien moyen, distance euclidienne, "
+                         "ordre optimal des feuilles)."),
+        "heat_rows": "Les lignes", "heat_columns": "Les colonnes",
+        "heat_both": "Les lignes et les colonnes",
         "semicolon": " ; ",
     },
 }
@@ -482,6 +513,20 @@ def _agreement(spec, info, say) -> list[str]:
             say["ba_p"]]
 
 
+def _heatmap(spec, info, say) -> list[str]:
+    shape = info.heatmap or {}
+    if not shape:
+        return []
+    mode = shape.get("values", "values")
+    out = [say[f"heat_{mode}"].format(rows=shape["rows"], cols=shape["cols"])]
+    cluster = shape.get("cluster", "none")
+    if cluster != "none":
+        # a correlation matrix is reordered on both axes at once
+        which = "both" if mode == "correlation" else cluster
+        out.append(say["heat_cluster"].format(what=say[f"heat_{which}"]))
+    return out
+
+
 def methods_text(spec, info, language: str = "en") -> str:
     """The paragraph for one figure, in "en" or "fr"."""
     language = language if language in LANGUAGES else "en"
@@ -495,6 +540,8 @@ def methods_text(spec, info, language: str = "en") -> str:
         sentences = _contingency(spec, info, say)
     elif spec.plot_type == "bland_altman":
         sentences = _agreement(spec, info, say)
+    elif spec.plot_type == "heatmap":
+        sentences = _heatmap(spec, info, say)
     elif spec.plot_type in ("line", "scatter"):
         sentences = _xy(spec, info, say, language)
     else:

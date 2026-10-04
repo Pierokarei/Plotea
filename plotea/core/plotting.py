@@ -46,6 +46,7 @@ class RenderInfo:
     subjects: int = 0            # before-after: subjects drawn as lines
     agreement: list = field(default_factory=list)   # Bland-Altman rows
     bland_altman: dict = field(default_factory=dict)
+    heatmap: dict = field(default_factory=dict)     # rows, cols, settings
 
 
 # --------------------------------------------------------------------------
@@ -1157,6 +1158,183 @@ def draw_bland_altman(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
     return {}, {}
 
 
+#: Beyond this many cells, values written inside them are unreadable.
+HEAT_ANNOTATE_MAX = 600
+
+#: Beyond this many rows, their names would overlap: they are left out.
+HEAT_ROW_LABELS_MAX = 60
+
+
+def extract_matrix(df: pd.DataFrame, spec: PlotSpec):
+    """(values, row names, column names, problem) of a heat map.
+
+    Wide: one row per item, named by "Grouper par" (a name on two rows is
+    averaged), one column per checked Y. Long: rows from "Grouper par",
+    columns from "Sous-groupe", the cell the mean of the Y values.
+    """
+    if (spec.group in df.columns and spec.subgroup in df.columns
+            and spec.group != spec.subgroup and spec.y
+            and spec.y[0] in df.columns):
+        frame = df[[spec.group, spec.subgroup]].astype(str)
+        frame = frame.assign(_v=pd.to_numeric(df[spec.y[0]], errors="coerce"))
+        rows = _first_seen(frame[spec.group])
+        cols = _first_seen(frame[spec.subgroup])
+        table = frame.pivot_table(index=spec.group, columns=spec.subgroup,
+                                  values="_v", aggfunc="mean")
+        table = table.reindex(index=rows, columns=cols)
+        return table.to_numpy(dtype=float), rows, cols, ""
+    cols = [c for c in spec.y if c in df.columns]
+    if not cols:
+        return None, [], [], tr(
+            "Carte de chaleur : cochez les colonnes à afficher dans « Valeurs "
+            "Y », ou, en format long, choisissez les lignes dans « Grouper "
+            "par » et les colonnes dans « Sous-groupe ».")
+    values = df[cols].apply(pd.to_numeric, errors="coerce")
+    if spec.group in df.columns:
+        names = df[spec.group].astype(str)
+        rows = _first_seen(names)
+        values = values.groupby(names, sort=False).mean().loc[rows]
+    else:
+        rows = [str(i + 1) for i in range(len(values))]
+    return values.to_numpy(dtype=float), rows, cols, ""
+
+
+def _zscore(matrix: np.ndarray, axis: int) -> np.ndarray:
+    """Centre and scale each row (axis=1) or column (axis=0); a line that
+    never varies stays at 0 rather than dividing by zero."""
+    mean = np.nanmean(matrix, axis=axis, keepdims=True)
+    sd = np.nanstd(matrix, axis=axis, ddof=1, keepdims=True)
+    sd = np.where(np.isfinite(sd) & (sd > 0), sd, np.nan)
+    z = (matrix - mean) / sd
+    return np.where(np.isnan(sd) & np.isfinite(matrix), 0.0, z)
+
+
+def _cluster_order(matrix: np.ndarray) -> np.ndarray:
+    """Rows in the order of their average-linkage clustering (Euclidean),
+    leaves optimally ordered so that neighbours are alike."""
+    from scipy.cluster import hierarchy
+
+    if matrix.shape[0] < 3:
+        return np.arange(matrix.shape[0])
+    filled = np.where(np.isfinite(matrix), matrix,
+                      np.nanmean(matrix, axis=0, keepdims=True))
+    filled = np.nan_to_num(filled)
+    tree = hierarchy.linkage(filled, method="average", metric="euclidean",
+                             optimal_ordering=True)
+    return hierarchy.leaves_list(tree)
+
+
+def heat_matrix(df: pd.DataFrame, spec: PlotSpec):
+    """The matrix as drawn: transformed, then reordered if asked."""
+    matrix, rows, cols, problem = extract_matrix(df, spec)
+    if problem or matrix is None or not matrix.size:
+        return None, rows, cols, problem or tr("Aucune donnée")
+    mode = spec.heat_values
+    if mode == "z_rows":
+        matrix = _zscore(matrix, axis=1)
+    elif mode == "z_columns":
+        matrix = _zscore(matrix, axis=0)
+    elif mode == "correlation":
+        if len(cols) < 2:
+            return None, rows, cols, tr(
+                "Carte de chaleur : la corrélation demande au moins deux "
+                "colonnes.")
+        matrix = pd.DataFrame(matrix, columns=cols).corr().to_numpy()
+        rows = list(cols)
+    cluster = spec.heat_cluster
+    if mode == "correlation" and cluster != "none":
+        # a correlation matrix is symmetric: one order for both axes
+        order = _cluster_order(matrix)
+        matrix = matrix[np.ix_(order, order)]
+        rows = cols = [rows[i] for i in order]
+    else:
+        if cluster in ("rows", "both"):
+            order = _cluster_order(matrix)
+            matrix, rows = matrix[order], [rows[i] for i in order]
+        if cluster in ("columns", "both"):
+            order = _cluster_order(matrix.T)
+            matrix, cols = matrix[:, order], [cols[i] for i in order]
+    return matrix, rows, cols, ""
+
+
+def draw_heatmap(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
+                 info: RenderInfo):
+    """A matrix of colours, with its scale and, if asked, its values.
+
+    Centred values (z-scores, correlations) get a diverging scale around 0,
+    the rest a sequential one; both read for the colour-blind. Missing cells
+    are grey, not a colour of the scale.
+    """
+    import matplotlib as mpl
+    from matplotlib.colors import Normalize, TwoSlopeNorm
+
+    matrix, rows, cols, problem = heat_matrix(df, spec)
+    if problem:
+        info.warnings.append(problem)
+        return _no_data(ax)
+    mode = spec.heat_values
+    centred = mode in ("z_rows", "z_columns", "correlation")
+    name = spec.heat_cmap
+    if name == "auto":
+        name = "rdbu" if centred else "viridis"
+    cmap = mpl.colormaps[{"viridis": "viridis", "magma": "magma",
+                          "blues": "Blues", "rdbu": "RdBu_r"}[name]]
+    cmap = cmap.with_extremes(bad="#D9D9D9")
+    finite = matrix[np.isfinite(matrix)]
+    low, high = (float(finite.min()), float(finite.max())) if finite.size \
+        else (0.0, 1.0)
+    if mode == "correlation":
+        norm = Normalize(-1.0, 1.0)
+    elif name == "rdbu" and low < 0 < high:
+        reach = max(abs(low), abs(high))
+        norm = TwoSlopeNorm(0.0, -reach, reach)
+    else:
+        norm = Normalize(low, high if high > low else low + 1.0)
+    image = ax.imshow(np.ma.masked_invalid(matrix), cmap=cmap, norm=norm,
+                      aspect="auto", interpolation="nearest", zorder=1)
+
+    ax.set_xticks(np.arange(len(cols)))
+    ax.set_xticklabels(cols)
+    if len(rows) <= HEAT_ROW_LABELS_MAX:
+        ax.set_yticks(np.arange(len(rows)))
+        ax.set_yticklabels(rows)
+    else:
+        ax.set_yticks([])
+    ax.tick_params(length=0)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    if spec.heat_annotate and matrix.size <= HEAT_ANNOTATE_MAX:
+        whole = finite.size and np.all(finite == np.round(finite)) and \
+            not centred
+        for (i, j), value in np.ndenumerate(matrix):
+            if not np.isfinite(value):
+                continue
+            red, green, blue, _ = cmap(norm(value))
+            light = 0.299 * red + 0.587 * green + 0.114 * blue > 0.5
+            text = (f"{value:.2f}" if centred else
+                    f"{value:.0f}" if whole else f"{value:.3g}")
+            ax.text(j, i, text,
+                    ha="center", va="center", fontsize=theme.base_size * 0.75,
+                    color="black" if light else "white", zorder=3)
+
+    label = spec.ylabel or {
+        "z_rows": tr("Score z"), "z_columns": tr("Score z"),
+        "correlation": tr("r de Pearson"),
+    }.get(mode, spec.y[0] if spec.subgroup and spec.y else tr("Valeur"))
+    bar = ax.figure.colorbar(image, ax=ax, fraction=0.05, pad=0.03)
+    bar.set_label(label)
+    bar.outline.set_visible(False)
+    bar.ax.tick_params(labelsize=theme.base_size,
+                       labelfontfamily=theme.fonts)
+    bar.ax.yaxis.label.set_fontfamily(theme.fonts)
+    info.series = list(cols)
+    info.groups = list(rows)
+    info.heatmap = {"rows": len(rows), "cols": len(cols), "values": mode,
+                    "cluster": spec.heat_cluster}
+    return {}, {}
+
+
 # --------------------------------------------------------------------------
 # Main entry point
 # --------------------------------------------------------------------------
@@ -1171,11 +1349,13 @@ DRAWERS = {
     "contingency": draw_contingency,
     "paired": draw_paired,
     "bland_altman": draw_bland_altman,
+    "heatmap": draw_heatmap,
 }
 
 
 #: Plot types whose X axis names categories rather than measuring something.
-CATEGORY_AXES = ("bar", "box", "violin", "contingency")
+CATEGORY_AXES = ("bar", "box", "violin", "contingency", "paired",
+                 "heatmap")
 
 #: Share of the space between two ticks a label may take: the rest is air.
 LABEL_ROOM = 0.92

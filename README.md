@@ -40,7 +40,7 @@ tout texte d'interface sans traduction.
 | | |
 |---|---|
 | **Import** | CSV, TSV, TXT (séparateur et décimale détectés), Excel `.xlsx` / `.xlsm` / `.xls` multi-feuilles, collage depuis Excel, **fichiers GraphPad Prism `.pzfx`** |
-| **Types de graphiques** | courbes, nuages de points, histogrammes, boxplots, violin plots, barres avec erreurs (simples et groupées à deux facteurs), **courbes de survie Kaplan-Meier**, **tableaux de contingence** (barres empilées en pourcentages ou en effectifs), **avant/après apparié** (une ligne par sujet), **Bland-Altman** (concordance de deux méthodes de mesure) |
+| **Types de graphiques** | courbes, nuages de points, histogrammes, boxplots, violin plots, barres avec erreurs (simples et groupées à deux facteurs), **courbes de survie Kaplan-Meier**, **tableaux de contingence** (barres empilées en pourcentages ou en effectifs), **avant/après apparié** (une ligne par sujet), **Bland-Altman** (concordance de deux méthodes de mesure), **cartes de chaleur** (valeurs, scores z, matrice de corrélation, classification hiérarchique) |
 | **Thématiques** | Nature, Science, Cell, PNAS, Minimal, Grayscale — typographie, largeur de colonne et palette conformes aux instructions aux auteurs |
 | **Export** | SVG, PDF, EPS (vectoriels, texte éditable) · PNG, TIFF, JPEG jusqu'à 1200 dpi (600 dpi par défaut) |
 | **Statistiques** | t de Student / Welch / apparié, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs contrôle**, **ANOVA à mesures répétées** (avec correction de Greenhouse-Geisser), **log-rank** sur les courbes de survie, **test exact de Fisher et khi²** (avec ou sans correction de Yates) sur les tableaux de contingence, avec odds ratio, risque relatif et V de Cramér ; corrections Bonferroni / Holm / FDR ; **détection de valeurs aberrantes (Grubbs)** ; barres de significativité automatiques, y compris sur les barres groupées à deux facteurs |
@@ -295,6 +295,18 @@ différence en pourcentage de la moyenne. L'exemple « Deux débitmètres »
 reprend les données de l'article fondateur (Bland et Altman, *Lancet*,
 1986).
 
+### Cartes de chaleur
+
+Une ligne par élément (gène, échantillon…) nommée par « Grouper par », une
+colonne par condition cochée dans « Valeurs Y » — ou, en format long, les
+lignes dans « Grouper par » et les colonnes dans « Sous-groupe ». Les cases
+montrent les valeurs, le score z par ligne (l'usage pour l'expression
+génique) ou par colonne, ou la corrélation de Pearson entre colonnes ;
+lignes et colonnes peuvent être réordonnées par classification
+hiérarchique pour rapprocher les profils semblables. Échelle divergente
+centrée sur 0 pour les valeurs centrées, séquentielle sinon, lisibles par
+les daltoniens ; cases manquantes en gris.
+
 ### Comparer des courbes ajustées
 
 Avec plusieurs séries (colonne « Grouper par », ou plusieurs colonnes Y) et
@@ -420,7 +432,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 541 tests, 5 à 20 minutes selon la machine
+pytest                      # 558 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -436,6 +448,7 @@ pytest -k paired            # un seul sujet (les tests appariés)
 | `test_methods.py` | paragraphe Méthodes : le test nommé est celui qui a tourné, les deux langues se correspondent |
 | `test_paired.py` | avant/après : une ligne par sujet, test apparié choisi sur les différences |
 | `test_bland_altman.py` | Bland-Altman : biais et limites de l'article de 1986 retrouvés |
+| `test_heatmap.py` | cartes de chaleur : scores z, corrélation, regroupement, échelles |
 | `test_stats_fixes.py` | barres groupées, tests appariés, valeurs manquantes |
 | `test_anova.py` | ANOVA à deux facteurs, choix de test par famille |
 | `test_advanced_stats.py` | Dunnett, ANOVA à mesures répétées, valeurs aberrantes |
