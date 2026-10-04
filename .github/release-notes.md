@@ -1,5 +1,7 @@
 **Français** · [English below](#english)
 
+{changes_fr}
+
 ## Installer Plotea {version}
 
 Aucune installation de Python n'est nécessaire : chaque archive contient tout
@@ -54,6 +56,8 @@ technique à joindre.
 ---
 
 <a id="english"></a>
+
+{changes_en}
 
 ## Installing Plotea {version}
 

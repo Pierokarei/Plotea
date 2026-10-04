@@ -139,7 +139,9 @@ jobs:
         shell: bash
         run: |
           ls -la archives
-          sed "s/{version}/$VERSION/g" .github/release-notes.md > notes.md
+          # .github/release-notes.md, precede des nouveautes de
+          # .github/changes/$VERSION.md
+          python3 tools/build_app.py --notes notes.md
           gh release create "$GITHUB_REF_NAME" archives/* \
             --draft --verify-tag \
             --title "Plotea $VERSION" \

@@ -3,6 +3,7 @@
     pip install pyinstaller
     python tools/build_app.py             # dist/Plotea (dist/Plotea.app)
     python tools/build_app.py --archive   # plus the archive to hand out
+    python tools/build_app.py --notes notes.md   # the release page only
 
 Regenerates the icons, runs PyInstaller against plotea.spec and, on Linux,
 writes a .desktop file next to the binary. The result lands in dist/.
@@ -112,6 +113,30 @@ def archive_name(number: str, platform: str = sys.platform) -> str:
     return f"Plotea-{number}-{kind}.{extension}"
 
 
+CHANGES_SPLIT = "<!-- english -->"
+
+
+def release_notes(number: str) -> str:
+    """The release page: what changed in this version, then how to install.
+
+    .github/changes/<version>.md holds the French changes, then the English
+    ones after CHANGES_SPLIT; each lands at the top of its language's half
+    of .github/release-notes.md.
+    """
+    with open(os.path.join(ROOT, ".github", "release-notes.md"),
+              encoding="utf-8") as handle:
+        notes = handle.read()
+    path = os.path.join(ROOT, ".github", "changes", f"{number}.md")
+    french = english = ""
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as handle:
+            french, _, english = handle.read().partition(CHANGES_SPLIT)
+    for key, text in (("{changes_fr}", french), ("{changes_en}", english)):
+        notes = notes.replace(f"{key}\n\n", f"{text.strip()}\n\n"
+                              if text.strip() else "")
+    return notes.replace("{version}", number)
+
+
 def make_archive(platform: str = sys.platform) -> str:
     """Pack the build in dist/ into the archive users download."""
     kind = system(platform)
@@ -138,7 +163,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--archive", action="store_true",
                         help="emballer aussi l'archive à distribuer")
+    parser.add_argument("--notes", metavar="FICHIER",
+                        help="écrire seulement les notes de version")
     options = parser.parse_args(argv)
+    if options.notes:
+        with open(options.notes, "w", encoding="utf-8") as handle:
+            handle.write(release_notes(version()))
+        return 0
     make_icons()
     code = build()
     if code:

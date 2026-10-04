@@ -124,6 +124,26 @@ def test_the_release_is_a_draft_built_from_tested_code():
     workflow = read(".github", "workflows", "release.yml")
     assert "--draft" in workflow
     assert "tools/build_app.py --archive" in workflow
-    assert "release-notes.md" in workflow
+    assert "build_app.py --notes notes.md" in workflow
     assert "--workflow tests.yml" in workflow
     assert '"v$version"' in workflow
+
+
+def test_this_version_says_what_changed():
+    """Tagging a version with no notes of its own fails here, not on the page."""
+    notes = build_app.release_notes(__version__)
+    french, english = notes.split('<a id="english"></a>')
+    assert f"## Nouveautés de la version {__version__}" in french
+    assert f"## What's new in {__version__}" in english
+    # each language's changes sit above its own installation guide
+    assert french.index("## Nouveautés") < french.index("## Installer")
+    assert english.index("## What's new") < english.index("## Installing")
+    assert not re.search(r"\{(version|changes_fr|changes_en)\}", notes)
+    assert build_app.CHANGES_SPLIT not in notes
+
+
+def test_a_version_without_changes_keeps_a_clean_page():
+    notes = build_app.release_notes("0.0.1")
+    assert not re.search(r"\{\w+\}", notes)
+    assert "## Nouveautés" not in notes and "\n\n\n" not in notes
+    assert "Plotea-0.0.1-windows.zip" in notes

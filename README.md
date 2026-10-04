@@ -435,7 +435,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 577 tests, 5 à 20 minutes selon la machine
+pytest                      # 579 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
