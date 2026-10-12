@@ -31,6 +31,7 @@ class DataFrameModel(QAbstractTableModel):
     """Editable Qt model over a pandas DataFrame."""
 
     aboutToChange = pyqtSignal()          # before an edit: undo starts here
+    columnRenamed = pyqtSignal(str, str)  # old name, new name
     dataChangedExternally = pyqtSignal()
 
     def __init__(self, df: pd.DataFrame | None = None, parent=None):
@@ -118,11 +119,16 @@ class DataFrameModel(QAbstractTableModel):
                       role=Qt.ItemDataRole.EditRole) -> bool:
         if orientation != Qt.Orientation.Horizontal:
             return False
+        cols = [str(c) for c in self._df.columns]
+        old, new = cols[section], str(value).strip()
+        # two columns of one name could no longer be told apart
+        if not new or new == old or new in cols:
+            return False
         self.aboutToChange.emit()
-        cols = list(self._df.columns)
-        cols[section] = str(value)
+        cols[section] = new
         self._df.columns = cols
         self.headerDataChanged.emit(orientation, section, section)
+        self.columnRenamed.emit(old, new)
         self.dataChangedExternally.emit()
         return True
 
@@ -190,8 +196,11 @@ class DataPanel(QWidget):
     """Left dock: the dataset list on top, the editable table below."""
 
     datasetChanged = pyqtSignal()        # active dataset switched
-    datasetRenamed = pyqtSignal(str, str)  # old name, new name
     aboutToEdit = pyqtSignal()           # cells about to change -> undo
+    columnRenamed = pyqtSignal(str, str, str)   # table, old name, new name
+    renameTableRequested = pyqtSignal(str)
+    duplicateTableRequested = pyqtSignal(str)
+    deleteTableRequested = pyqtSignal(str)
     dataEdited = pyqtSignal()            # cells changed -> re-render
     importRequested = pyqtSignal()
     addTableRequested = pyqtSignal()
@@ -202,6 +211,7 @@ class DataPanel(QWidget):
         self.datasets: list[Dataset] = []
         self.model = DataFrameModel()
         self.model.aboutToChange.connect(self.aboutToEdit)
+        self.model.columnRenamed.connect(self._on_column_renamed)
         self.model.dataChangedExternally.connect(self._on_model_edited)
 
         self.list = QListWidget()
@@ -340,6 +350,11 @@ class DataPanel(QWidget):
         self.refresh_current_label()
         self.dataEdited.emit()
 
+    def _on_column_renamed(self, old: str, new: str):
+        ds = self.current_dataset()
+        if ds is not None:
+            self.columnRenamed.emit(ds.name, old, new)
+
     def refresh_current_label(self):
         """The size shown in the list and under the table."""
         i = self.list.currentRow()
@@ -430,9 +445,16 @@ class DataPanel(QWidget):
             new, ok = QInputDialog.getText(self, tr("Renommer"),
                                            tr("Nouveau nom :"),
                                            text=str(df.columns[col]))
-            if ok and new.strip():
-                self.model.setHeaderData(col, Qt.Orientation.Horizontal,
-                                         new.strip())
+            new = new.strip()
+            if not ok or not new or new == str(df.columns[col]):
+                return
+            if new in {str(c) for c in df.columns}:
+                QMessageBox.information(
+                    self, tr("Plotea"),
+                    tr("Une colonne porte déjà ce nom : « {name} ».").format(
+                        name=new))
+                return
+            self.model.setHeaderData(col, Qt.Orientation.Horizontal, new)
         elif act is to_num:
             self.aboutToEdit.emit()
             name = df.columns[col]
@@ -478,16 +500,12 @@ class DataPanel(QWidget):
         ds = self.current_dataset()
         if ds is None:
             return
+        # renaming, duplicating and deleting a table touch the plots that
+        # show it, and are undone with them: the window does them
         if act is a_rename:
-            new, ok = QInputDialog.getText(self, tr("Renommer la table"),
-                                           tr("Nom :"), text=ds.name)
-            if ok and new.strip() and new.strip() != ds.name:
-                old, ds.name = ds.name, new.strip()
-                self.refresh_current_label()
-                self.datasetRenamed.emit(old, ds.name)
+            self.renameTableRequested.emit(ds.name)
         elif act is a_dup:
-            self.datasets.append(ds.copy())
-            self.set_datasets(self.datasets, len(self.datasets) - 1)
+            self.duplicateTableRequested.emit(ds.name)
         elif act is a_transpose:
             # The first column keeps its name: the old headers become its
             # values, and transposing a second time gives the table back
@@ -503,5 +521,4 @@ class DataPanel(QWidget):
                 QMessageBox.information(self, tr("Plotea"),
                                         tr("Au moins une table est nécessaire."))
                 return
-            self.datasets.remove(ds)
-            self.set_datasets(self.datasets, 0)
+            self.deleteTableRequested.emit(ds.name)

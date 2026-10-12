@@ -8,6 +8,17 @@ from ..i18n import tr
 from .dataset import Dataset
 
 
+def _shown_as(ds: Dataset, **settings) -> Dataset:
+    """Attach the plot an example is made for: Help > Examples opens it so.
+
+    Choosing columns by guesswork works for a table of one's own; an
+    example has a plot it was built to show, and opening it as anything
+    else - survival times as bars - teaches the wrong thing.
+    """
+    ds.meta["plot"] = settings
+    return ds
+
+
 def viability(seed: int = 7) -> Dataset:
     """Long format: 4 treatments x 12 replicates, classic bar/box material."""
     rng = np.random.default_rng(seed)
@@ -19,7 +30,10 @@ def viability(seed: int = 7) -> Dataset:
             rows.append({tr("Traitement"): name, tr("Réplicat"): rep,
                          tr("Viabilité"): round(float(val), 2),
                          tr("Lignée"): "HeLa" if rep % 2 else "U2OS"})
-    return Dataset(tr("Viabilité cellulaire"), pd.DataFrame(rows))
+    return _shown_as(Dataset(tr("Viabilité cellulaire"), pd.DataFrame(rows)),
+                     plot_type="bar", group=tr("Traitement"),
+                     y=[tr("Viabilité")], xlabel=tr("Traitement"),
+                     ylabel=tr("Viabilité (%)"), stats_enabled=True)
 
 
 def growth(seed: int = 3) -> Dataset:
@@ -32,7 +46,11 @@ def growth(seed: int = 3) -> Dataset:
         base = top / (1 + np.exp(-k * (t - 24)))
         out[name] = np.round(base + rng.normal(0, 0.04, t.size), 4)
         out[f"{name} SD"] = np.round(np.abs(rng.normal(0.06, 0.02, t.size)), 4)
-    return Dataset(tr("Courbe de croissance"), pd.DataFrame(out))
+    series = ["WT", "KO", "KO + rescue"]
+    return _shown_as(Dataset(tr("Courbe de croissance"), pd.DataFrame(out)),
+                     plot_type="line", x=tr("Temps (h)"), y=series,
+                     error_cols=[f"{name} SD" for name in series],
+                     xlabel=tr("Temps (h)"), ylabel="DO600")
 
 
 def dose_response(seed: int = 11) -> Dataset:
@@ -49,18 +67,23 @@ def dose_response(seed: int = 11) -> Dataset:
             rows.append({"log[C] (M)": round(float(lc), 3),
                          tr("Réponse (%)"): round(float(r), 2),
                          tr("Composé"): compound})
-    return Dataset(tr("Dose-réponse"), pd.DataFrame(rows))
+    return _shown_as(Dataset(tr("Dose-réponse"), pd.DataFrame(rows)),
+                     plot_type="scatter", x="log[C] (M)",
+                     y=[tr("Réponse (%)")], group=tr("Composé"),
+                     fit_model="hill4_log", xlabel="log[C] (M)",
+                     ylabel=tr("Réponse (%)"))
 
 
 def expression(seed: int = 21) -> Dataset:
     """Wide format, heavy-tailed: violin / histogram material."""
     rng = np.random.default_rng(seed)
     n = 220
-    return Dataset(tr("Expression génique"), pd.DataFrame({
-        tr("Sain"): np.round(rng.lognormal(1.8, 0.45, n), 3),
-        tr("Tumeur"): np.round(rng.lognormal(2.4, 0.55, n), 3),
-        tr("Métastase"): np.round(rng.lognormal(2.75, 0.62, n), 3),
-    }))
+    tissues = [tr("Sain"), tr("Tumeur"), tr("Métastase")]
+    return _shown_as(Dataset(tr("Expression génique"), pd.DataFrame({
+        tissues[0]: np.round(rng.lognormal(1.8, 0.45, n), 3),
+        tissues[1]: np.round(rng.lognormal(2.4, 0.55, n), 3),
+        tissues[2]: np.round(rng.lognormal(2.75, 0.62, n), 3),
+    })), plot_type="violin", y=tissues, ylabel=tr("Expression génique"))
 
 
 def correlation(seed: int = 5) -> Dataset:
@@ -75,7 +98,12 @@ def correlation(seed: int = 5) -> Dataset:
             rows.append({tr("Biomarqueur (ng/mL)"): round(float(xi), 2),
                          tr("Score clinique"): round(float(yi), 2),
                          tr("Cohorte"): cohort})
-    return Dataset(tr("Corrélation biomarqueur"), pd.DataFrame(rows))
+    return _shown_as(Dataset(tr("Corrélation biomarqueur"),
+                             pd.DataFrame(rows)),
+                     plot_type="scatter", x=tr("Biomarqueur (ng/mL)"),
+                     y=[tr("Score clinique")], group=tr("Cohorte"),
+                     fit_model="linear", xlabel=tr("Biomarqueur (ng/mL)"),
+                     ylabel=tr("Score clinique"))
 
 
 def two_factor(seed: int = 15) -> Dataset:
@@ -88,7 +116,10 @@ def two_factor(seed: int = 15) -> Dataset:
                 rows.append({tr("Génotype"): genotype, tr("Temps"): time,
                              tr("Activité"): round(float(
                                  rng.normal(base * factor, 7.5)), 2)})
-    return Dataset(tr("Plan à deux facteurs"), pd.DataFrame(rows))
+    return _shown_as(Dataset(tr("Plan à deux facteurs"), pd.DataFrame(rows)),
+                     plot_type="bar", group=tr("Temps"),
+                     subgroup=tr("Génotype"), y=[tr("Activité")],
+                     xlabel=tr("Temps"), ylabel=tr("Activité"))
 
 
 def survival(seed: int = 21) -> Dataset:
@@ -107,7 +138,10 @@ def survival(seed: int = 21) -> Dataset:
             rows.append({tr("Bras"): arm,
                          tr("Temps (mois)"): round(min(observed, 36.0), 2),
                          tr("Événement"): int(event_time <= min(leaves, 36.0))})
-    return Dataset(tr("Essai de survie"), pd.DataFrame(rows))
+    return _shown_as(Dataset(tr("Essai de survie"), pd.DataFrame(rows)),
+                     plot_type="survival", x=tr("Temps (mois)"),
+                     group=tr("Bras"), event_col=tr("Événement"),
+                     xlabel=tr("Temps (mois)"), stats_enabled=True)
 
 
 def contingency() -> Dataset:
@@ -120,7 +154,10 @@ def contingency() -> Dataset:
             tr("Placebo"): (14, 26)}
     rows = [{tr("Traitement"): arm, tr("Répondeurs"): yes,
              tr("Non-répondeurs"): no} for arm, (yes, no) in arms.items()]
-    return Dataset(tr("Réponse au traitement"), pd.DataFrame(rows))
+    return _shown_as(Dataset(tr("Réponse au traitement"), pd.DataFrame(rows)),
+                     plot_type="contingency", group=tr("Traitement"),
+                     y=[tr("Répondeurs"), tr("Non-répondeurs")],
+                     xlabel=tr("Traitement"))
 
 
 def paired() -> Dataset:
@@ -132,9 +169,12 @@ def paired() -> Dataset:
     rng = np.random.default_rng(31)
     before = rng.normal(148, 11, 12)
     after = before - rng.normal(9, 7, 12)
-    return Dataset(tr("Pression artérielle"), pd.DataFrame({
+    return _shown_as(Dataset(tr("Pression artérielle"), pd.DataFrame({
         tr("Patient"): [f"P{i:02d}" for i in range(1, 13)],
-        tr("Avant"): before.round(1), tr("Après"): after.round(1)}))
+        tr("Avant"): before.round(1), tr("Après"): after.round(1)})),
+        plot_type="paired", y=[tr("Avant"), tr("Après")],
+        stats_pair_by=tr("Patient"), stats_enabled=True,
+        ylabel=tr("Pression artérielle") + " (mmHg)")
 
 
 #: Peak expiratory flow rate (l/min) of 17 subjects, first reading on each
@@ -154,7 +194,10 @@ def agreement() -> Dataset:
     data = {tr("Sujet"): [f"S{i:02d}" for i in range(1, 18)]}
     data.update({name: [float(v) for v in values]
                  for name, values in PEAK_FLOW.items()})
-    return Dataset(tr("Débit expiratoire de pointe"), pd.DataFrame(data))
+    return _shown_as(Dataset(tr("Débit expiratoire de pointe"),
+                             pd.DataFrame(data)),
+                     plot_type="bland_altman", y=list(PEAK_FLOW),
+                     stats_pair_by=tr("Sujet"))
 
 
 def heatmap() -> Dataset:
@@ -178,8 +221,10 @@ def heatmap() -> Dataset:
             rows.append({tr("Gène"): gene,
                          **{s: round(v, 2) for s, v in zip(samples, values)}})
     order = rng.permutation(len(rows))          # as a table arrives
-    return Dataset(tr("Expression (log2)"),
-                   pd.DataFrame([rows[i] for i in order]))
+    return _shown_as(Dataset(tr("Expression (log2)"),
+                             pd.DataFrame([rows[i] for i in order])),
+                     plot_type="heatmap", group=tr("Gène"), y=samples,
+                     heat_values="z_rows", heat_cluster="rows")
 
 
 EXAMPLES = {

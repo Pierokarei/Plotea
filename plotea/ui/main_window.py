@@ -1,6 +1,7 @@
 """Main window: assembles the data panel, canvas, inspector and stats dock."""
 from __future__ import annotations
 
+import copy
 import os
 
 from PyQt6.QtCore import QSettings, QSize, Qt, QTimer
@@ -164,7 +165,10 @@ class MainWindow(QMainWindow):
     def _build_docks(self):
         self.data_panel = DataPanel()
         self.data_panel.datasetChanged.connect(self._on_dataset_changed)
-        self.data_panel.datasetRenamed.connect(self._on_dataset_renamed)
+        self.data_panel.columnRenamed.connect(self._on_column_renamed)
+        self.data_panel.renameTableRequested.connect(self.rename_table)
+        self.data_panel.duplicateTableRequested.connect(self.duplicate_table)
+        self.data_panel.deleteTableRequested.connect(self.delete_table)
         # the copy for undo is taken before the cells change, not after
         self.data_panel.aboutToEdit.connect(
             lambda: self._begin_edit("Modification des données", deep=True))
@@ -589,9 +593,24 @@ class MainWindow(QMainWindow):
         spec = self.current_spec()
         if spec:
             self._show_table(spec, ds)
+            self._show_as_made(spec, ds)
             self._sync_inspector()
             self.schedule_render()
         self._record("Jeu de données d'exemple", before)
+
+    @staticmethod
+    def _show_as_made(spec: PlotSpec, ds):
+        """Give an example the plot it was made for, from a clean slate.
+
+        What the previous table was shown with - a fit, a second factor,
+        statistics - has nothing to do with this one; the style stays.
+        """
+        made = ds.meta.get("plot")
+        if not made:
+            return
+        settings = {**PlotSpec().table_settings(), **copy.deepcopy(made)}
+        for key, value in settings.items():
+            setattr(spec, key, value)
 
     def _paste_data(self):
         self.data_panel.paste_clipboard()
@@ -608,6 +627,9 @@ class MainWindow(QMainWindow):
             return
         if spec.plot_type == "heatmap":
             self._map_heatmap(spec, ds)
+            return
+        if spec.plot_type == "survival":
+            self._map_survival(spec, ds)
             return
         if spec.plot_type in ("paired", "bland_altman"):
             self._map_paired(spec, ds)
@@ -692,6 +714,26 @@ class MainWindow(QMainWindow):
         spec.ylabel = ""
 
     @staticmethod
+    def _map_survival(spec: PlotSpec, ds):
+        """Follow-up times, the 0/1 event column, and the arms if any."""
+        import pandas as pd
+
+        numeric = ds.numeric_columns()
+        categorical = ds.categorical_columns()
+
+        def zero_one(column):
+            values = set(pd.to_numeric(ds.df[column], errors="coerce")
+                         .dropna().unique())
+            return bool(values) and values <= {0, 1}
+        events = [c for c in numeric if zero_one(c)]
+        times = [c for c in numeric if c not in events]
+        spec.x = times[0] if times else ""
+        spec.event_col = events[0] if events else ""
+        spec.group = categorical[0] if categorical else ""
+        spec.subgroup, spec.y = "", []
+        spec.xlabel, spec.ylabel = spec.x, ""
+
+    @staticmethod
     def _map_heatmap(spec: PlotSpec, ds):
         """Rows named by a text column, every numeric column a column - or,
         with a single number to show, a long table pivoted on two texts."""
@@ -750,7 +792,14 @@ class MainWindow(QMainWindow):
         needs_x = plot_type in ("line", "scatter")
         invalid = (not spec.y or not set(spec.y) <= cols
                    or (needs_x and spec.x not in cols)
-                   or (not needs_x and spec.group and spec.group not in cols))
+                   or (not needs_x and spec.group and spec.group not in cols)
+                   or (spec.subgroup and spec.subgroup not in cols))
+        if plot_type == "survival":
+            # times, and the groups and events when there are any: no Y
+            invalid = (spec.x not in cols
+                       or bool(spec.group and spec.group not in cols)
+                       or bool(spec.event_col
+                               and spec.event_col not in cols))
         if plot_type == "heatmap" and ds is not None:
             # numbers to show: checked columns, or a long table's two texts
             long = (spec.group in cols and spec.subgroup in cols
@@ -781,15 +830,17 @@ class MainWindow(QMainWindow):
         """Point the plot at another table, as that table was last shown.
 
         A table this plot has shown before comes back with its plot type,
-        columns, titles and statistics; a new one gets its columns chosen.
-        Choosing them again for a table already set up is what turned the
-        cell viability bars into bars of replicate numbers on the way back
-        from a contingency table.
+        columns, titles and statistics. A new one keeps the plot as it is
+        when it has the same columns - a copy, the next experiment laid out
+        the same way - and gets its columns chosen otherwise. Choosing them
+        again for a table already set up is what turned the cell viability
+        bars into bars of replicate numbers on the way back from a
+        contingency table.
         """
         if ds is None or spec.dataset == ds.name:
             return
-        restored = spec.switch_table(ds.name)
-        if not restored or not self._mapping_fits(spec, ds, spec.plot_type):
+        spec.switch_table(ds.name)
+        if not self._mapping_fits(spec, ds, spec.plot_type):
             self._auto_map(spec, ds)
 
     def _on_dataset_changed(self):
@@ -800,13 +851,95 @@ class MainWindow(QMainWindow):
         self._sync_inspector()
         self.schedule_render()
 
-    def _on_dataset_renamed(self, old: str, new: str):
-        """A new name, not a new table: every plot keeps its settings."""
+    def _on_column_renamed(self, table: str, old: str, new: str):
+        """Every plot drawn from that column follows it to its new name."""
         for spec in self.project.plots:
-            spec.rename_table(old, new)
-        self.project.dirty = True
+            spec.rename_column(table, old, new)
+        self._sync_inspector()
+
+    # ------------------------------------------------------------------
+    # tables: renamed, copied and deleted with the plots that show them
+    # ------------------------------------------------------------------
+    def _table(self, name: str):
+        return next((d for d in self.project.datasets if d.name == name),
+                    None)
+
+    def _select_table(self, name: str):
+        """Show `name` in the data panel without moving the current plot."""
+        names = self.project.dataset_names()
+        self.data_panel.set_datasets(self.project.datasets,
+                                     names.index(name) if name in names
+                                     else 0)
+
+    def rename_table(self, name: str):
+        ds = self._table(name)
+        if ds is None:
+            return
+        new, ok = QInputDialog.getText(self, tr("Renommer la table"),
+                                       tr("Nom :"), text=name)
+        new = new.strip()
+        if not ok or not new or new == name:
+            return
+        if self._table(new) is not None:
+            QMessageBox.information(
+                self, tr("Plotea"),
+                tr("Une table porte déjà ce nom : « {name} ».").format(
+                    name=new))
+            return
+        before = self._capture()
+        ds.name = new
+        for spec in self.project.plots:
+            spec.rename_table(name, new)
+        self.data_panel.refresh_current_label()
         self._sync_inspector()
         self.schedule_render()
+        self._record("Renommer la table", before)
+
+    def duplicate_table(self, name: str):
+        ds = self._table(name)
+        if ds is None:
+            return
+        before = self._capture()
+        twin = self.project.add_dataset(ds.copy())     # a name of its own
+        for spec in self.project.plots:
+            # the copy is shown the way the original was
+            if spec.dataset == name:
+                spec.per_table[twin.name] = spec.table_settings()
+            elif name in spec.per_table:
+                spec.per_table[twin.name] = copy.deepcopy(
+                    spec.per_table[name])
+        self._select_table(twin.name)
+        self._record("Dupliquer la table", before)
+
+    def delete_table(self, name: str):
+        """Delete a table; the plots that showed it move to another one.
+
+        Undone in one step, plots included: nothing is asked, and the
+        status bar says which plots moved.
+        """
+        if self._table(name) is None or len(self.project.datasets) < 2:
+            return
+        before = self._capture()
+        current = self.current_spec()
+        self.project.remove_dataset(name)
+        replacement = self.project.datasets[0]
+        moved = []
+        for spec in self.project.plots:
+            spec.per_table.pop(name, None)
+            if spec.dataset == name:
+                spec.dataset = ""         # nothing to remember of it
+                self._show_table(spec, replacement)
+                moved.append(spec.name)
+        self._select_table(current.dataset if current else replacement.name)
+        self._sync_inspector()
+        self.schedule_render()
+        self._record("Supprimer la table", before)
+        message = tr("Table « {name} » supprimée.").format(name=name)
+        if moved:
+            message += " " + tr(
+                "{plots} : désormais sur « {table} ». Ctrl+Z pour annuler."
+            ).format(plots=", ".join(moved), table=replacement.name)
+        self.statusBar().showMessage(message, 8000)
 
     def _on_inspector_dataset(self, name: str):
         spec = self.current_spec()

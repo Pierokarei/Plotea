@@ -27,6 +27,27 @@ STYLE_FIELDS = [
 #: The plot itself, not the way one of its tables is shown.
 _OWN_FIELDS = {"name", "dataset", "per_table", "dpi_preview", "notes"}
 
+#: Settings naming one column, settings naming several, and texts that
+#: start out as a column's name.
+COLUMN_FIELDS = ("x", "group", "subgroup", "event_col", "stats_pair_by")
+COLUMN_LISTS = ("y", "error_cols")
+_NAMED_AFTER_COLUMNS = ("xlabel", "ylabel", "legend_title", "fit_compare")
+
+
+def _rename_in(settings: dict, old: str, new: str):
+    """Rename a column in a dict of table settings, in place."""
+    for key in COLUMN_FIELDS + _NAMED_AFTER_COLUMNS:
+        if settings.get(key) == old:
+            settings[key] = new
+    for key in COLUMN_LISTS:
+        if key in settings:
+            settings[key] = [new if c == old else c for c in settings[key]]
+    # a wide table's series are its columns, and keep their colour
+    colors = settings.get("custom_colors")
+    if colors and old in colors:
+        settings["custom_colors"] = {(new if k == old else k): v
+                                     for k, v in colors.items()}
+
 
 @dataclass
 class Annotation:
@@ -236,6 +257,20 @@ class PlotSpec:
             self.dataset = new
         if old in self.per_table:
             self.per_table[new] = self.per_table.pop(old)
+
+    def rename_column(self, table: str, old: str, new: str):
+        """A column of `table` changed name: follow it, here and in memory.
+
+        Titles still reading the column's name follow it too; one typed by
+        hand stays as written.
+        """
+        if self.dataset == table:
+            settings = self.table_settings()
+            _rename_in(settings, old, new)
+            for key, value in settings.items():
+                setattr(self, key, value)
+        if table in self.per_table:
+            _rename_in(self.per_table[table], old, new)
 
     # -- convenience -------------------------------------------------------
     @property

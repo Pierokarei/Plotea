@@ -1601,6 +1601,37 @@ def settle_layout(fig, placed, layout=None):
         layout()
 
 
+#: Plot types drawn differently when a second factor is given.
+_SUBGROUPED = ("bar", "box", "violin", "contingency", "heatmap")
+
+
+def missing_columns(spec: PlotSpec, df: pd.DataFrame) -> tuple[list, list]:
+    """Columns the plot names that the table does not have.
+
+    First those it is drawn from, without which it would not be the plot
+    asked for; then those that only add to it - error bars, events,
+    subjects - and whose absence is said, not drawn.
+    """
+    have = {str(c) for c in df.columns}
+    drawn = [] if spec.plot_type == "survival" else list(spec.y)
+    if spec.x and (spec.is_xy or spec.plot_type == "survival"):
+        drawn.append(spec.x)
+    if spec.group:
+        drawn.append(spec.group)
+    if spec.subgroup and spec.plot_type in _SUBGROUPED:
+        drawn.append(spec.subgroup)
+    extra = [c for c in spec.error_cols if c]
+    if spec.plot_type == "survival" and spec.event_col:
+        extra.append(spec.event_col)
+    if spec.stats_pair_by and (spec.stats_enabled
+                               or spec.plot_type == "paired"):
+        extra.append(spec.stats_pair_by)
+
+    def gone(columns):
+        return list(dict.fromkeys(c for c in columns if str(c) not in have))
+    return gone(drawn), gone(extra)
+
+
 def draw_into(ax, spec: PlotSpec, df: pd.DataFrame,
               info: RenderInfo | None = None, theme: Theme | None = None
               ) -> RenderInfo:
@@ -1614,6 +1645,25 @@ def draw_into(ax, spec: PlotSpec, df: pd.DataFrame,
     if df is None or df.empty:
         ax.text(0.5, 0.5, tr("Aucune donnée"), ha="center", va="center",
                 transform=ax.transAxes, color="#999999")
+        ax.set_axis_off()
+        return info
+
+    lost, unused = missing_columns(spec, df)
+    if unused:
+        info.warnings.append(tr("Colonne introuvable : {names}").format(
+            names=", ".join(tr("« {name} »").format(name=c)
+                            for c in unused)))
+    if lost:
+        # half a plot drawn from what is left would pass for the real one
+        message = tr("Colonne introuvable : {names}").format(
+            names=", ".join(tr("« {name} »").format(name=c)
+                            for c in lost))
+        info.warnings.append(message)
+        ax.text(0.5, 0.5, message + "\n" + tr(
+                    "Renommée ou supprimée ? Choisissez-la de nouveau dans "
+                    "Mise en forme."),
+                ha="center", va="center", transform=ax.transAxes,
+                color="#999999", wrap=True)
         ax.set_axis_off()
         return info
 
