@@ -177,6 +177,43 @@ def paired() -> Dataset:
         ylabel=tr("Pression artérielle") + " (mmHg)")
 
 
+def standard_curve(seed: int = 9) -> Dataset:
+    """A sandwich ELISA: eight standards in duplicate, then the sera.
+
+    Standards and samples share the table, as in Prism: the samples' X is
+    left empty for the curve to fill in. Two sera were diluted 1:10; one
+    lies above the highest standard and one below the lowest - what a
+    plate gives and what the report must not hide.
+    """
+    rng = np.random.default_rng(seed)
+    bottom, top, ec50, hill = 0.06, 2.6, 160.0, 1.15
+
+    def od(conc):
+        return bottom + (top - bottom) / (1 + (ec50 / conc) ** hill)
+
+    sample, conc_col = tr("Échantillon"), tr("Concentration (pg/mL)")
+    od_col, dilution = tr("DO 450 nm"), tr("Dilution")
+    rows = []
+    for i, conc in enumerate((1000, 500, 250, 125, 62.5, 31.25, 15.6, 7.8)):
+        for _ in range(2):
+            rows.append({sample: f"{tr('Étalon')} {i + 1}", conc_col: conc,
+                         od_col: round(float(od(conc) * rng.normal(1, 0.03)),
+                                       3), dilution: np.nan})
+    sera = ((45.0, 1), (210.0, 1), (640.0, 1), (380.0, 10), (95.0, 10),
+            (5000.0, 1), (2.0, 1))
+    for i, (true, factor) in enumerate(sera, start=1):
+        for _ in range(2):
+            rows.append({sample: f"{tr('Sérum')} {i}", conc_col: np.nan,
+                         od_col: round(float(od(true / factor)
+                                             * rng.normal(1, 0.04)), 3),
+                         dilution: float(factor)})
+    return _shown_as(Dataset(tr("Dosage ELISA"), pd.DataFrame(rows)),
+                     plot_type="scatter", x=conc_col, y=[od_col],
+                     fit_model="hill4", fit_ci=True, log_x=True,
+                     interpolate=True, interp_label=sample,
+                     interp_factor=dilution, xlabel=conc_col, ylabel=od_col)
+
+
 #: Peak expiratory flow rate (l/min) of 17 subjects, first reading on each
 #: meter: Bland JM, Altman DG. Statistical methods for assessing agreement
 #: between two methods of clinical measurement. Lancet 1986;i:307-310,
@@ -231,6 +268,7 @@ EXAMPLES = {
     "Viabilité cellulaire (barres, stats)": viability,
     "Courbe de croissance (courbes + SD)": growth,
     "Dose-réponse (fit 4PL)": dose_response,
+    "Dosage ELISA (gamme étalon)": standard_curve,
     "Expression génique (violin/histogramme)": expression,
     "Corrélation (nuage + régression)": correlation,
     "Plan à deux facteurs (barres groupées)": two_factor,

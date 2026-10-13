@@ -29,7 +29,8 @@ _OWN_FIELDS = {"name", "dataset", "per_table", "dpi_preview", "notes"}
 
 #: Settings naming one column, settings naming several, and texts that
 #: start out as a column's name.
-COLUMN_FIELDS = ("x", "group", "subgroup", "event_col", "stats_pair_by")
+COLUMN_FIELDS = ("x", "group", "subgroup", "event_col", "stats_pair_by",
+                 "interp_label", "interp_factor")
 COLUMN_LISTS = ("y", "error_cols")
 _NAMED_AFTER_COLUMNS = ("xlabel", "ylabel", "legend_title", "fit_compare")
 
@@ -182,6 +183,10 @@ class PlotSpec:
     # "" no comparison, "all" one curve for every series, or the name of a
     # parameter of the model whose value may differ between the series
     fit_compare: str = ""
+    # standard curve: rows with a Y but no X are unknowns, read off the fit
+    interpolate: bool = False
+    interp_label: str = ""          # column naming the unknowns
+    interp_factor: str = ""         # column of dilution factors
 
     # -- statistics --------------------------------------------------------
     stats_enabled: bool = False

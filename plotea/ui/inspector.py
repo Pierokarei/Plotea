@@ -199,6 +199,11 @@ class Inspector(QWidget):
                 (self.cmb_group, numeric, True),
                 (self.cmb_subgroup, numeric, True),
                 (self.cmb_pair, numeric, True),
+                # left empty, the first click anywhere else wrote "" back
+                # and every survival time counted as a death
+                (self.cmb_event, numeric, True),
+                (self.cmb_interp_label, numeric, True),
+                (self.cmb_interp_factor, numeric, True),
                 (self.cmb_control, [], True)):
             combo.blockSignals(True)
             combo.clear()
@@ -765,6 +770,23 @@ class Inspector(QWidget):
                 "réplicat comme Prism : les points tracés restent les "
                 "moyennes.")))
 
+        # a standard curve: the samples are the rows whose X is empty
+        self.chk_interp = self._bind(
+            QCheckBox(tr("Doser les inconnues (lignes sans X)")),
+            "interpolate")
+        sec.add_widget(self.chk_interp)
+        self.cmb_interp_label = self._bind(QComboBox(), "interp_label")
+        sec.add_row(tr("Nom des échantillons"), self.cmb_interp_label)
+        self.cmb_interp_factor = self._bind(QComboBox(), "interp_factor")
+        sec.add_row(tr("Facteur de dilution"), self.cmb_interp_factor)
+        self.hint_interp = hint(
+            tr("Gamme étalon : les étalons ont une concentration en X, les "
+               "échantillons une colonne X vide. Les réplicats d'un même "
+               "échantillon sont moyennés, la concentration lue sur la "
+               "courbe puis multipliée par la dilution ; rien n'est "
+               "extrapolé hors des étalons. Résultats dans l'onglet Dosage."))
+        sec.add_widget(self.hint_interp)
+
     def _refill_compare(self, keep: str | None = None):
         """Offer the parameters of the chosen model, keeping the choice."""
         combo = getattr(self, "cmb_fit_compare", None)
@@ -883,6 +905,13 @@ class Inspector(QWidget):
                 label.setVisible(xy)
         self.sec_fit.setVisible(xy)
         self.hint_compare.setVisible(bool(self.spec.fit_compare))
+        # the samples are read off a curve: there must be one
+        fitted = self.spec.fit_model != "none"
+        self.chk_interp.setEnabled(fitted)
+        interp = fitted and self.spec.interpolate
+        for widget in (self.cmb_interp_label, self.cmb_interp_factor):
+            widget.setEnabled(interp)
+        self.hint_interp.setVisible(interp)
         # Bland-Altman has no test to choose, but needs the pairing row
         self.sec_stats.setVisible(cat or surv or ct or t == "bland_altman")
         for widget in (self.chk_stats, self.cmb_mode, self.cmb_control,

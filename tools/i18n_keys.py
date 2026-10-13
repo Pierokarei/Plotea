@@ -159,6 +159,16 @@ def runtime_keys() -> set[str]:
             keys.add(row["Source"])
     defaults = inspect.signature(stats.two_way_anova).parameters
     keys.update({defaults["factor_a"].default, defaults["factor_b"].default})
+    # standard curve: the Dosage tab's headers - the X column is the user's
+    from matplotlib.figure import Figure
+
+    from plotea.core.plotspec import PlotSpec
+    curve = demo.standard_curve()
+    spec = PlotSpec(**curve.meta["plot"])
+    info = plotting.render(Figure(), spec, curve.df)
+    for row in info.interpolations:
+        keys.update(k for k in row if k != spec.x)
+    keys.add("Série")                    # shown when there are several
 
     # interface tables
     from plotea.ui.dialogs import SEPARATORS

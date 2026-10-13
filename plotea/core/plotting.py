@@ -42,6 +42,7 @@ class RenderInfo:
     outliers: list = field(default_factory=list)    # Grubbs, group by group
     contingency: list = field(default_factory=list) # odds ratio, RR, V...
     fit_comparison: object = None                  # fitting.FitComparison
+    interpolations: list = field(default_factory=list)  # standard curve
     test_used: str = ""          # the test that ran ("auto" resolved)
     subjects: int = 0            # before-after: subjects drawn as lines
     agreement: list = field(default_factory=list)   # Bland-Altman rows
@@ -712,6 +713,104 @@ def replicate_points(df: pd.DataFrame, spec: PlotSpec) -> dict:
     return {s.label: (s.x, s.y) for s in extract_xy(df, raw)}
 
 
+def unknown_rows(df: pd.DataFrame, spec: PlotSpec) -> list[dict]:
+    """The unknowns of a standard curve: rows with a Y and no X.
+
+    The way Prism lays them out - standards and samples in one XY table,
+    the samples' X left empty for the curve to fill in. Each comes with
+    its series, its name (the label column, else its row number) and its
+    dilution factor (1 when there is no factor column or no value).
+    """
+    if spec.x not in df.columns:
+        return []
+    labels = (df[spec.interp_label] if spec.interp_label in df.columns
+              else None)
+    factors = (_num(df[spec.interp_factor])
+               if spec.interp_factor in df.columns else None)
+    positions = {index: i for i, index in enumerate(df.index)}
+    if spec.group and spec.group in df.columns and spec.y:
+        parts = [(str(key), sub, spec.y[0])
+                 for key, sub in df.groupby(spec.group, sort=False)]
+    else:
+        parts = [(str(col), df, col) for col in spec.y]
+    found = []
+    for series, sub, column in parts:
+        if column not in sub.columns:
+            continue
+        xv, yv = _num(sub[spec.x]), _num(sub[column])
+        for index, x, y in zip(sub.index, xv, yv):
+            if np.isfinite(x) or not np.isfinite(y):
+                continue
+            row = positions[index]
+            name = labels.iloc[row] if labels is not None else None
+            factor = factors[row] if factors is not None else np.nan
+            found.append({
+                "series": series, "y": float(y),
+                "label": (str(name) if name is not None and pd.notna(name)
+                          and str(name).strip()
+                          else tr("Ligne {n}").format(n=row + 1)),
+                "factor": float(factor) if np.isfinite(factor) else 1.0})
+    return found
+
+
+def interpolate_unknowns(df: pd.DataFrame, spec: PlotSpec,
+                         fits: dict) -> list[dict]:
+    """One row per sample: replicates averaged in Y, then read off the curve.
+
+    The order of an ELISA protocol: average the replicate signals, read the
+    concentration off the standard curve, multiply by the dilution. The CV
+    of the replicates is given for the usual quality check. A sample beyond
+    the standards is reported as beyond them, not extrapolated. With the
+    log-concentration 4PL the curve gives log10(X): the concentration is
+    10^X.
+    """
+    samples: dict = {}
+    for row in unknown_rows(df, spec):
+        key = (row["series"], row["label"], row["factor"])
+        samples.setdefault(key, []).append(row["y"])
+    several = len({key[0] for key in samples}) > 1
+    as_log = fitting.FIT_MODEL.normalise(spec.fit_model) == "hill4_log"
+    diluted = bool(spec.interp_factor)
+    converted = as_log or diluted
+
+    def concentration(x, factor):
+        return (10 ** x if as_log else x) * factor
+
+    rows = []
+    for (series, label, factor), ys in samples.items():
+        ys = np.asarray(ys)
+        mean = float(ys.mean())
+        cv = (float(ys.std(ddof=1) / abs(mean) * 100)
+              if ys.size > 1 and mean else float("nan"))
+        result = fits.get(series)
+        found = (fitting.inverse(result, mean) if result is not None
+                 else fitting.Inverse())
+        row = {"Série": series} if several else {}
+        row.update({"Échantillon": label, "n": int(ys.size),
+                    "Y moyen": mean, "CV (%)": cv,
+                    spec.x: found.x})
+        if diluted:
+            row["Dilution"] = factor
+        if converted:
+            row["Concentration"] = concentration(found.x, factor)
+        row["IC 95 % bas"] = concentration(found.low, factor)
+        row["IC 95 % haut"] = concentration(found.high, factor)
+        lo, hi = result.x_range if result is not None and result.ok \
+            else (float("nan"), float("nan"))
+        row["Remarque"] = {
+            "ok": "",
+            "below": tr("Sous la gamme (< {limit:.4g})").format(
+                limit=concentration(lo, factor)),
+            "above": tr("Au-dessus de la gamme (> {limit:.4g})").format(
+                limit=concentration(hi, factor)),
+            "ambiguous": tr("Plusieurs solutions sur la gamme"),
+            "none": tr("Pas de courbe ajustée"),
+        }[found.status]
+        row["_x"], row["_series"] = found.x, series     # for the plot
+        rows.append(row)
+    return rows
+
+
 def draw_xy(ax, df, spec, theme, info):
     series = extract_xy(df, spec)
     info.groups = [s.label for s in series]
@@ -775,6 +874,23 @@ def draw_xy(ax, df, spec, theme, info):
                                     zorder=1)
             elif res:
                 info.warnings.append(f"{s.label}: {res.message}")
+
+    if spec.fit_model != "none" and spec.interpolate:
+        rows = interpolate_unknowns(df, spec, info.fits)
+        if not rows:
+            info.warnings.append(tr(
+                "Aucune inconnue à doser : laissez vide la colonne X des "
+                "échantillons."))
+        index = {s.label: i for i, s in enumerate(series)}
+        for row in rows:
+            x = row.pop("_x")
+            color = colors[index.get(row.pop("_series"), 0)]
+            if np.isfinite(x):              # the sample, on the curve
+                ax.scatter([x], [row["Y moyen"]], marker="D",
+                           s=sizes["ms"] ** 2, facecolor="white",
+                           edgecolor=color, linewidth=theme.spine_width,
+                           zorder=6)
+        info.interpolations = rows
 
     if spec.fit_model != "none" and spec.fit_compare:
         info.fit_comparison = fitting.compare_fits(
@@ -1626,6 +1742,8 @@ def missing_columns(spec: PlotSpec, df: pd.DataFrame) -> tuple[list, list]:
     if spec.stats_pair_by and (spec.stats_enabled
                                or spec.plot_type == "paired"):
         extra.append(spec.stats_pair_by)
+    if spec.interpolate and spec.is_xy:
+        extra += [c for c in (spec.interp_label, spec.interp_factor) if c]
 
     def gone(columns):
         return list(dict.fromkeys(c for c in columns if str(c) not in have))

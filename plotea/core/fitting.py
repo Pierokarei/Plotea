@@ -178,6 +178,13 @@ class FitResult:
     extra: dict = field(default_factory=dict)
     ok: bool = True
     message: str = ""
+    # what reading the curve backwards needs: the parameters in model order,
+    # their covariance, the residual degrees of freedom, and the X range of
+    # the points fitted - the standards, for a standard curve
+    popt: tuple = ()
+    pcov: object = None
+    dof: int = 0
+    x_range: tuple = ()
 
     def summary_lines(self) -> list[str]:
         lines = [self.equation] if self.equation else []
@@ -286,7 +293,97 @@ def fit(x, y, model_name: str, n_points: int = 200,
         extra["r Pearson"] = float(lr.rvalue)
 
     return FitResult(model_name, params, stderr, r2, r2_adj, rmse,
-                     int(x.size), equation, xf, yf, ci_low, ci_high, extra)
+                     int(x.size), equation, xf, yf, ci_low, ci_high, extra,
+                     popt=tuple(float(v) for v in popt), pcov=pcov, dof=dof,
+                     x_range=(float(x.min()), float(x.max())))
+
+
+# --------------------------------------------------------------------------
+# Reading a standard curve backwards: the X of an unknown from its Y
+# --------------------------------------------------------------------------
+@dataclass
+class Inverse:
+    """The X a fitted curve gives for one Y, within the standards' range.
+
+    `status` is "ok", or why there is no value: "below" / "above" when the
+    Y lies beyond the curve over the standards (the X would be below the
+    lowest standard or above the highest), "ambiguous" when the curve
+    reaches that Y more than once, "none" when there is no curve. Nothing
+    is extrapolated: a value outside the standards is not measured.
+
+    `low` and `high` bound the 95 % confidence interval: where the Y meets
+    the confidence band of the curve. They are NaN where the band does not
+    meet it within the standards - the interval is open on that side.
+    """
+    x: float = float("nan")
+    low: float = float("nan")
+    high: float = float("nan")
+    status: str = "none"
+
+
+def _crossings(xs: np.ndarray, gap: np.ndarray, func) -> list[float]:
+    """Where a function sampled on `xs` crosses zero, refined."""
+    from scipy.optimize import brentq
+
+    roots = [float(x) for x, g in zip(xs, gap) if g == 0]
+    for i in np.nonzero(np.sign(gap[:-1]) * np.sign(gap[1:]) < 0)[0]:
+        try:
+            roots.append(float(brentq(func, xs[i], xs[i + 1], xtol=1e-12,
+                                      rtol=1e-12)))
+        except ValueError:
+            continue
+    return sorted(roots)
+
+
+def inverse(result: FitResult, y: float, grid: int = 2001) -> Inverse:
+    """X of the curve at `y`, with its 95 % confidence interval."""
+    if result is None or not result.ok or not result.x_range \
+            or not np.isfinite(y):
+        return Inverse()
+    model = MODELS.get(FIT_MODEL.normalise(result.model))
+    if model is None or model.func is None:
+        return Inverse()
+    lo, hi = result.x_range
+    xs = np.linspace(lo, hi, grid)
+    if lo > 0 and hi / lo > 20:          # decades of concentration
+        xs = np.union1d(xs, np.geomspace(lo, hi, grid))
+    popt = result.popt
+
+    def curve(x):
+        return model.func(np.asarray(x, dtype=float), *popt)
+
+    fx = curve(xs)
+    roots = _crossings(xs, fx - y, lambda x: float(curve(x)) - y)
+    if not roots:
+        # beyond the end of the standards whose response is nearer
+        nearer_low = abs(fx[0] - y) <= abs(fx[-1] - y)
+        return Inverse(status="below" if nearer_low else "above")
+    if len(roots) > 1 and np.ptp(roots) > 1e-9 * max(abs(hi), 1.0):
+        return Inverse(status="ambiguous")
+    x = roots[0]
+
+    found = Inverse(x=x, status="ok")
+    if result.pcov is None or result.dof < 1:
+        return found
+    t = float(sps.t.ppf(0.975, result.dof))
+
+    def half(x):
+        x = np.atleast_1d(np.asarray(x, dtype=float))
+        J = _jacobian(model.func, x, popt)
+        var = np.einsum("ij,jk,ik->i", J, result.pcov, J)
+        return t * np.sqrt(np.clip(var, 0, None))
+
+    width = half(xs)
+    bounds = []
+    for sign in (1.0, -1.0):
+        bounds += _crossings(
+            xs, fx + sign * width - y,
+            lambda v, s=sign: float(curve(v) + s * half(v)[0]) - y)
+    below = [b for b in bounds if b < x]
+    above = [b for b in bounds if b > x]
+    found.low = max(below) if below else float("nan")
+    found.high = min(above) if above else float("nan")
+    return found
 
 
 # --------------------------------------------------------------------------

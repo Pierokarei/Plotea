@@ -307,3 +307,17 @@ def test_survival_columns_are_chosen_on_a_table_of_ones_own(window):
     assert (spec.x, spec.event_col, spec.group) == ("Suivi (j)", "Décès",
                                                     "Bras")
     assert window._mapping_fits(spec, Dataset("Cohorte", frame), "survival")
+
+
+def test_a_click_in_the_inspector_keeps_the_event_column(window):
+    """The event picker was left empty: the next click anywhere wrote ""
+    back, and every follow-up time became a death - no censoring left."""
+    window.files.start_new()
+    window.load_example("Essai de survie (Kaplan-Meier)")
+    inspector = window.inspector
+    assert inspector.cmb_event.currentText() == "Événement"
+    inspector.chk_surv_ci.setChecked(not inspector.chk_surv_ci.isChecked())
+    window._render_now()
+    assert window.current_spec().event_col == "Événement"
+    rows = window.canvas.last_info.descriptives
+    assert any(row.get("Censurés", 0) for row in rows), rows

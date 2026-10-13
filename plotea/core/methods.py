@@ -81,6 +81,14 @@ PHRASES = {
         "fit_ci": ("; shaded areas show the 95% confidence band of the fit "
                    "(delta method)"),
         "fit_end": ".",
+        "assay": ("Unknown samples were quantified on the standard curve: "
+                  "their concentration was read off the fitted curve from "
+                  "the mean signal of their replicates{dilution}, with a "
+                  "95% confidence interval "
+                  "where that signal meets the confidence band of the curve;"
+                  " samples outside the range of the standards were "
+                  "reported as such, without extrapolation."),
+        "assay_dilution": ", then multiplied by the dilution factor",
         "compare_one": ("Whether a single curve fits all series was tested "
                         "with the extra sum-of-squares F test."),
         "compare_param": ("Whether {param} differs between {series} was "
@@ -197,6 +205,15 @@ PHRASES = {
         "fit_ci": (" ; les zones ombrées montrent la bande de confiance à "
                    "95 % de l'ajustement (méthode delta)"),
         "fit_end": ".",
+        "assay": ("Les échantillons inconnus ont été dosés sur la gamme "
+                  "étalon : leur concentration a été lue sur la courbe "
+                  "ajustée à partir du signal moyen de leurs "
+                  "réplicats{dilution}, avec un intervalle de "
+                  "confiance à 95 % là où ce signal rencontre la bande de "
+                  "confiance de la courbe ; les échantillons hors de la "
+                  "gamme des étalons ont été signalés comme tels, sans "
+                  "extrapolation."),
+        "assay_dilution": ", puis multipliée par le facteur de dilution",
         "compare_one": ("L'adéquation d'une courbe unique pour toutes les "
                         "séries a été testée par le test F des sommes de "
                         "carrés supplémentaires."),
@@ -409,7 +426,8 @@ def _categorical(spec, info, say, tests, language) -> list[str]:
         if info.omnibus and info.omnibus[0]:
             name = info.omnibus[0]
             omnibus = tests.get(name, name)
-            followed = ("suivie" if name in FEMININE else "suivi")                 if language == "fr" else ""
+            followed = (("suivie" if name in FEMININE else "suivi")
+                        if language == "fr" else "")
             then = say["omnibus_then"].format(omnibus=omnibus,
                                               followed=followed)
             follow = _de(pairwise_text) if language == "fr" else pairwise_text
@@ -488,6 +506,10 @@ def _xy(spec, info, say, language) -> list[str]:
         if spec.fit_ci:
             text += say["fit_ci"]
         out.append(text + say["fit_end"])
+        if spec.interpolate and getattr(info, "interpolations", None):
+            out.append(say["assay"].format(
+                dilution=say["assay_dilution"] if spec.interp_factor
+                else ""))
         comparison = info.fit_comparison
         if comparison is not None and comparison.ok:
             if comparison.shared == fitting.ONE_CURVE:

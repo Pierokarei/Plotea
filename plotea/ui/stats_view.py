@@ -137,10 +137,12 @@ class StatsPanel(QWidget):
         self.anova = _table()
         self.outliers = _table()
         self.effects = _table()
+        self.assay = _table()
         self.tabs.addTab(self.desc, tr("Descriptives"))
         self.tabs.addTab(self.tests, tr("Comparaisons"))
         self.tabs.addTab(self.anova, tr("ANOVA 2 facteurs"))
         self.tabs.addTab(self.fits, tr("Ajustements"))
+        self.tabs.addTab(self.assay, tr("Dosage"))
         self.tabs.addTab(self.outliers, tr("Aberrantes"))
         self.tabs.addTab(self.effects, tr("Effets"))
         self.tabs.addTab(self._build_methods(), tr("Méthodes"))
@@ -177,9 +179,11 @@ class StatsPanel(QWidget):
         self._anova_rows: list[dict] = []
         self._outlier_rows: list[dict] = []
         self._effect_rows: list[dict] = []
+        self._assay_rows: list[dict] = []
         self._info, self._spec = None, None
         self.tabs.setTabVisible(2, False)
         self.tabs.setTabVisible(self.tabs.indexOf(self.effects), False)
+        self.tabs.setTabVisible(self.tabs.indexOf(self.assay), False)
 
     # ------------------------------------------------------------------
     def _build_methods(self) -> QWidget:
@@ -250,11 +254,16 @@ class StatsPanel(QWidget):
         self._outlier_rows = list(info.outliers)
         self.tabs.setTabVisible(self.tabs.indexOf(self.outliers),
                                 bool(info.outliers))
-        effects = list(getattr(info, "contingency", []) or []) +             list(getattr(info, "agreement", []) or [])
+        effects = (list(getattr(info, "contingency", []) or [])
+                   + list(getattr(info, "agreement", []) or []))
         _fill(self.effects, effects)
         self._effect_rows = effects
         self.tabs.setTabVisible(self.tabs.indexOf(self.effects),
                                 bool(effects))
+        self._assay_rows = list(getattr(info, "interpolations", []) or [])
+        _fill(self.assay, self._assay_rows)
+        self.tabs.setTabVisible(self.tabs.indexOf(self.assay),
+                                bool(self._assay_rows))
 
         head = []
         if info.anova:
@@ -287,6 +296,11 @@ class StatsPanel(QWidget):
         comparison = getattr(info, "fit_comparison", None)
         if comparison is not None and comparison.ok:
             head.append(plotting.comparison_line(comparison))
+        if self._assay_rows:
+            outside = sum(1 for row in self._assay_rows if row["Remarque"])
+            head.append(tr("Dosage : {count} échantillon(s), {outside} sans "
+                           "concentration").format(
+                               count=len(self._assay_rows), outside=outside))
         if info.comparisons:
             head.append(tr("{count} comparaison(s)").format(
                 count=len(info.comparisons)))
@@ -325,7 +339,8 @@ class StatsPanel(QWidget):
                 id(self.tests): self._test_rows,
                 id(self.anova): self._anova_rows,
                 id(self.outliers): self._outlier_rows,
-                id(self.effects): self._effect_rows}.get(
+                id(self.effects): self._effect_rows,
+                id(self.assay): self._assay_rows}.get(
                     id(self.tabs.currentWidget()), [])
 
     def copy_current(self):
