@@ -89,6 +89,16 @@ PHRASES = {
                   " samples outside the range of the standards were "
                   "reported as such, without extrapolation."),
         "assay_dilution": ", then multiplied by the dilution factor",
+        "auc": ("Areas under the curves were computed by the trapezoidal "
+                "rule from {base}{per}."),
+        "auc_zero": "Y = 0",
+        "auc_first": ("the first value of each curve (incremental area)"),
+        "auc_value": "Y = {value}",
+        "auc_subject": ", one area per {subject}",
+        "auc_se": ("; their standard errors were derived from the SEM at "
+                   "each X (Bailer's method), with 95% confidence intervals "
+                   "from Student's t with Satterthwaite's degrees of "
+                   "freedom"),
         "compare_one": ("Whether a single curve fits all series was tested "
                         "with the extra sum-of-squares F test."),
         "compare_param": ("Whether {param} differs between {series} was "
@@ -214,6 +224,17 @@ PHRASES = {
                   "gamme des étalons ont été signalés comme tels, sans "
                   "extrapolation."),
         "assay_dilution": ", puis multipliée par le facteur de dilution",
+        "auc": ("Les aires sous les courbes ont été calculées par la "
+                "méthode des trapèzes à partir de {base}{per}."),
+        "auc_zero": "Y = 0",
+        "auc_first": ("la première valeur de chaque courbe (aire "
+                      "incrémentale)"),
+        "auc_value": "Y = {value}",
+        "auc_subject": ", une aire par {subject}",
+        "auc_se": (" ; leurs erreurs types ont été tirées de la SEM à "
+                   "chaque X (méthode de Bailer), avec des intervalles de "
+                   "confiance à 95 % selon la loi de Student aux degrés de "
+                   "liberté de Satterthwaite"),
         "compare_one": ("L'adéquation d'une courbe unique pour toutes les "
                         "séries a été testée par le test F des sommes de "
                         "carrés supplémentaires."),
@@ -520,6 +541,14 @@ def _xy(spec, info, say, language) -> list[str]:
                           else say["series_all"].format(count=len(labels)))
                 out.append(say["compare_param"].format(
                     param=comparison.shared, series=series))
+    if spec.auc and getattr(info, "aucs", None):
+        base = spec.auc_baseline if spec.auc_baseline in (
+            "zero", "first", "value") else "zero"
+        out.append(say["auc"].format(
+            base=say[f"auc_{base}"].format(
+                value=f"{spec.auc_baseline_value or 0:g}"),
+            per=(say["auc_subject"].format(subject=spec.auc_subject)
+                 if spec.auc_subject else say["auc_se"])))
     return out
 
 

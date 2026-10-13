@@ -84,6 +84,7 @@ class Inspector(QWidget):
     changed = pyqtSignal()
     datasetSwitched = pyqtSignal(str)
     plotTypeChanged = pyqtSignal(str)
+    aucTableRequested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -107,6 +108,7 @@ class Inspector(QWidget):
         self._build_error_points()
         self._build_type_specific()
         self._build_fit()
+        self._build_auc()
         self._build_stats()
         self.vbox.addStretch(1)
 
@@ -204,6 +206,7 @@ class Inspector(QWidget):
                 (self.cmb_event, numeric, True),
                 (self.cmb_interp_label, numeric, True),
                 (self.cmb_interp_factor, numeric, True),
+                (self.cmb_auc_subject, numeric, True),
                 (self.cmb_control, [], True)):
             combo.blockSignals(True)
             combo.clear()
@@ -787,6 +790,36 @@ class Inspector(QWidget):
                "extrapolé hors des étalons. Résultats dans l'onglet Dosage."))
         sec.add_widget(self.hint_interp)
 
+    def _build_auc(self):
+        sec = self._add(CollapsibleSection(tr("Aire sous la courbe"), False))
+        self.sec_auc = sec
+        self.chk_auc = self._bind(
+            QCheckBox(tr("Calculer l'aire sous la courbe")), "auc")
+        sec.add_widget(self.chk_auc)
+        self.cmb_auc_base = self._bind(QComboBox(), "auc_baseline")
+        self.fill(self.cmb_auc_base, enums.AUC_BASELINE)
+        sec.add_row(tr("Ligne de base"), self.cmb_auc_base)
+        self.f_auc_value = self._bind(OptionalFloat(), "auc_baseline_value")
+        sec.add_row(tr("Valeur"), self.f_auc_value)
+        self.cmb_auc_subject = self._bind(QComboBox(), "auc_subject")
+        sec.add_row(tr("Une aire par sujet"), self.cmb_auc_subject)
+        self.chk_auc_shade = self._bind(
+            QCheckBox(tr("Ombrer l'aire sous la courbe moyenne")),
+            "auc_shade")
+        sec.add_widget(self.chk_auc_shade)
+        self.btn_auc_table = QPushButton(
+            tr("Comparer les aires entre groupes"))
+        self.btn_auc_table.clicked.connect(self.aucTableRequested)
+        sec.add_widget(self.btn_auc_table)
+        self.hint_auc = hint(
+            tr("Méthode des trapèzes sur la moyenne des réplicats, depuis la "
+               "ligne de base ; erreur type de Bailer. Pour comparer des "
+               "groupes, choisissez la colonne des sujets (une souris, un "
+               "patient) : chacun a son aire, et le bouton en fait un "
+               "graphique en barres avec ses tests. Résultats dans l'onglet "
+               "Aires."))
+        sec.add_widget(self.hint_auc)
+
     def _refill_compare(self, keep: str | None = None):
         """Offer the parameters of the chosen model, keeping the choice."""
         combo = getattr(self, "cmb_fit_compare", None)
@@ -912,6 +945,15 @@ class Inspector(QWidget):
         for widget in (self.cmb_interp_label, self.cmb_interp_factor):
             widget.setEnabled(interp)
         self.hint_interp.setVisible(interp)
+        self.sec_auc.setVisible(xy)
+        auc = self.spec.auc
+        for widget in (self.cmb_auc_base, self.cmb_auc_subject,
+                       self.chk_auc_shade):
+            widget.setEnabled(auc)
+        self.f_auc_value.setEnabled(auc
+                                    and self.spec.auc_baseline == "value")
+        self.btn_auc_table.setEnabled(auc and bool(self.spec.auc_subject))
+        self.hint_auc.setVisible(auc)
         # Bland-Altman has no test to choose, but needs the pairing row
         self.sec_stats.setVisible(cat or surv or ct or t == "bland_altman")
         for widget in (self.chk_stats, self.cmb_mode, self.cmb_control,

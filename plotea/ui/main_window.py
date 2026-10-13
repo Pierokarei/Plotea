@@ -192,6 +192,7 @@ class MainWindow(QMainWindow):
         self.inspector.changed.connect(self.schedule_render)
         self.inspector.datasetSwitched.connect(self._on_inspector_dataset)
         self.inspector.plotTypeChanged.connect(self._on_plot_type_changed)
+        self.inspector.aucTableRequested.connect(self.compare_aucs)
         self.panel_editor = PanelEditor()
         self.panel_editor.changed.connect(
             lambda: self._begin_edit("Figure composite"))
@@ -1040,6 +1041,48 @@ class MainWindow(QMainWindow):
         self.project.add_plot(spec)
         self._sync_tabs(len(self.project.plots) - 1)
         self._record("Nouveau graphique", before)
+
+    def compare_aucs(self):
+        """One area per subject -> a table of its own, and a bar chart.
+
+        How groups are compared on areas under the curve: each animal or
+        patient gives one value, and the groups are compared on those
+        values with the usual tests - not on the area of the mean curves.
+        """
+        import pandas as pd
+
+        from ..core.dataset import Dataset
+
+        spec = self.current_spec()
+        rows = getattr(self.canvas.last_info, "aucs", None) or []
+        if spec is None or not spec.auc_subject or not rows:
+            self.statusBar().showMessage(
+                tr("Choisissez d'abord la colonne des sujets."), 5000)
+            return
+        group = next(iter(rows[0]))          # the group, or "Série"
+        # Plotea's headers in the interface language; the user's column
+        # names as they are
+        theirs = {group, spec.auc_subject} - {"Série"}
+        frame = pd.DataFrame(rows).rename(
+            columns=lambda c: c if c in theirs else tr(c))
+        group = group if group in theirs else tr(group)
+        before = self._capture()
+        table = self.project.add_dataset(Dataset(
+            tr("Aires - {name}").format(name=spec.name), frame,
+            notes=tr("Une aire sous la courbe par sujet, de « {name} »."
+                     ).format(name=spec.name)))
+        bars = self.project.add_plot(PlotSpec(
+            name=tr("Aires - {name}").format(name=spec.name),
+            plot_type="bar", dataset=table.name, group=group,
+            y=[tr("Aire nette")], xlabel=group,
+            ylabel=tr("Aire sous la courbe"), stats_enabled=True,
+            theme=spec.theme))
+        self.data_panel.set_datasets(
+            self.project.datasets,
+            self.project.datasets.index(self.project.get_dataset(
+                spec.dataset)))
+        self._sync_tabs(self.project.plots.index(bars))
+        self._record("Comparer les aires", before)
 
     def new_panel(self):
         before = self._capture()

@@ -214,6 +214,36 @@ def standard_curve(seed: int = 9) -> Dataset:
                      interp_factor=dilution, xlabel=conc_col, ylabel=od_col)
 
 
+def glucose_tolerance(seed: int = 12) -> Dataset:
+    """A glucose tolerance test: six mice per diet, blood glucose 0-120 min.
+
+    Long format, one row per mouse and time: the curves are drawn as means
+    of each diet, the areas computed mouse by mouse - what the groups are
+    compared on.
+    """
+    rng = np.random.default_rng(seed)
+    times = (0, 15, 30, 60, 90, 120)
+    shape = (0.0, 1.0, 0.92, 0.55, 0.28, 0.12)
+    mouse, diet = tr("Souris"), tr("Régime")
+    time, glucose = tr("Temps (min)"), tr("Glycémie (mg/dL)")
+    rows = []
+    for name, (fasting, peak) in {tr("Standard"): (95.0, 245.0),
+                                  tr("Riche en graisses"): (125.0, 355.0)
+                                  }.items():
+        for m in range(6):
+            own = rng.normal(1, 0.08)           # each mouse its own height
+            for t, f in zip(times, shape):
+                value = (fasting + (peak - fasting) * f) * own
+                rows.append({mouse: f"{name[0]}{m + 1}", diet: name,
+                             time: t,
+                             glucose: round(float(value
+                                                  + rng.normal(0, 8)), 0)})
+    return _shown_as(Dataset(tr("Tolérance au glucose"), pd.DataFrame(rows)),
+                     plot_type="line", x=time, y=[glucose], group=diet,
+                     auc=True, auc_subject=mouse, xlabel=time,
+                     ylabel=glucose)
+
+
 #: Peak expiratory flow rate (l/min) of 17 subjects, first reading on each
 #: meter: Bland JM, Altman DG. Statistical methods for assessing agreement
 #: between two methods of clinical measurement. Lancet 1986;i:307-310,
@@ -269,6 +299,7 @@ EXAMPLES = {
     "Courbe de croissance (courbes + SD)": growth,
     "Dose-réponse (fit 4PL)": dose_response,
     "Dosage ELISA (gamme étalon)": standard_curve,
+    "Tolérance au glucose (aire sous la courbe)": glucose_tolerance,
     "Expression génique (violin/histogramme)": expression,
     "Corrélation (nuage + régression)": correlation,
     "Plan à deux facteurs (barres groupées)": two_factor,

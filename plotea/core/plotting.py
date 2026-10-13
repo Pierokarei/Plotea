@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from ..i18n import tr
-from . import diagnostics, fitting
+from . import auc, diagnostics, fitting
 from . import stats as st
 from .plotspec import PlotSpec
 from .themes import HATCHES, Theme, color_cycle, get_theme
@@ -43,6 +43,7 @@ class RenderInfo:
     contingency: list = field(default_factory=list) # odds ratio, RR, V...
     fit_comparison: object = None                  # fitting.FitComparison
     interpolations: list = field(default_factory=list)  # standard curve
+    aucs: list = field(default_factory=list)        # area under the curve
     test_used: str = ""          # the test that ran ("auto" resolved)
     subjects: int = 0            # before-after: subjects drawn as lines
     agreement: list = field(default_factory=list)   # Bland-Altman rows
@@ -713,6 +714,52 @@ def replicate_points(df: pd.DataFrame, spec: PlotSpec) -> dict:
     return {s.label: (s.x, s.y) for s in extract_xy(df, raw)}
 
 
+def _series_parts(df: pd.DataFrame, spec: PlotSpec) -> list[tuple]:
+    """(series name, its rows, its Y column), as extract_xy splits them."""
+    if spec.group and spec.group in df.columns and spec.y:
+        return [(str(key), sub, spec.y[0])
+                for key, sub in df.groupby(spec.group, sort=False)]
+    return [(str(col), df, col) for col in spec.y if col in df.columns]
+
+
+def auc_rows(df: pd.DataFrame, spec: PlotSpec) -> list[dict]:
+    """The area under each curve - or under each subject's, when a subject
+    column is given: one value per animal or patient, the way groups are
+    compared (a bar chart of these areas, with its tests)."""
+    if spec.x not in df.columns:
+        return []
+    named = (spec.group if spec.group and spec.group in df.columns
+             else "Série")
+    parts = _series_parts(df, spec)
+    by_subject = spec.auc_subject and spec.auc_subject in df.columns
+    rows = []
+    for series, sub, column in parts:
+        if by_subject:
+            pieces = [(str(key), part) for key, part
+                      in sub.groupby(spec.auc_subject, sort=False)]
+        else:
+            pieces = [(None, sub)]
+        for subject, part in pieces:
+            found = auc.area(_num(part[spec.x]), _num(part[column]),
+                             spec.auc_baseline, spec.auc_baseline_value)
+            if not found.ok:
+                continue
+            row = {named: series} if len(parts) > 1 or by_subject else {}
+            if by_subject:
+                row[spec.auc_subject] = subject
+            row.update({"Aire nette": found.net})
+            if not by_subject:
+                row.update({"ES": found.se, "IC 95 % bas": found.low,
+                            "IC 95 % haut": found.high})
+            row.update({"Aire au-dessus": found.above,
+                        "Aire au-dessous": found.below})
+            if spec.auc_baseline == "first":
+                row["Ligne de base"] = found.baseline
+            row.update({"Y max": found.peak_y, "X du max": found.peak_x})
+            rows.append(row)
+    return rows
+
+
 def unknown_rows(df: pd.DataFrame, spec: PlotSpec) -> list[dict]:
     """The unknowns of a standard curve: rows with a Y and no X.
 
@@ -728,13 +775,8 @@ def unknown_rows(df: pd.DataFrame, spec: PlotSpec) -> list[dict]:
     factors = (_num(df[spec.interp_factor])
                if spec.interp_factor in df.columns else None)
     positions = {index: i for i, index in enumerate(df.index)}
-    if spec.group and spec.group in df.columns and spec.y:
-        parts = [(str(key), sub, spec.y[0])
-                 for key, sub in df.groupby(spec.group, sort=False)]
-    else:
-        parts = [(str(col), df, col) for col in spec.y]
     found = []
-    for series, sub, column in parts:
+    for series, sub, column in _series_parts(df, spec):
         if column not in sub.columns:
             continue
         xv, yv = _num(sub[spec.x]), _num(sub[column])
@@ -874,6 +916,24 @@ def draw_xy(ax, df, spec, theme, info):
                                     zorder=1)
             elif res:
                 info.warnings.append(f"{s.label}: {res.message}")
+
+    if spec.auc:
+        info.aucs = auc_rows(df, spec)
+        if spec.auc_shade:
+            raw = replicate_points(df, spec)
+            for i, s in enumerate(series):
+                xs, means, _, _ = auc.means_by_x(*raw.get(s.label,
+                                                          (s.x, s.y)))
+                if xs.size < 2:
+                    continue
+                base = 0.0
+                if spec.auc_baseline == "first":
+                    base = means[0]
+                elif spec.auc_baseline == "value":
+                    base = spec.auc_baseline_value or 0.0
+                ax.fill_between(xs, base, means, color=colors[i],
+                                alpha=spec.fill_alpha, linewidth=0,
+                                zorder=1)
 
     if spec.fit_model != "none" and spec.interpolate:
         rows = interpolate_unknowns(df, spec, info.fits)
@@ -1744,6 +1804,8 @@ def missing_columns(spec: PlotSpec, df: pd.DataFrame) -> tuple[list, list]:
         extra.append(spec.stats_pair_by)
     if spec.interpolate and spec.is_xy:
         extra += [c for c in (spec.interp_label, spec.interp_factor) if c]
+    if spec.auc and spec.is_xy and spec.auc_subject:
+        extra.append(spec.auc_subject)
 
     def gone(columns):
         return list(dict.fromkeys(c for c in columns if str(c) not in have))

@@ -30,7 +30,7 @@ _OWN_FIELDS = {"name", "dataset", "per_table", "dpi_preview", "notes"}
 #: Settings naming one column, settings naming several, and texts that
 #: start out as a column's name.
 COLUMN_FIELDS = ("x", "group", "subgroup", "event_col", "stats_pair_by",
-                 "interp_label", "interp_factor")
+                 "interp_label", "interp_factor", "auc_subject")
 COLUMN_LISTS = ("y", "error_cols")
 _NAMED_AFTER_COLUMNS = ("xlabel", "ylabel", "legend_title", "fit_compare")
 
@@ -187,6 +187,12 @@ class PlotSpec:
     interpolate: bool = False
     interp_label: str = ""          # column naming the unknowns
     interp_factor: str = ""         # column of dilution factors
+    # area under the curve, by trapezoids, from a baseline
+    auc: bool = False
+    auc_baseline: str = "zero"      # zero / first value / a fixed value
+    auc_baseline_value: float | None = None
+    auc_subject: str = ""           # one area per subject of this column
+    auc_shade: bool = False
 
     # -- statistics --------------------------------------------------------
     stats_enabled: bool = False

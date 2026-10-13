@@ -138,11 +138,13 @@ class StatsPanel(QWidget):
         self.outliers = _table()
         self.effects = _table()
         self.assay = _table()
+        self.areas = _table()
         self.tabs.addTab(self.desc, tr("Descriptives"))
         self.tabs.addTab(self.tests, tr("Comparaisons"))
         self.tabs.addTab(self.anova, tr("ANOVA 2 facteurs"))
         self.tabs.addTab(self.fits, tr("Ajustements"))
         self.tabs.addTab(self.assay, tr("Dosage"))
+        self.tabs.addTab(self.areas, tr("Aires"))
         self.tabs.addTab(self.outliers, tr("Aberrantes"))
         self.tabs.addTab(self.effects, tr("Effets"))
         self.tabs.addTab(self._build_methods(), tr("Méthodes"))
@@ -180,10 +182,12 @@ class StatsPanel(QWidget):
         self._outlier_rows: list[dict] = []
         self._effect_rows: list[dict] = []
         self._assay_rows: list[dict] = []
+        self._area_rows: list[dict] = []
         self._info, self._spec = None, None
         self.tabs.setTabVisible(2, False)
         self.tabs.setTabVisible(self.tabs.indexOf(self.effects), False)
         self.tabs.setTabVisible(self.tabs.indexOf(self.assay), False)
+        self.tabs.setTabVisible(self.tabs.indexOf(self.areas), False)
 
     # ------------------------------------------------------------------
     def _build_methods(self) -> QWidget:
@@ -264,6 +268,10 @@ class StatsPanel(QWidget):
         _fill(self.assay, self._assay_rows)
         self.tabs.setTabVisible(self.tabs.indexOf(self.assay),
                                 bool(self._assay_rows))
+        self._area_rows = list(getattr(info, "aucs", []) or [])
+        _fill(self.areas, self._area_rows)
+        self.tabs.setTabVisible(self.tabs.indexOf(self.areas),
+                                bool(self._area_rows))
 
         head = []
         if info.anova:
@@ -296,6 +304,12 @@ class StatsPanel(QWidget):
         comparison = getattr(info, "fit_comparison", None)
         if comparison is not None and comparison.ok:
             head.append(plotting.comparison_line(comparison))
+        if self._area_rows:
+            per_subject = spec is not None and bool(spec.auc_subject)
+            head.append((tr("Aire sous la courbe : {count} sujet(s)")
+                         if per_subject else
+                         tr("Aire sous la courbe : {count} courbe(s)")
+                         ).format(count=len(self._area_rows)))
         if self._assay_rows:
             outside = sum(1 for row in self._assay_rows if row["Remarque"])
             head.append(tr("Dosage : {count} échantillon(s), {outside} sans "
@@ -340,7 +354,8 @@ class StatsPanel(QWidget):
                 id(self.anova): self._anova_rows,
                 id(self.outliers): self._outlier_rows,
                 id(self.effects): self._effect_rows,
-                id(self.assay): self._assay_rows}.get(
+                id(self.assay): self._assay_rows,
+                id(self.areas): self._area_rows}.get(
                     id(self.tabs.currentWidget()), [])
 
     def copy_current(self):

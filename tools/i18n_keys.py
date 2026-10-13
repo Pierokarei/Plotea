@@ -169,6 +169,14 @@ def runtime_keys() -> set[str]:
     for row in info.interpolations:
         keys.update(k for k in row if k != spec.x)
     keys.add("Série")                    # shown when there are several
+    # area under the curve: the Aires tab, per curve and per subject
+    tolerance = demo.glucose_tolerance()
+    for subject in ("", tolerance.meta["plot"]["auc_subject"]):
+        spec = PlotSpec(**{**tolerance.meta["plot"], "auc_subject": subject,
+                           "auc_baseline": "first"})
+        info = plotting.render(Figure(), spec, tolerance.df)
+        for row in info.aucs:
+            keys.update(k for k in row if k not in (spec.group, subject))
 
     # interface tables
     from plotea.ui.dialogs import SEPARATORS

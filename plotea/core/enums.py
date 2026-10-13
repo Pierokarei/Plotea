@@ -129,6 +129,13 @@ HEAT_CLUSTER = Enum("heat_cluster", [
     ("both", "Lignes et colonnes"),
 ])
 
+#: What the area under a curve is measured from.
+AUC_BASELINE = Enum("auc_baseline", [
+    ("zero", "Y = 0"),
+    ("first", "Première valeur de chaque courbe"),
+    ("value", "Valeur fixée"),
+])
+
 #: What a Bland-Altman plot puts on its Y axis.
 BA_VIEW = Enum("ba_view", [
     ("difference", "Différence (A - B)"),
@@ -310,6 +317,7 @@ SPEC_FIELDS = {
     "heat_values": HEAT_VALUES,
     "heat_cmap": HEAT_CMAP,
     "heat_cluster": HEAT_CLUSTER,
+    "auc_baseline": AUC_BASELINE,
     "stats_mode": STATS_MODE,
     "stats_format": STATS_FORMAT,
     "stats_correction": CORRECTION,
