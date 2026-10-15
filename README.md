@@ -306,7 +306,8 @@ lignes dans « Grouper par » et les colonnes dans « Sous-groupe ». Les cases
 montrent les valeurs, le score z par ligne (l'usage pour l'expression
 génique) ou par colonne, ou la corrélation de Pearson entre colonnes ;
 lignes et colonnes peuvent être réordonnées par classification
-hiérarchique pour rapprocher les profils semblables. Échelle divergente
+hiérarchique pour rapprocher les profils semblables, et les arbres du
+regroupement (dendrogrammes) sont dessinés le long de la matrice. Échelle divergente
 centrée sur 0 pour les valeurs centrées, séquentielle sinon, lisibles par
 les daltoniens ; cases manquantes en gris.
 
@@ -473,7 +474,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 694 tests, 5 à 20 minutes selon la machine
+pytest                      # 702 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```

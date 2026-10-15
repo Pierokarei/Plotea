@@ -1512,23 +1512,38 @@ def _zscore(matrix: np.ndarray, axis: int) -> np.ndarray:
     return np.where(np.isnan(sd) & np.isfinite(matrix), 0.0, z)
 
 
-def _cluster_order(matrix: np.ndarray) -> np.ndarray:
+def _cluster(matrix: np.ndarray):
     """Rows in the order of their average-linkage clustering (Euclidean),
-    leaves optimally ordered so that neighbours are alike."""
+    leaves optimally ordered so that neighbours are alike - and the tree,
+    as scipy lays it out, for the dendrogram (None under three rows).
+
+    The order is read off that same layout, so the branches drawn always
+    end on the rows they join.
+    """
     from scipy.cluster import hierarchy
 
     if matrix.shape[0] < 3:
-        return np.arange(matrix.shape[0])
+        return np.arange(matrix.shape[0]), None
     filled = np.where(np.isfinite(matrix), matrix,
                       np.nanmean(matrix, axis=0, keepdims=True))
     filled = np.nan_to_num(filled)
     tree = hierarchy.linkage(filled, method="average", metric="euclidean",
                              optimal_ordering=True)
-    return hierarchy.leaves_list(tree)
+    drawn = hierarchy.dendrogram(tree, no_plot=True)
+    return np.asarray(drawn["leaves"]), drawn
 
 
-def heat_matrix(df: pd.DataFrame, spec: PlotSpec):
-    """The matrix as drawn: transformed, then reordered if asked."""
+def _cluster_order(matrix: np.ndarray) -> np.ndarray:
+    return _cluster(matrix)[0]
+
+
+def heat_matrix(df: pd.DataFrame, spec: PlotSpec, trees: dict | None = None):
+    """The matrix as drawn: transformed, then reordered if asked.
+
+    `trees`, when given, receives the dendrogram of each axis reordered:
+    "rows" and "columns".
+    """
+    trees = {} if trees is None else trees
     matrix, rows, cols, problem = extract_matrix(df, spec)
     if problem or matrix is None or not matrix.size:
         return None, rows, cols, problem or tr("Aucune donnée")
@@ -1547,15 +1562,16 @@ def heat_matrix(df: pd.DataFrame, spec: PlotSpec):
     cluster = spec.heat_cluster
     if mode == "correlation" and cluster != "none":
         # a correlation matrix is symmetric: one order for both axes
-        order = _cluster_order(matrix)
+        order, tree = _cluster(matrix)
         matrix = matrix[np.ix_(order, order)]
         rows = cols = [rows[i] for i in order]
+        trees["rows"] = trees["columns"] = tree
     else:
         if cluster in ("rows", "both"):
-            order = _cluster_order(matrix)
+            order, trees["rows"] = _cluster(matrix)
             matrix, rows = matrix[order], [rows[i] for i in order]
         if cluster in ("columns", "both"):
-            order = _cluster_order(matrix.T)
+            order, trees["columns"] = _cluster(matrix.T)
             matrix, cols = matrix[:, order], [cols[i] for i in order]
     return matrix, rows, cols, ""
 
@@ -1571,7 +1587,8 @@ def draw_heatmap(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
     import matplotlib as mpl
     from matplotlib.colors import Normalize, TwoSlopeNorm
 
-    matrix, rows, cols, problem = heat_matrix(df, spec)
+    trees: dict = {}
+    matrix, rows, cols, problem = heat_matrix(df, spec, trees)
     if problem:
         info.warnings.append(problem)
         return _no_data(ax)
@@ -1631,11 +1648,55 @@ def draw_heatmap(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
     bar.ax.tick_params(labelsize=theme.base_size,
                        labelfontfamily=theme.fonts)
     bar.ax.yaxis.label.set_fontfamily(theme.fonts)
+    drawn = (draw_dendrograms(ax, trees, len(rows), len(cols), theme)
+             if spec.heat_dendrogram else [])
     info.series = list(cols)
     info.groups = list(rows)
     info.heatmap = {"rows": len(rows), "cols": len(cols), "values": mode,
-                    "cluster": spec.heat_cluster}
+                    "cluster": spec.heat_cluster, "trees": drawn}
     return {}, {}
+
+
+#: Room each dendrogram takes, as a share of the matrix beside it.
+TREE_SHARE = 0.22
+
+
+def draw_dendrograms(ax, trees: dict, n_rows: int, n_cols: int,
+                     theme: Theme) -> list[str]:
+    """The clustering trees, in the matrix's own frame: the columns' above,
+    the rows' to the right - between the matrix and its colour scale, so
+    the row names keep their side and nothing overlaps.
+
+    scipy lays leaf k at 5 + 10 k; a cell's centre is at k. The leaves sit
+    against the matrix and the root lies farthest from it, the height of
+    each joint being the distance at which its two branches merge.
+    """
+    drawn = []
+    pen = dict(color="#55595F", lw=max(theme.spine_width * 0.9, 0.5),
+               solid_capstyle="butt", zorder=2, clip_on=False)
+    right, top = n_cols - 0.5, -0.5
+    x_max, y_min = right, top
+    row_tree, col_tree = trees.get("rows"), trees.get("columns")
+    if row_tree is not None:
+        width, gap = TREE_SHARE * n_cols, 0.04 * n_cols
+        scale = width / (max(max(d) for d in row_tree["dcoord"]) or 1.0)
+        for xs, ds in zip(row_tree["icoord"], row_tree["dcoord"]):
+            ax.plot([right + gap + d * scale for d in ds],
+                    [(x - 5) / 10 for x in xs], **pen)
+        x_max = right + gap + width
+        drawn.append("rows")
+    if col_tree is not None:
+        height, gap = TREE_SHARE * n_rows, 0.04 * n_rows
+        scale = height / (max(max(d) for d in col_tree["dcoord"]) or 1.0)
+        for xs, ds in zip(col_tree["icoord"], col_tree["dcoord"]):
+            ax.plot([(x - 5) / 10 for x in xs],
+                    [top - gap - d * scale for d in ds], **pen)
+        y_min = top - gap - height
+        drawn.append("columns")
+    if drawn:
+        ax.set_xlim(-0.5, x_max)
+        ax.set_ylim(n_rows - 0.5, y_min)
+    return drawn
 
 
 # --------------------------------------------------------------------------

@@ -197,3 +197,111 @@ def test_the_window_maps_the_expression_table(window):
     assert not inspector.sec_stats.isVisible()
     window._render_now()
     assert window.canvas.last_info.heatmap["rows"] == 12
+
+
+# --------------------------------------------------------------------------
+# Dendrograms
+# --------------------------------------------------------------------------
+def tree_lines(figure):
+    """The branches: the black-grey lines, not the colour bar's."""
+    return [line for line in figure.axes[0].lines
+            if line.get_color() == "#55595F"]
+
+
+def test_the_trees_are_drawn_when_clustering():
+    figure, info, _ = render(heat_values="z_rows", heat_cluster="both")
+    assert info.heatmap["trees"] == ["rows", "columns"]
+    # 12 rows and 6 columns: 11 + 5 joints, one bracket each
+    assert len(tree_lines(figure)) == 11 + 5
+    figure, info, _ = render(heat_values="z_rows", heat_cluster="rows")
+    assert info.heatmap["trees"] == ["rows"] and len(tree_lines(figure)) == 11
+
+
+def test_every_row_branch_ends_on_its_row():
+    """Leaves sit against the matrix, at the centre of each row."""
+    figure, info, _ = render(heat_values="z_rows", heat_cluster="rows")
+    edge = len(SAMPLES) - 0.5
+    ends = set()
+    for line in tree_lines(figure):
+        xs, ys = line.get_data()
+        gap = 0.04 * len(SAMPLES)
+        ends.update(round(y, 6) for x, y in zip(xs, ys)
+                    if abs(x - (edge + gap)) < 1e-9)
+    assert ends == set(range(12))
+
+
+def test_the_closest_rows_join_first():
+    """The lowest joint pairs the two rows nearest each other."""
+    from scipy.spatial.distance import pdist, squareform
+
+    values, rows, _, _ = matrix(heat_values="z_rows", heat_cluster="rows")
+    distances = squareform(pdist(values))
+    np.fill_diagonal(distances, np.inf)
+    i, j = np.unravel_index(np.argmin(distances), distances.shape)
+
+    figure, _, _ = render(heat_values="z_rows", heat_cluster="rows")
+    edge = len(SAMPLES) - 0.5 + 0.04 * len(SAMPLES)
+    lowest = min(tree_lines(figure),
+                 key=lambda line: max(line.get_xdata()) - edge)
+    joined = {int(round(y)) for x, y in zip(*lowest.get_data())
+              if abs(x - edge) < 1e-9}
+    assert joined == {i, j}
+
+
+def test_the_order_is_the_trees_own():
+    from scipy.cluster import hierarchy
+
+    values = np.random.default_rng(4).normal(size=(9, 5))
+    order, drawn = plotting._cluster(values)
+    tree = hierarchy.linkage(values, "average", optimal_ordering=True)
+    assert list(order) == list(hierarchy.leaves_list(tree))
+    assert list(order) == drawn["leaves"]
+
+
+def test_no_tree_without_clustering_or_when_turned_off():
+    figure, info, _ = render(heat_values="z_rows")
+    assert info.heatmap["trees"] == [] and not tree_lines(figure)
+    assert figure.axes[0].get_xlim() == (-0.5, len(SAMPLES) - 0.5)
+    figure, info, _ = render(heat_values="z_rows", heat_cluster="both",
+                             heat_dendrogram=False)
+    assert info.heatmap["trees"] == [] and not tree_lines(figure)
+
+
+def test_a_correlation_matrix_has_one_tree_on_both_sides():
+    figure, info, _ = render(heat_values="correlation", heat_cluster="rows")
+    assert info.heatmap["trees"] == ["rows", "columns"]
+    assert len(tree_lines(figure)) == 2 * (len(SAMPLES) - 1)
+
+
+def test_the_trees_overlap_neither_the_scale_nor_the_names():
+    import io
+
+    figure = Figure(figsize=(4.2, 3.6))
+    plotting.render(figure, spec(heat_values="z_rows", heat_cluster="both"),
+                    EXPR)
+    figure.savefig(io.BytesIO(), format="png")
+    renderer = plotting._renderer(figure)
+    heat, scale = figure.axes[0], figure.axes[1]
+    branches = [line.get_window_extent(renderer)
+                for line in tree_lines(figure)]
+    assert max(b.x1 for b in branches) < scale.get_window_extent(renderer).x0
+    names = [t.get_window_extent(renderer) for t in heat.get_yticklabels()]
+    assert min(b.x0 for b in branches) > max(n.x1 for n in names)
+    whole = figure.bbox
+    assert all(whole.y0 <= b.y0 and b.y1 <= whole.y1 for b in branches)
+    # inside the matrix's own frame: what a composite figure lays out
+    frame = heat.get_window_extent(renderer)
+    assert all(frame.x0 - 1 <= b.x0 and b.x1 <= frame.x1 + 1
+               and frame.y0 - 1 <= b.y0 and b.y1 <= frame.y1 + 1
+               for b in branches)
+
+
+def test_the_tree_checkbox_follows_the_clustering(window):
+    window.load_example("Expression de gènes (carte de chaleur)")
+    inspector = window.inspector
+    assert inspector.chk_heat_tree.isEnabled()      # the example clusters
+    inspector.chk_heat_tree.setChecked(False)
+    assert not window.current_spec().heat_dendrogram
+    inspector.cmb_heat_cluster.setCurrentIndex(
+        inspector.cmb_heat_cluster.findData("none"))
+    assert not inspector.chk_heat_tree.isEnabled()

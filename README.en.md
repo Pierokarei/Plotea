@@ -290,7 +290,8 @@ condition ticked under "Y values" — or, in long format, the rows in
 "Group by" and the columns in "Subgroup". The cells show the values,
 the z-score by row (the usage for gene expression) or by column, or
 Pearson's correlation between columns; rows and columns can be reordered
-by hierarchical clustering to bring similar profiles together. A diverging
+by hierarchical clustering to bring similar profiles together, with
+the clustering trees (dendrograms) drawn along the matrix. A diverging
 scale centred on 0 for centred values, a sequential one otherwise, both
 readable by the colour-blind; missing cells in grey.
 
@@ -459,7 +460,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 694 tests, 5 to 20 minutes depending on the machine
+pytest                      # 702 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```

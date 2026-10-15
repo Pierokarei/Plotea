@@ -161,6 +161,7 @@ class PlotSpec:
     heat_cmap: str = "auto"
     heat_cluster: str = "none"          # none / rows / columns / both
     heat_annotate: bool = False         # write each value in its cell
+    heat_dendrogram: bool = True        # draw the clustering trees
     contingency_test: str = "auto"      # Fisher on 2 x 2, chi-square beyond
 
     bar_width: float = 0.7

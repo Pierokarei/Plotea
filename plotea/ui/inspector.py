@@ -737,6 +737,11 @@ class Inspector(QWidget):
             "heat_annotate")
         self.r_heat_annotate = sec.add_row(tr("Valeurs écrites"),
                                            self.chk_heat_annotate)
+        self.chk_heat_tree = self._bind(
+            QCheckBox(tr("Dessiner les arbres du regroupement")),
+            "heat_dendrogram")
+        self.r_heat_tree = sec.add_row(tr("Dendrogrammes"),
+                                       self.chk_heat_tree)
 
     def _build_agreement_rows(self, sec):
         self.cmb_ba_view = self._bind(QComboBox(), "ba_view")
@@ -960,8 +965,10 @@ class Inspector(QWidget):
         for widget in (self.r_ba_view, self.r_ba_ci):
             self._set_row_visible(widget, t == "bland_altman")
         for widget in (self.r_heat_values, self.r_heat_cmap,
-                       self.r_heat_cluster, self.r_heat_annotate):
+                       self.r_heat_cluster, self.r_heat_annotate,
+                       self.r_heat_tree):
             self._set_row_visible(widget, t == "heatmap")
+        self.chk_heat_tree.setEnabled(self.spec.heat_cluster != "none")
         for widget in (self.r_roc_positive, self.r_roc_youden):
             self._set_row_visible(widget, t == "roc")
         self.hint_roc.setVisible(t == "roc")
