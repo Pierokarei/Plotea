@@ -1880,19 +1880,28 @@ def break_problem(spec: PlotSpec, natural: tuple) -> str:
 
 
 def draw_broken(fig, spec: PlotSpec, df: pd.DataFrame, info: RenderInfo,
-                theme: Theme):
+                theme: Theme, where=None):
     """The plot twice, on two stacked axes that share their X.
 
     The lower part runs up to the start of the cut and carries the X axis;
     the upper part starts at its end and carries what is drawn once - the
     statistics and their brackets, the legend, the title. Each part keeps
     the limit of its far side from the plot's own scaling.
+
+    `where`, a tile of a composite figure, holds the two parts; without
+    it they fill the figure.
     """
     share = min(max(spec.y_break_top, 0.1), 0.9)
-    # no hspace here: tight_layout refuses a grid that sets its own, and
-    # restack() closes the gap once the layout is done
-    top, bottom = fig.subplots(2, 1, sharex=True, gridspec_kw={
-        "height_ratios": [share, 1 - share]})
+    if where is None:
+        # no hspace here: tight_layout refuses a grid that sets its own,
+        # and restack() closes the gap once the layout is done
+        top, bottom = fig.subplots(2, 1, sharex=True, gridspec_kw={
+            "height_ratios": [share, 1 - share]})
+    else:
+        tile = where.subgridspec(2, 1, height_ratios=[share, 1 - share],
+                                 hspace=0.0)
+        top = fig.add_subplot(tile[0])
+        bottom = fig.add_subplot(tile[1], sharex=top)
     lower = spec.clone(spec.name)
     lower.stats_enabled = False
     lower.show_legend = False
@@ -1906,6 +1915,12 @@ def draw_broken(fig, spec: PlotSpec, df: pd.DataFrame, info: RenderInfo,
 
     bottom.set_ylim(bottom.get_ylim()[0], spec.y_break_from)
     top.set_ylim(spec.y_break_to, top.get_ylim()[1])
+    # Each part shows its own range and nothing beyond: a point drawn
+    # unclipped (so that it is not cut in half at an edge) would otherwise
+    # show the low values below the upper part, in the cut.
+    for part in (top, bottom):
+        for artist in [*part.collections, *part.lines, *part.patches]:
+            artist.set_clip_on(True)
     top.spines["bottom"].set_visible(False)
     bottom.spines["top"].set_visible(False)
     top.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
@@ -1947,6 +1962,48 @@ def restack(top, bottom, spec: PlotSpec):
                       upper_height])
     # only the height: matplotlib keeps placing it beside the tick labels
     bottom.yaxis.label.set_y((height / 2) / lower_height)
+
+
+def centre_stacked_title(top, bottom):
+    """The Y title at the middle of both parts together, as laid out now."""
+    lower = bottom.get_position()
+    upper = top.get_position()
+    bottom.yaxis.label.set_y(((upper.y1 + lower.y0) / 2 - lower.y0)
+                             / lower.height)
+
+
+def keep_title_centred(top, bottom):
+    """Centre the Y title again at every drawing, once the layout has run.
+
+    In a composite figure the layout engine stacks the two parts itself:
+    moving them after it (restack, or an axes locator) either comes undone
+    at the next drawing or misleads the engine, whose margins are measured
+    on the axes where it put them. Only the title is left to place.
+
+    The layout engine runs at each drawing, and an export to SVG or PDF
+    measures text a little differently from the screen: the parts move by
+    a pixel or two, and a title centred once would drift with them. An
+    invisible artist of the lower part, drawn before its axes, centres it
+    with the places of that very drawing.
+    """
+    from matplotlib.artist import Artist
+    from matplotlib.transforms import Bbox
+
+    class Recentre(Artist):
+        def draw(self, renderer):
+            centre_stacked_title(top, bottom)
+
+        def get_window_extent(self, renderer=None):
+            return Bbox.null()
+
+        def get_tightbbox(self, renderer=None):
+            return None
+
+    hook = Recentre()
+    hook.set_in_layout(False)
+    hook.set_zorder(-10)                 # before the axis and its title
+    bottom.add_artist(hook)
+    centre_stacked_title(top, bottom)
 
 
 def settle_layout(fig, placed, layout=None):

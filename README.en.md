@@ -65,7 +65,7 @@ any interface text that has no translation.
   fit. A rotation chosen by hand always wins.
 - **Broken Y axis** (Axes section) to show small and very large values
   together: two parts that read as one plot, break marks, statistics and
-  legend drawn once.
+  legend drawn once, composite figures included.
 - **Monochrome mode** (hatching and a grey palette) for black-and-white
   printing.
 - **Dark theme** for the interface; the figure itself always stays on a white
@@ -460,7 +460,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 702 tests, 5 to 20 minutes depending on the machine
+pytest                      # 709 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -482,7 +482,7 @@ pytest -k paired            # a single topic (paired tests)
 | `test_roc.py` | ROC curves: Hanley and McNeil's published area, DeLong, Youden, Wilson, simulated paired test |
 | `test_columns_tables.py` | renamed columns, renamed, copied and deleted tables, examples opening as made |
 | `test_table_switch.py` | each table gets its plot back, table on screen and data the same |
-| `test_broken_axis.py` | broken axis: two parts, one legend, impossible breaks refused |
+| `test_broken_axis.py` | broken axis: two parts, one legend, impossible breaks refused, composite figures |
 | `test_stats_fixes.py` | grouped bars, paired tests, missing values |
 | `test_anova.py` | two-way ANOVA, test choice per family |
 | `test_advanced_stats.py` | Dunnett, repeated-measures ANOVA, outliers |

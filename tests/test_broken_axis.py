@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 from matplotlib.figure import Figure
 
-from plotea.core import plotting
+from plotea.core import demo, plotting
 from plotea.core.panel import Panel, render_panel
 from plotea.core.plotspec import PlotSpec
 
@@ -148,13 +148,124 @@ def test_a_cut_that_cannot_be_made_says_why_and_leaves_the_plot(fields,
     assert any(says in w for w in info.warnings), info.warnings
 
 
-def test_composite_figures_say_the_cut_is_not_carried():
-    specs = {"P": PlotSpec(name="P", plot_type="bar", dataset="D",
-                           group="Groupe", y=["Valeur"], y_break=True,
-                           y_break_from=30.0, y_break_to=180.0)}
-    info = render_panel(Figure(), Panel(name="F", plots=["P"]), specs,
-                        {"D": DATA})
-    assert any("figures composites" in w for w in info.warnings)
+# --------------------------------------------------------------------------
+# In a composite figure
+# --------------------------------------------------------------------------
+def composite(cut=None, **panel_fields):
+    """A cut bar chart, a whole one, and a heat map with its colour bar."""
+    heat = demo.heatmap()
+    cut = {"name": "Coupé", "plot_type": "bar", "dataset": "D",
+           "group": "Groupe", "y": ["Valeur"], "ylabel": "Concentration",
+           "title": "Dosage", "stats_enabled": True, "y_break": True,
+           "y_break_from": 30.0, "y_break_to": 180.0, "y_break_top": 0.35,
+           **(cut or {})}
+    specs = {
+        "Coupé": PlotSpec(**cut),
+        "Entier": PlotSpec(name="Entier", plot_type="bar", dataset="D",
+                           group="Groupe", y=["Valeur"]),
+        "Chaleur": PlotSpec(**{**heat.meta["plot"], "name": "Chaleur",
+                               "dataset": "H"}),
+        "Courbe": PlotSpec(name="Courbe", plot_type="scatter", dataset="D2",
+                           x="t", y=["y"])}
+    frames = {"D": DATA, "H": heat.df,
+              "D2": pd.DataFrame({"t": [1.0, 2, 3], "y": [1.0, 4, 9]})}
+    fields = {"name": "F", "plots": ["Coupé", "Entier", "Chaleur"],
+              "cols": 2, **panel_fields}
+    figure = Figure(figsize=(7, 5))
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        info = render_panel(figure, Panel(**fields), specs, frames)
+        figure.savefig(io.BytesIO(), format="png")
+    collapsed = [w for w in caught if "collapsed" in str(w.message)]
+    return figure, info, collapsed
+
+
+def test_composite_figures_cut_the_axis_too():
+    figure, info, collapsed = composite()
+    assert not collapsed, "la mise en page a renoncé"
+    assert not any("composites" in w for w in info.warnings), info.warnings
+    top, bottom = figure.axes[0], figure.axes[1]
+    assert bottom.get_ylim()[1] == pytest.approx(30.0)
+    assert top.get_ylim()[0] == pytest.approx(180.0)
+    # drawn once, on the upper part: letter, title, brackets
+    assert top.get_title(loc="left") == "A" and top.get_title() == "Dosage"
+    assert any(t.get_text() == "****" for t in top.texts)
+    assert not bottom.get_title(loc="left")
+
+
+def test_in_its_tile_the_parts_stack_with_their_share():
+    figure, _, _ = composite()
+    top, bottom = (ax.get_position() for ax in figure.axes[:2])
+    assert top.x0 == pytest.approx(bottom.x0)
+    assert top.width == pytest.approx(bottom.width)
+    whole = top.y1 - bottom.y0
+    gap = top.y0 - bottom.y1
+    assert 0 < gap < 0.12 * whole                  # a hair apart
+    assert top.height / (top.height + bottom.height) == pytest.approx(
+        0.35, abs=0.01)
+
+
+def test_in_a_composite_the_y_title_is_centred_on_both_parts():
+    figure, _, _ = composite()
+    top, bottom = figure.axes[:2]
+    renderer = plotting._renderer(figure)
+    label = bottom.yaxis.label.get_window_extent(renderer)
+    whole = (top.get_window_extent(renderer).y1
+             + bottom.get_window_extent(renderer).y0) / 2
+    assert (label.y0 + label.y1) / 2 == pytest.approx(whole, abs=2)
+    assert top.get_ylabel() == ""                # written once
+
+
+def test_each_part_hides_what_belongs_to_the_other():
+    """The low groups' points stay out of the upper part - and out of the
+    cut between the two."""
+    figure, _, _ = composite()
+    for part in figure.axes[:2]:
+        assert all(c.get_clip_on() for c in part.collections)
+
+
+def test_the_layout_is_the_same_at_every_drawing():
+    figure, _, _ = composite()
+    def places():
+        return [v for ax in figure.axes for v in ax.get_position().bounds]
+    figure.savefig(io.BytesIO(), format="svg")
+    before = places()
+    figure.savefig(io.BytesIO(), format="svg")
+    assert places() == pytest.approx(before, abs=1e-5)   # sub-pixel
+    # an export measures text its own way and moves the parts a little:
+    # the Y title is centred again on the places of that export
+    top, bottom = (ax.get_position() for ax in figure.axes[:2])
+    centre = ((top.y1 + bottom.y0) / 2 - bottom.y0) / bottom.height
+    assert figure.axes[1].yaxis.label.get_position()[1] == pytest.approx(
+        centre)
+
+
+def test_shared_scales_skip_the_cut_plot():
+    figure, _, collapsed = composite(plots=["Coupé", "Entier", "Courbe"],
+                                     share_x=False, share_y=True)
+    assert not collapsed
+    cut_top, cut_bottom, whole, curve = figure.axes[:4]
+    assert curve.get_shared_y_axes().joined(whole, curve)
+    assert not cut_bottom.get_shared_y_axes().joined(cut_bottom, whole)
+
+
+def test_a_cut_plot_does_not_stretch_the_scale_it_would_share():
+    """Drawn whole first to find where to cut, it must not pull the shared
+    scale of the plots before it up to its own brackets."""
+    alone, _, _ = composite(plots=["Entier", "Courbe"], share_y=True)
+    figure, _, _ = composite(plots=["Entier", "Coupé", "Courbe"],
+                             share_y=True)
+    whole = figure.axes[0]
+    assert whole.get_ylim() == pytest.approx(alone.axes[0].get_ylim())
+
+
+def test_a_cut_that_cannot_be_made_leaves_the_tile_whole():
+    figure, info, _ = composite(cut={"y_break_to": 5000.0})
+    assert any("« Coupé »" in w and "doit tomber entre" in w
+               for w in info.warnings), info.warnings
+    assert len(figure.axes) == 3 + 1         # three tiles + the colour bar
 
 
 def test_the_settings_survive_saving(tmp_path):

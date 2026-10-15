@@ -85,6 +85,27 @@ class PanelInfo:
     missing: list = field(default_factory=list)
 
 
+def _cut(fig, ax, tile, spec, frame, sub, theme):
+    """Redraw a plot with its Y axis cut, in its tile, if it can be.
+
+    The plot was first drawn whole, which gives the natural limits the cut
+    must fall between; when it cannot, the reason joins the warnings and
+    the whole plot stays. Returns the axes that carries the X axis, the
+    upper part hanging from it as `upper_part`.
+    """
+    problem = plotting.break_problem(spec, ax.get_ylim())
+    if problem:
+        sub.warnings.append(f"« {spec.name} » : {problem}")
+        return ax
+    ax.remove()
+    cut = plotting.RenderInfo()
+    top, bottom = plotting.draw_broken(fig, spec, frame, cut, theme,
+                                       where=tile)
+    sub.warnings[:] = cut.warnings
+    bottom.upper_part = top
+    return bottom
+
+
 def render_panel(fig, panel: Panel, specs: dict, frames: dict) -> PanelInfo:
     """Draw `panel` onto `fig`.
 
@@ -132,24 +153,29 @@ def render_panel(fig, panel: Panel, specs: dict, frames: dict) -> PanelInfo:
             break
         theme = get_theme(spec.theme)
         with mpl.rc_context(theme.rc()):
+            # a cut axis is two axes of its own: it neither lends nor
+            # borrows a shared scale
             shared = {}
-            if first is not None:
+            if first is not None and not spec.y_break:
                 if panel.share_x:
                     shared["sharex"] = first
                 if panel.share_y:
                     shared["sharey"] = first
+            frame = frames.get(spec.dataset)
             ax = fig.add_subplot(gs[row, col], **shared)
-            first = first or ax
-            placed.append((ax, spec))
-            sub = plotting.draw_into(ax, spec, frames.get(spec.dataset))
+            sub = plotting.draw_into(ax, spec, frame)
             if spec.y_break:
-                info.warnings.append(tr(
-                    "« {name} » : l'axe interrompu n'est pas encore repris "
-                    "dans les figures composites.").format(name=spec.name))
+                ax = _cut(fig, ax, gs[row, col], spec, frame, sub, theme)
+            else:
+                first = first or ax
+            placed.append((ax, spec))
             info.warnings.extend(sub.warnings)
             if panel.letters != "none":
-                ax.set_title(letter_for(index, panel.letters), loc="left",
-                             fontweight="bold", fontsize=panel.letter_size)
+                # on the upper part of a cut axis: the top of the tile
+                lettered = getattr(ax, "upper_part", ax)
+                lettered.set_title(letter_for(index, panel.letters),
+                                   loc="left", fontweight="bold",
+                                   fontsize=panel.letter_size)
             info.drawn += 1
     # each panel's names fitted to the room its tile actually got
     try:
@@ -159,4 +185,7 @@ def render_panel(fig, panel: Panel, specs: dict, frames: dict) -> PanelInfo:
                                    layout=lambda: engine.execute(fig))
     except Exception:
         pass
+    for ax, _spec in placed:
+        if hasattr(ax, "upper_part"):
+            plotting.keep_title_centred(ax.upper_part, ax)
     return info

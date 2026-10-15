@@ -838,7 +838,6 @@
  "{w:.0f} x {h:.0f} mm   |   {count} panneau(x)   |   zoom {zoom:.0f} %": "{w:.0f} x {h:.0f} mm   |   {count} panel(s)   |   zoom {zoom:.0f} %",
  "{what} : F({num}, {den}) = {F:.3g}, {p}": "{what}: F({num}, {den}) = {F:.3g}, {p}",
  "« {name} »": "“{name}”",
- "« {name} » : l'axe interrompu n'est pas encore repris dans les figures composites.": "“{name}”: the broken axis is not yet carried into composite figures.",
  "« {table} » : Plotea ne trace pas encore les tableaux de type {kind} ; les données sont importées telles quelles.": "“{table}”: Plotea cannot plot {kind} tables yet; the data are imported as they are.",
  "« {table} » : Prism y stocke des moyennes et des écarts déjà calculés. Ils sont importés, mais Plotea ne trace des barres d'erreur à partir de résumés que sur les courbes.": "“{table}”: Prism stores means and errors already computed there. They are imported, but Plotea draws error bars from summaries on curves only.",
  "« {table} » : {count} cellule(s) non numérique(s) ignorée(s).": "“{table}”: {count} non-numeric cell(s) ignored.",
