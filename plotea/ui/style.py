@@ -321,6 +321,11 @@ QToolTip {{
     padding: 5px 8px;
 }}
 QLabel[hint="true"] {{ color: {c['text_dim']}; font-size: 11px; }}
+QFrame[banner="true"] {{
+    background: {c['accent_soft']};
+    border-bottom: 1px solid {c['border']};
+}}
+QFrame[banner="true"] QLabel {{ color: {c['text']}; }}
 QLabel[section="true"] {{
     color: {c['text_dim']};
     font-size: 11px;

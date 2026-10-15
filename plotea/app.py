@@ -110,7 +110,23 @@ def selftest_report(app: QApplication, window) -> list[str]:
     lines.append(f"langue : {i18n.language()} - traductions "
                  + ", ".join(loaded))
     lines.append(f"import Prism : {_prism_selftest()}")
+    lines.append(f"certificats : {_certificates_selftest()}")
     return lines
+
+
+def _certificates_selftest() -> str:
+    """The update check verifies GitHub's certificate against certifi's
+    roots: a build that lost them would fail every check, silently.
+    Nothing is asked of the network here."""
+    try:
+        import certifi
+
+        from .core import updates
+        updates._context()
+        path = certifi.where()
+        return "ok" if os.path.getsize(path) > 10_000 else "VIDES"
+    except Exception as exc:
+        return f"PERDUS ({type(exc).__name__}: {exc})"
 
 
 def _prism_selftest() -> str:
@@ -283,16 +299,26 @@ def main(argv: list[str] | None = None) -> int:
         # Smoke test for packaged builds: prove the app starts, then leave
         # without entering the event loop.
         app.processEvents()
-        for line in selftest_report(app, window):
+        report = selftest_report(app, window)
+        for line in report:
             print(line)
         window.project.dirty = False
         window.close()
         tear_down(app, window)
+        # said out loud is not enough: the release workflow reads the exit
+        # code, and an archive that lost a part must not be published
+        lost = [line for line in report if "PERDU" in line or "VIDE" in line]
+        if lost:
+            print(f"{APP_NAME} {VERSION} : parties perdues - "
+                  + " ; ".join(lost))
+            return 1
         print(f"{APP_NAME} {VERSION} démarré correctement")
         return 0
 
     offer_recovery(window)
     open_arguments(window, argv)
+    # here, not in the window: tests and the self-test never ask the network
+    window.updates.on_startup()
     code = app.exec()
     tear_down(app, window)
     return code

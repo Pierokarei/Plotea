@@ -186,6 +186,16 @@ python -m plotea
 
 ---
 
+### Nouvelles versions
+
+Au premier lancement, un bandeau propose de vérifier une fois par jour s'il
+existe une nouvelle version. Rien ne se fait sans votre accord, et rien
+d'autre n'est envoyé qu'une simple demande à GitHub, la liste publique des
+versions ; rien n'est téléchargé ni installé sans vous. Une version qui
+corrige des calculs pouvant changer des résultats le signale. Menu
+**Aide → Rechercher une mise à jour** à tout moment ; la vérification
+quotidienne s'active et se coupe dans le même menu.
+
 ## Prise en main
 
 1. **Fichier ▸ Jeux de données d'exemple** charge un jeu prêt à tracer, ou
@@ -475,7 +485,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 709 tests, 5 à 20 minutes selon la machine
+pytest                      # 726 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -510,6 +520,7 @@ pytest -k paired            # un seul sujet (les tests appariés)
 | `test_project_files.py` | ouverture et enregistrement des projets |
 | `test_recovery.py` | copie de secours, abandons protégés, projets récents |
 | `test_session.py` | icône, disposition mémorisée, dernier dossier |
+| `test_updates.py` | nouvelles versions : accord demandé d'abord, une fois par jour, jamais de réseau dans les tests |
 | `test_startup.py` | démarrage de l'application, arguments, auto-test |
 | `test_window_actions.py` | actions de la fenêtre : graphiques, onglets, export, styles |
 | `test_debt.py` | clés vs libellés, journal d'erreurs, gros volumes |

@@ -53,6 +53,7 @@ from .projects import ProjectFiles
 from .session import SessionMemory
 from .stats_view import StatsPanel
 from .style import build_qss, palette_colors
+from .updates import Banner, UpdateNotifier
 from .widgets import refresh_icons, set_icon_color, tag_icon
 
 APP_NAME = "Plotea"
@@ -92,6 +93,7 @@ class MainWindow(QMainWindow):
                             | QMainWindow.DockOption.AnimatedDocks)
 
         self._build_central()
+        self.updates = UpdateNotifier(self, self.update_banner)
         self._build_docks()
         self._build_actions()
         self._build_menus()
@@ -154,10 +156,13 @@ class MainWindow(QMainWindow):
         bl.addWidget(self.cmb_theme_quick)
 
         self.canvas = PlotCanvas()
+        # a newer version, or the question whether to look for one
+        self.update_banner = Banner()
         central = QWidget()
         lay = QVBoxLayout(central)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
+        lay.addWidget(self.update_banner)
         lay.addWidget(bar)
         lay.addWidget(self.canvas, 1)
         self.setCentralWidget(central)
@@ -312,6 +317,14 @@ class MainWindow(QMainWindow):
         self.a_log = self._act(tr("Journal des erreurs..."), self.show_log)
         self.a_about = self._act(tr("À propos"), self.show_about)
         self.a_shortcuts = self._act(tr("Raccourcis clavier"), self.show_shortcuts)
+        self.a_check_updates = self._act(
+            tr("Rechercher une mise à jour..."),
+            lambda: self.updates.check(manual=True))
+        self.a_auto_updates = self._act(
+            tr("Vérifier chaque jour s'il existe une nouvelle version"),
+            lambda: self.updates.set_allowed(self.a_auto_updates.isChecked()))
+        self.a_auto_updates.setCheckable(True)
+        self.a_auto_updates.setChecked(bool(self.memory.update_checks()))
 
     def _build_menus(self):
         mb = self.menuBar()
@@ -394,6 +407,10 @@ class MainWindow(QMainWindow):
         m_help = mb.addMenu(tr("&Aide"))
         m_help.addAction(self.a_shortcuts)
         m_help.addAction(self.a_log)
+        m_help.addSeparator()
+        m_help.addAction(self.a_check_updates)
+        m_help.addAction(self.a_auto_updates)
+        m_help.addSeparator()
         m_help.addAction(self.a_about)
 
     def _build_toolbar(self):

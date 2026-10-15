@@ -135,6 +135,23 @@ def test_the_self_test_reports_and_returns(monkeypatch, capsys):
             widget.hide()
 
 
+def test_a_lost_part_fails_the_self_test(monkeypatch, capsys):
+    """The release workflow reads the exit code: printing is not enough."""
+    monkeypatch.setenv("PLOTEA_SELFTEST", "1")
+    monkeypatch.setattr(app_mod, "_certificates_selftest",
+                        lambda: "PERDUS (ImportError: certifi)")
+    assert app_mod.main(["plotea"]) == 1
+    printed = capsys.readouterr().out
+    assert "parties perdues" in printed and "certifi" in printed
+    assert "démarré correctement" not in printed
+
+
+def test_the_self_test_checks_the_certificates(monkeypatch, capsys):
+    monkeypatch.setenv("PLOTEA_SELFTEST", "1")
+    assert app_mod.main(["plotea"]) == 0
+    assert "certificats : ok" in capsys.readouterr().out
+
+
 def test_the_config_folder_can_be_moved(tmp_path, monkeypatch):
     """A portable install, and the reason a test run touches nothing real."""
     from plotea.core.project import config_dir

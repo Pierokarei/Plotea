@@ -27,6 +27,7 @@ dependencies = [
     "numpy>=1.24",
     "scipy>=1.10",
     "openpyxl>=3.1",
+    "certifi>=2023.7",          # root certificates for the update check
 ]
 
 [project.optional-dependencies]

@@ -177,6 +177,15 @@ python -m plotea
 
 ---
 
+### New versions
+
+On first launch, a banner offers to check once a day whether a new
+version exists. Nothing happens without your consent, and nothing is sent
+but a simple request to GitHub for the public list of versions; nothing is
+downloaded or installed without you. A version that fixes calculations
+which may change results says so. **Help → Check for updates** at any
+time; the daily check is turned on and off in the same menu.
+
 ## Getting started
 
 1. **File ▸ Example datasets** loads a dataset ready to plot, or
@@ -460,7 +469,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 709 tests, 5 to 20 minutes depending on the machine
+pytest                      # 726 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -495,6 +504,7 @@ pytest -k paired            # a single topic (paired tests)
 | `test_project_files.py` | opening and saving projects |
 | `test_recovery.py` | backup copy, guarded discards, recent projects |
 | `test_session.py` | icon, remembered layout, last folder |
+| `test_updates.py` | new versions: consent asked first, once a day, never the network in tests |
 | `test_startup.py` | application startup, arguments, self-test |
 | `test_window_actions.py` | window actions: plots, tabs, export, styles |
 | `test_debt.py` | keys vs labels, error log, large volumes |

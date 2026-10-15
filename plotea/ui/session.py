@@ -80,6 +80,27 @@ class SessionMemory:
         """Only those still on disk: files come and go behind our back."""
         return [p for p in self.recent_projects() if os.path.exists(p)]
 
+    # -- new versions ---------------------------------------------------
+    def update_checks(self) -> bool | None:
+        """Whether Plotea may look for a newer version; None until asked."""
+        value = self.settings.value("updateChecks", "", type=str)
+        return {"yes": True, "no": False}.get(value)
+
+    def remember_update_checks(self, allowed: bool):
+        self.settings.setValue("updateChecks", "yes" if allowed else "no")
+
+    def last_update_check(self) -> float:
+        return self.settings.value("lastUpdateCheck", 0.0, type=float)
+
+    def remember_update_check(self, when: float):
+        self.settings.setValue("lastUpdateCheck", float(when))
+
+    def skipped_version(self) -> str:
+        return self.settings.value("skippedVersion", "", type=str) or ""
+
+    def skip_version(self, version: str):
+        self.settings.setValue("skippedVersion", version)
+
     # -- last folder ----------------------------------------------------
     def last_dir(self) -> str:
         """Folder of the last file opened or written, for the next dialog."""
