@@ -35,7 +35,7 @@ any interface text that has no translation.
 | | |
 |---|---|
 | **Import** | CSV, TSV, TXT (separator and decimal mark detected), multi-sheet Excel `.xlsx` / `.xlsm` / `.xls`, paste from Excel, **GraphPad Prism `.pzfx` files** |
-| **Plot types** | line, scatter, histogram, box plot, violin plot, bars with error bars (simple, and grouped with two factors), **Kaplan-Meier survival curves**, **contingency tables** (bars stacked in percentages or counts), **paired before-after** (one line per subject), **Bland-Altman** (agreement of two measurement methods), **heat maps** (values, z-scores, correlation matrix, hierarchical clustering) |
+| **Plot types** | line, scatter, histogram, box plot, violin plot, bars with error bars (simple, and grouped with two factors), **Kaplan-Meier survival curves**, **contingency tables** (bars stacked in percentages or counts), **paired before-after** (one line per subject), **Bland-Altman** (agreement of two measurement methods), **heat maps** (values, z-scores, correlation matrix, hierarchical clustering), **ROC curves** (DeLong's area under the curve, optimal cut-off, markers compared) |
 | **Themes** | Nature, Science, Cell, PNAS, Minimal, Grayscale: typography, column width and palette that follow each journal's author guidelines |
 | **Export** | SVG, PDF, EPS (vector, editable text) · PNG, TIFF, JPEG up to 1200 dpi (600 dpi by default) |
 | **Statistics** | Student's / Welch's / paired t-test, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs control**, **repeated-measures ANOVA** (with Greenhouse-Geisser correction), **log-rank** on survival curves, **Fisher's exact test and chi-square** (with or without Yates' correction) on contingency tables, with odds ratio, relative risk and Cramér's V; Bonferroni / Holm / FDR corrections; **outlier detection (Grubbs)**; automatic significance bars, including on bars grouped by two factors |
@@ -304,6 +304,42 @@ same curve with this parameter shared fit clearly worse? It is computed on
 every replicate, and the result shows on the figure and in the Fits tab,
 with each series' value and the shared one.
 
+### Standard curve assays
+
+ELISA, Bradford, BCA, qPCR: standards and samples in one XY table, as in
+Prism — the standards' concentration in X, **the samples' X left empty**.
+Choose a model (4PL, straight line…) under Curve fit and tick **Quantify
+unknowns**; two optional columns give the sample names and their dilution
+factor. Replicates of a sample are averaged, the concentration read off the
+curve, then multiplied by the dilution, with its 95 % CI (where the signal
+meets the confidence band of the curve). Nothing is extrapolated: a sample
+beyond the standards is reported "Above the range (> 1000)" or "Below the
+range (< 7.8)". Results in the **Assay** tab; example "ELISA assay
+(standard curve)".
+
+### Area under the curve
+
+On a curve, the **Area under the curve** section computes the area by the
+trapezoidal rule from Y = 0, the first value of each curve (the incremental
+area of a glucose tolerance test) or a fixed value: net area, area above
+and below the baseline, peak (Cmax, Tmax), Bailer's standard error and
+95 % CI. With a subject column (a mouse, a patient), each gets its own
+area, and **Compare areas between groups** turns them into a table and a
+bar chart with its tests: groups compared on the subjects' areas, as they
+should be. Example "Glucose tolerance".
+
+### ROC curves
+
+A diagnosis column with two values (diseased / healthy) and one column per
+marker — or, as in Prism, two columns of values: the healthy, then the
+diseased. The **ROC** plot draws sensitivity against 100 % − specificity;
+the **ROC** tab gives the area under the curve with its 95 % CI (DeLong)
+and its P value against 0.5, the optimal cut-off (Youden's index) with
+sensitivity and specificity and their Wilson intervals. A marker lower in
+the diseased is recognised and read the other way round ("< 39.6").
+Markers measured on the same patients are compared with DeLong's test for
+paired curves. Example "Diagnostic biomarkers".
+
 ### Two-factor designs
 
 With a **Group by** column and a **Subgroup** column, Plotea compares the
@@ -423,7 +459,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 673 tests, 5 to 20 minutes depending on the machine
+pytest                      # 694 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -440,6 +476,11 @@ pytest -k paired            # a single topic (paired tests)
 | `test_paired.py` | before-after: one line per subject, paired test chosen on the differences |
 | `test_bland_altman.py` | Bland-Altman: the bias and limits of the 1986 paper recovered |
 | `test_heatmap.py` | heat maps: z-scores, correlation, clustering, colour scales |
+| `test_standard_curve.py` | standard curve assays: 4PL solved by hand, the textbook inverse prediction interval, dilutions, out of range |
+| `test_auc.py` | area under the curve: trapezoids, baseline crossings, Bailer's error, simulated coverage |
+| `test_roc.py` | ROC curves: Hanley and McNeil's published area, DeLong, Youden, Wilson, simulated paired test |
+| `test_columns_tables.py` | renamed columns, renamed, copied and deleted tables, examples opening as made |
+| `test_table_switch.py` | each table gets its plot back, table on screen and data the same |
 | `test_broken_axis.py` | broken axis: two parts, one legend, impossible breaks refused |
 | `test_stats_fixes.py` | grouped bars, paired tests, missing values |
 | `test_anova.py` | two-way ANOVA, test choice per family |

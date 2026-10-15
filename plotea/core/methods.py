@@ -89,6 +89,19 @@ PHRASES = {
                   " samples outside the range of the standards were "
                   "reported as such, without extrapolation."),
         "assay_dilution": ", then multiplied by the dilution factor",
+        "roc": ("The ability of {markers} to distinguish “{positive}” "
+                "({n_pos}) from “{negative}” ({n_neg}) subjects was assessed "
+                "with ROC curves; areas under the curves are given with 95% "
+                "confidence intervals by DeLong's method and tested against "
+                "0.5."),
+        "roc_lower": ("For {markers}, lower in “{positive}” subjects, "
+                      "values were read in reverse."),
+        "roc_cut": ("Optimal cut-offs maximise Youden's index; sensitivity "
+                    "and specificity are given with Wilson score intervals."),
+        "roc_compare": ("Areas under the curves of markers measured on the "
+                        "same subjects were compared with DeLong's test for "
+                        "correlated ROC curves{correction}."),
+        "roc_correction": ", P values being adjusted by the {method} method",
         "auc": ("Areas under the curves were computed by the trapezoidal "
                 "rule from {base}{per}."),
         "auc_zero": "Y = 0",
@@ -224,6 +237,23 @@ PHRASES = {
                   "gamme des étalons ont été signalés comme tels, sans "
                   "extrapolation."),
         "assay_dilution": ", puis multipliée par le facteur de dilution",
+        "roc": ("La capacité de {markers} à distinguer les sujets "
+                "« {positive} » ({n_pos}) des sujets « {negative} » "
+                "({n_neg}) a été "
+                "évaluée par des courbes ROC ; les aires sous les courbes "
+                "sont données avec leur intervalle de confiance à 95 % par "
+                "la méthode de DeLong et comparées à 0,5."),
+        "roc_lower": ("Pour {markers}, plus faibles chez les sujets "
+                      "« {positive} », les valeurs ont été lues en sens "
+                      "inverse."),
+        "roc_cut": ("Les seuils optimaux maximisent l'indice de Youden ; "
+                    "sensibilité et spécificité sont données avec leur "
+                    "intervalle de Wilson."),
+        "roc_compare": ("Les aires sous les courbes des marqueurs mesurés "
+                        "sur les mêmes sujets ont été comparées par le test "
+                        "de DeLong pour courbes ROC appariées{correction}."),
+        "roc_correction": (", les valeurs de p étant ajustées par la méthode "
+                           "de {method}"),
         "auc": ("Les aires sous les courbes ont été calculées par la "
                 "méthode des trapèzes à partir de {base}{per}."),
         "auc_zero": "Y = 0",
@@ -578,6 +608,32 @@ def _heatmap(spec, info, say) -> list[str]:
     return out
 
 
+def _roc(spec, info, say) -> list[str]:
+    rows = list(getattr(info, "rocs", []) or [])
+    classes = list(getattr(info, "roc_classes", []) or [])
+    if not rows or len(classes) != 2:
+        return []
+    negative, positive = classes
+    out = [say["roc"].format(
+        markers=_join([r["Marqueur"] for r in rows], say["and"]),
+        positive=positive, negative=negative, n_pos=rows[0]["n positifs"],
+        n_neg=rows[0]["n négatifs"])]
+    lower = [r["Marqueur"] for r in rows
+             if str(r["Seuil optimal"]).startswith("<")]
+    if lower:
+        out.append(say["roc_lower"].format(
+            markers=_join(lower, say["and"]), positive=positive))
+    if spec.roc_youden:
+        out.append(say["roc_cut"])
+    if info.comparisons:
+        method = spec.stats_correction
+        correction = (say["roc_correction"].format(method=say[method])
+                      if len(info.comparisons) > 1
+                      and method in ("holm", "bonferroni", "fdr_bh") else "")
+        out.append(say["roc_compare"].format(correction=correction))
+    return out
+
+
 def methods_text(spec, info, language: str = "en") -> str:
     """The paragraph for one figure, in "en" or "fr"."""
     language = language if language in LANGUAGES else "en"
@@ -595,6 +651,8 @@ def methods_text(spec, info, language: str = "en") -> str:
         sentences = _heatmap(spec, info, say)
     elif spec.plot_type in ("line", "scatter"):
         sentences = _xy(spec, info, say, language)
+    elif spec.plot_type == "roc":
+        sentences = _roc(spec, info, say)
     else:
         sentences = []
     sentences.append(say["software"].format(**_versions()))

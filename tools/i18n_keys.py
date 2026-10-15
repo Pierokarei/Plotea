@@ -177,6 +177,13 @@ def runtime_keys() -> set[str]:
         info = plotting.render(Figure(), spec, tolerance.df)
         for row in info.aucs:
             keys.update(k for k in row if k not in (spec.group, subject))
+    # ROC: the ROC tab's headers
+    markers = demo.diagnostic()
+    info = plotting.render(Figure(), PlotSpec(**markers.meta["plot"]),
+                           markers.df)
+    for row in info.rocs:
+        keys.update(row)
+    keys.update(c.test for c in info.comparisons)
 
     # interface tables
     from plotea.ui.dialogs import SEPARATORS

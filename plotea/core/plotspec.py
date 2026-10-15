@@ -32,7 +32,8 @@ _OWN_FIELDS = {"name", "dataset", "per_table", "dpi_preview", "notes"}
 COLUMN_FIELDS = ("x", "group", "subgroup", "event_col", "stats_pair_by",
                  "interp_label", "interp_factor", "auc_subject")
 COLUMN_LISTS = ("y", "error_cols")
-_NAMED_AFTER_COLUMNS = ("xlabel", "ylabel", "legend_title", "fit_compare")
+_NAMED_AFTER_COLUMNS = ("xlabel", "ylabel", "legend_title", "fit_compare",
+                        "roc_positive")
 
 
 def _rename_in(settings: dict, old: str, new: str):
@@ -187,6 +188,10 @@ class PlotSpec:
     interpolate: bool = False
     interp_label: str = ""          # column naming the unknowns
     interp_factor: str = ""         # column of dilution factors
+    # ROC curve: which class is the diseased one (a level of the group
+    # column, or a column of a two-column table); "" takes the second
+    roc_positive: str = ""
+    roc_youden: bool = True         # mark the optimal cut-off
     # area under the curve, by trapezoids, from a baseline
     auc: bool = False
     auc_baseline: str = "zero"      # zero / first value / a fixed value

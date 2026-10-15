@@ -40,7 +40,7 @@ tout texte d'interface sans traduction.
 | | |
 |---|---|
 | **Import** | CSV, TSV, TXT (séparateur et décimale détectés), Excel `.xlsx` / `.xlsm` / `.xls` multi-feuilles, collage depuis Excel, **fichiers GraphPad Prism `.pzfx`** |
-| **Types de graphiques** | courbes, nuages de points, histogrammes, boxplots, violin plots, barres avec erreurs (simples et groupées à deux facteurs), **courbes de survie Kaplan-Meier**, **tableaux de contingence** (barres empilées en pourcentages ou en effectifs), **avant/après apparié** (une ligne par sujet), **Bland-Altman** (concordance de deux méthodes de mesure), **cartes de chaleur** (valeurs, scores z, matrice de corrélation, classification hiérarchique) |
+| **Types de graphiques** | courbes, nuages de points, histogrammes, boxplots, violin plots, barres avec erreurs (simples et groupées à deux facteurs), **courbes de survie Kaplan-Meier**, **tableaux de contingence** (barres empilées en pourcentages ou en effectifs), **avant/après apparié** (une ligne par sujet), **Bland-Altman** (concordance de deux méthodes de mesure), **cartes de chaleur** (valeurs, scores z, matrice de corrélation, classification hiérarchique), **courbes ROC** (aire sous la courbe de DeLong, seuil optimal, comparaison de marqueurs) |
 | **Thématiques** | Nature, Science, Cell, PNAS, Minimal, Grayscale — typographie, largeur de colonne et palette conformes aux instructions aux auteurs |
 | **Export** | SVG, PDF, EPS (vectoriels, texte éditable) · PNG, TIFF, JPEG jusqu'à 1200 dpi (600 dpi par défaut) |
 | **Statistiques** | t de Student / Welch / apparié, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs contrôle**, **ANOVA à mesures répétées** (avec correction de Greenhouse-Geisser), **log-rank** sur les courbes de survie, **test exact de Fisher et khi²** (avec ou sans correction de Yates) sur les tableaux de contingence, avec odds ratio, risque relatif et V de Cramér ; corrections Bonferroni / Holm / FDR ; **détection de valeurs aberrantes (Grubbs)** ; barres de significativité automatiques, y compris sur les barres groupées à deux facteurs |
@@ -321,6 +321,44 @@ paramètre commun s'ajuste-t-elle nettement moins bien ? Il est calculé sur
 chaque réplicat, et le résultat s'affiche sur la figure et dans l'onglet
 Ajustements, avec la valeur de chaque série et la valeur commune.
 
+### Dosage sur gamme étalon
+
+ELISA, Bradford, BCA, qPCR : étalons et échantillons dans la même table XY,
+comme dans Prism — la concentration des étalons en X, **la colonne X des
+échantillons laissée vide**. Choisissez un modèle (4PL, droite…) dans
+Ajustement de courbe et cochez **Doser les inconnues** ; deux colonnes
+facultatives donnent le nom des échantillons et leur facteur de dilution.
+Les réplicats d'un échantillon sont moyennés, la concentration lue sur la
+courbe puis multipliée par la dilution, avec son IC 95 % (là où le signal
+rencontre la bande de confiance de la courbe). Rien n'est extrapolé : un
+échantillon au-delà des étalons est rapporté « Au-dessus de la gamme
+(> 1000) » ou « Sous la gamme (< 7.8) ». Résultats dans l'onglet **Dosage** ;
+exemple « Dosage ELISA (gamme étalon) ».
+
+### Aire sous la courbe
+
+Sur une courbe, la section **Aire sous la courbe** calcule l'aire par la
+méthode des trapèzes depuis Y = 0, la première valeur de chaque courbe
+(aire incrémentale d'un test de tolérance au glucose) ou une valeur fixée :
+aire nette, au-dessus et au-dessous de la ligne de base, pic (Cmax, Tmax),
+erreur type de Bailer et IC 95 %. Avec une colonne de sujets (une souris,
+un patient), chacun a son aire, et **Comparer les aires entre groupes** en
+fait une table et un graphique en barres avec ses tests : les groupes
+comparés sur les aires des sujets, comme il se doit. Exemple « Tolérance au
+glucose ».
+
+### Courbes ROC
+
+Une colonne de diagnostic à deux valeurs (malade / sain) et une colonne par
+marqueur — ou, comme dans Prism, deux colonnes de valeurs : les sains, puis
+les malades. Le graphique **ROC** trace la sensibilité contre 100 % −
+spécificité ; l'onglet **ROC** donne l'aire sous la courbe avec son IC 95 %
+(DeLong) et sa p contre 0,5, le seuil optimal (indice de Youden) avec
+sensibilité et spécificité et leurs intervalles de Wilson. Un marqueur plus
+bas chez les malades est reconnu et lu à l'envers (« < 39,6 »). Des
+marqueurs mesurés sur les mêmes patients sont comparés par le test de
+DeLong pour courbes appariées. Exemple « Biomarqueurs diagnostiques ».
+
 ### Plans à deux facteurs
 
 Avec une colonne **Grouper par** et une colonne **Sous-groupe**, Plotea compare
@@ -435,7 +473,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 673 tests, 5 à 20 minutes selon la machine
+pytest                      # 694 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -452,6 +490,11 @@ pytest -k paired            # un seul sujet (les tests appariés)
 | `test_paired.py` | avant/après : une ligne par sujet, test apparié choisi sur les différences |
 | `test_bland_altman.py` | Bland-Altman : biais et limites de l'article de 1986 retrouvés |
 | `test_heatmap.py` | cartes de chaleur : scores z, corrélation, regroupement, échelles |
+| `test_standard_curve.py` | dosage sur gamme étalon : 4PL résolu à la main, intervalle de prédiction inverse classique, dilutions, hors gamme |
+| `test_auc.py` | aire sous la courbe : trapèzes, croisements de la ligne de base, erreur de Bailer, couverture simulée |
+| `test_roc.py` | courbes ROC : aire publiée de Hanley et McNeil, DeLong, Youden, Wilson, test apparié simulé |
+| `test_columns_tables.py` | colonnes renommées, tables renommées, dupliquées, supprimées, exemples ouverts comme prévu |
+| `test_table_switch.py` | chaque table retrouve son graphique, tableau affiché et données identiques |
 | `test_broken_axis.py` | axe interrompu : deux parties, une seule légende, coupures impossibles refusées |
 | `test_stats_fixes.py` | barres groupées, tests appariés, valeurs manquantes |
 | `test_anova.py` | ANOVA à deux facteurs, choix de test par famille |

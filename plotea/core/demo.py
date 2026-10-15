@@ -244,6 +244,36 @@ def glucose_tolerance(seed: int = 12) -> Dataset:
                      ylabel=glucose)
 
 
+def diagnostic(seed: int = 23) -> Dataset:
+    """Three blood markers in 60 patients with the disease and 70 without.
+
+    Troponin separates them well, CRP less so; albumin falls with the
+    disease - a marker read the other way round. All three were measured
+    on the same patients, so their curves can be compared.
+    """
+    rng = np.random.default_rng(seed)
+    status, troponin = tr("Diagnostic"), tr("Troponine (ng/L)")
+    crp, albumin = tr("CRP (mg/L)"), tr("Albumine (g/L)")
+    rows = []
+    for label, sick, count in ((tr("Sain"), 0, 70), (tr("Malade"), 1, 60)):
+        for _ in range(count):
+            shared = rng.normal()                  # how ill, roughly
+            log_tn = 2.0 + 1.25 * sick + 0.6 * (0.7 * shared
+                                                + 0.71 * rng.normal())
+            log_crp = 1.5 + 0.7 * sick + 0.9 * (0.5 * shared
+                                                + 0.87 * rng.normal())
+            rows.append({
+                status: label,
+                troponin: round(float(np.exp(log_tn)), 1),
+                crp: round(float(np.exp(log_crp)), 1),
+                albumin: round(float(42.0 - 4.5 * sick
+                                     + 4.5 * rng.normal()), 1)})
+    return _shown_as(Dataset(tr("Biomarqueurs diagnostiques"),
+                             pd.DataFrame(rows)),
+                     plot_type="roc", group=status,
+                     y=[troponin, crp, albumin], roc_positive=tr("Malade"))
+
+
 #: Peak expiratory flow rate (l/min) of 17 subjects, first reading on each
 #: meter: Bland JM, Altman DG. Statistical methods for assessing agreement
 #: between two methods of clinical measurement. Lancet 1986;i:307-310,
@@ -300,6 +330,7 @@ EXAMPLES = {
     "Dose-réponse (fit 4PL)": dose_response,
     "Dosage ELISA (gamme étalon)": standard_curve,
     "Tolérance au glucose (aire sous la courbe)": glucose_tolerance,
+    "Biomarqueurs diagnostiques (courbes ROC)": diagnostic,
     "Expression génique (violin/histogramme)": expression,
     "Corrélation (nuage + régression)": correlation,
     "Plan à deux facteurs (barres groupées)": two_factor,

@@ -101,6 +101,7 @@ PLOT_TYPE = Enum("plot_type", [
     ("paired", "Avant/après apparié"),
     ("bland_altman", "Bland-Altman (concordance)"),
     ("heatmap", "Carte de chaleur"),
+    ("roc", "Courbe ROC (diagnostic)"),
 ])
 
 #: What the cells of a heat map show.

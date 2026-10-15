@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from ..i18n import tr
-from . import auc, diagnostics, fitting
+from . import auc, diagnostics, fitting, roc
 from . import stats as st
 from .plotspec import PlotSpec
 from .themes import HATCHES, Theme, color_cycle, get_theme
@@ -44,6 +44,8 @@ class RenderInfo:
     fit_comparison: object = None                  # fitting.FitComparison
     interpolations: list = field(default_factory=list)  # standard curve
     aucs: list = field(default_factory=list)        # area under the curve
+    rocs: list = field(default_factory=list)        # ROC table
+    roc_classes: list = field(default_factory=list)  # negative, positive
     test_used: str = ""          # the test that ran ("auto" resolved)
     subjects: int = 0            # before-after: subjects drawn as lines
     agreement: list = field(default_factory=list)   # Bland-Altman rows
@@ -1258,6 +1260,130 @@ def draw_paired(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
     return positions, tops
 
 
+def roc_markers(df: pd.DataFrame, spec: PlotSpec):
+    """((negative, positive), {marker: frame of status + value}, problem).
+
+    Long format: a two-level status column, one column per marker - the
+    markers then come from the same subjects and can be compared. Prism's
+    layout: two columns of values, the healthy and the diseased, one
+    marker.
+    """
+    if spec.group and spec.group in df.columns:
+        status = df[spec.group]
+        levels = [str(v) for v in pd.unique(status.dropna())]
+        if len(levels) != 2:
+            return None, {}, tr(
+                "Une courbe ROC compare deux classes : la colonne « {name} » "
+                "en a {count}.").format(name=spec.group, count=len(levels))
+        positive = (spec.roc_positive if spec.roc_positive in levels
+                    else levels[1])
+        negative = levels[0] if positive == levels[1] else levels[1]
+        sick = (status.astype(str) == positive).to_numpy()
+        known = status.notna().to_numpy()
+        markers = {col: (sick[known], _num(df[col])[known])
+                   for col in spec.y if col in df.columns}
+        return (negative, positive), markers, ""
+    columns = [c for c in spec.y if c in df.columns]
+    if len(columns) != 2:
+        return None, {}, tr(
+            "Une courbe ROC demande une colonne de classes (malade / sain) "
+            "et les marqueurs, ou deux colonnes de valeurs : les sains, "
+            "puis les malades.")
+    positive = (spec.roc_positive if spec.roc_positive in columns
+                else columns[1])
+    negative = columns[0] if positive == columns[1] else columns[1]
+    values = np.concatenate([_num(df[negative]), _num(df[positive])])
+    sick = np.repeat([False, True], len(df))
+    name = tr("{positive} contre {negative}").format(positive=positive,
+                                                     negative=negative)
+    return (negative, positive), {name: (sick, values)}, ""
+
+
+def draw_roc(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
+             info: RenderInfo):
+    """Sensitivity against 100 % - specificity, one curve per marker."""
+    classes, markers, problem = roc_markers(df, spec)
+    if problem or not markers:
+        info.warnings.append(problem or tr("Aucun marqueur à analyser."))
+        return _no_data(ax, problem)
+    info.roc_classes = list(classes)
+    negative, positive = classes
+    names = list(markers)
+    colors = _colors(spec, theme, names)
+    sizes = _sizes(spec, theme)
+    ax.plot([0, 100], [0, 100], ls="--", color="#9AA1A9",
+            lw=theme.spine_width, zorder=1)
+    results, groups = {}, {}
+    for i, name in enumerate(names):
+        sick, values = markers[name]
+        found = roc.analyse(values[~sick], values[sick])
+        if not found.ok:
+            info.warnings.append(tr(
+                "{name} : il faut au moins deux sujets dans chaque classe."
+            ).format(name=name))
+            continue
+        results[name] = found
+        groups[f"{name} - {negative}"] = _clean_values(values[~sick])
+        groups[f"{name} - {positive}"] = _clean_values(values[sick])
+        ax.plot(100 * found.fpr, 100 * found.tpr, color=colors[i],
+                lw=sizes["lw"], label=f"{name} (AUC = {found.auc:.3f})",
+                zorder=3)
+        if spec.roc_youden:
+            ax.scatter([100 * (1 - found.specificity)],
+                       [100 * found.sensitivity], s=sizes["ms"] ** 2 * 1.4,
+                       facecolor="white", edgecolor=colors[i],
+                       linewidth=theme.spine_width * 1.2, zorder=4)
+        sign = "<" if found.lower_is_positive else ">"
+        info.rocs.append({
+            "Marqueur": name, "n positifs": found.n_pos,
+            "n négatifs": found.n_neg, "AUC": found.auc,
+            "IC 95 % bas": found.low, "IC 95 % haut": found.high,
+            "ES": found.se, "p (AUC = 0,5)": found.p,
+            "Seuil optimal": f"{sign} {found.cutoff:.4g}",
+            "Sensibilité (%)": 100 * found.sensitivity,
+            "Sens. IC bas": 100 * found.sens_ci[0],
+            "Sens. IC haut": 100 * found.sens_ci[1],
+            "Spécificité (%)": 100 * found.specificity,
+            "Spéc. IC bas": 100 * found.spec_ci[0],
+            "Spéc. IC haut": 100 * found.spec_ci[1]})
+    info.series = info.groups = list(results)
+    info.descriptives = st.describe(groups)
+
+    # markers measured on the same subjects: DeLong's paired test
+    pairs = list(itertools.combinations(results, 2))
+    found_pairs = []
+    for a, b in pairs:
+        sick, first = markers[a]
+        _, second = markers[b]
+        both = np.isfinite(first) & np.isfinite(second)
+        if not spec.group or both.sum() < 4:
+            continue
+        ra = roc.analyse(first[both][~sick[both]], first[both][sick[both]])
+        rb = roc.analyse(second[both][~sick[both]],
+                         second[both][sick[both]])
+        z, p = roc.compare(ra, rb)
+        if np.isfinite(p):
+            found_pairs.append((a, b, z, p, int(both.sum())))
+    adjusted = st.adjust([pair[3] for pair in found_pairs],
+                         spec.stats_correction) if len(found_pairs) > 1 \
+        else [pair[3] for pair in found_pairs]
+    info.comparisons = [
+        st.Comparison(a, b, z, p, p_adj, "DeLong (apparié)", n, n)
+        for (a, b, z, p, n), p_adj in zip(found_pairs, adjusted)]
+
+    ax.set_xlim(-2, 102)
+    ax.set_ylim(-2, 102)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlabel(tr("100 % - spécificité (%)"))
+    ax.set_ylabel(tr("Sensibilité (%)"))
+    return {}, {}
+
+
+def _clean_values(values) -> np.ndarray:
+    values = np.asarray(values, dtype=float)
+    return values[np.isfinite(values)]
+
+
 def draw_bland_altman(ax, df: pd.DataFrame, spec: PlotSpec, theme: Theme,
                        info: RenderInfo):
     """Agreement of two methods: difference against mean, per subject.
@@ -1527,6 +1653,7 @@ DRAWERS = {
     "paired": draw_paired,
     "bland_altman": draw_bland_altman,
     "heatmap": draw_heatmap,
+    "roc": draw_roc,
 }
 
 

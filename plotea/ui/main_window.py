@@ -632,6 +632,9 @@ class MainWindow(QMainWindow):
         if spec.plot_type == "survival":
             self._map_survival(spec, ds)
             return
+        if spec.plot_type == "roc":
+            self._map_roc(spec, ds)
+            return
         if spec.plot_type in ("paired", "bland_altman"):
             self._map_paired(spec, ds)
             if spec.plot_type == "bland_altman":
@@ -734,6 +737,19 @@ class MainWindow(QMainWindow):
         spec.subgroup, spec.y = "", []
         spec.xlabel, spec.ylabel = spec.x, ""
 
+    def _map_roc(self, spec: PlotSpec, ds):
+        """The two-valued column is the diagnosis; the numbers, markers."""
+        numeric = [c for c in ds.numeric_columns()
+                   if not self._numbering(ds, c)]
+        status = [c for c in ds.categorical_columns()
+                  if ds.df[c].dropna().nunique() == 2]
+        spec.subgroup, spec.roc_positive = "", ""
+        if status:
+            spec.group, spec.y = status[0], numeric[:4]
+        else:                              # Prism's two columns of values
+            spec.group, spec.y = "", numeric[:2]
+        spec.xlabel = spec.ylabel = ""
+
     @staticmethod
     def _map_heatmap(spec: PlotSpec, ds):
         """Rows named by a text column, every numeric column a column - or,
@@ -795,6 +811,15 @@ class MainWindow(QMainWindow):
                    or (needs_x and spec.x not in cols)
                    or (not needs_x and spec.group and spec.group not in cols)
                    or (spec.subgroup and spec.subgroup not in cols))
+        if plot_type == "roc":
+            # a two-class status column and markers, or two columns
+            if spec.group:
+                invalid = (spec.group not in cols or not spec.y
+                           or not set(spec.y) <= cols
+                           or ds is None
+                           or ds.df[spec.group].dropna().nunique() != 2)
+            else:
+                invalid = len(spec.y) != 2 or not set(spec.y) <= cols
         if plot_type == "survival":
             # times, and the groups and events when there are any: no Y
             invalid = (spec.x not in cols
@@ -1321,6 +1346,8 @@ class MainWindow(QMainWindow):
         self.inspector.update_series(
             series, plotting.series_colors(spec, series))
         self.inspector.set_group_labels([str(g) for g in info.groups])
+        if spec.plot_type == "roc":
+            self.inspector.set_roc_classes(list(info.roc_classes))
         self.stats_panel.update_from(info, spec)
         self.tabbar.setTabText(self.tabbar.currentIndex(), spec.name)
         self.data_panel.refresh_current_label()

@@ -192,6 +192,16 @@ def make_icon(name: str, color: str = "", size: int = 22) -> QIcon:
             p.drawRect(QRectF(m + (k % 3) * cell, m + (k // 3) * cell,
                               cell - 0.6, cell - 0.6))
         p.setBrush(Qt.BrushStyle.NoBrush)
+    elif name == "roc":
+        # a curve bowed towards the top left corner, above the diagonal
+        dashed = QPen(p.pen())
+        dashed.setStyle(Qt.PenStyle.DashLine)
+        p.setPen(dashed)
+        p.drawLine(QPointF(m, s - m), QPointF(s - m, m))
+        p.setPen(QPen(col, dashed.widthF()))
+        p.drawPolyline(QPolygonF([
+            QPointF(m, s - m), QPointF(m, s * 0.46), QPointF(s * 0.22, m * 1.9),
+            QPointF(s * 0.48, m * 1.2), QPointF(s - m, m)]))
     elif name == "bland_altman":
         # scattered points around a bias line, between two dashed limits
         p.drawLine(QPointF(m, s * 0.50), QPointF(s - m, s * 0.50))
@@ -266,7 +276,7 @@ PLOT_ICONS = {"line": "line", "scatter": "scatter", "histogram": "histogram",
               "box": "box", "violin": "violin", "bar": "bar",
               "survival": "survival", "contingency": "contingency",
               "paired": "paired", "bland_altman": "bland_altman",
-              "heatmap": "heatmap"}
+              "heatmap": "heatmap", "roc": "roc"}
 
 
 def tag_icon(target, name: str):

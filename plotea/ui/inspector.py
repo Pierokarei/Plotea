@@ -207,7 +207,12 @@ class Inspector(QWidget):
                 (self.cmb_interp_label, numeric, True),
                 (self.cmb_interp_factor, numeric, True),
                 (self.cmb_auc_subject, numeric, True),
-                (self.cmb_control, [], True)):
+                # what the last render found is offered again after it;
+                # until then, the current choice must be there to keep
+                (self.cmb_control, [spec.stats_control]
+                 if spec.stats_control else [], True),
+                (self.cmb_roc_positive, [spec.roc_positive]
+                 if spec.roc_positive else [], True)):
             combo.blockSignals(True)
             combo.clear()
             if keep_blank:
@@ -259,7 +264,7 @@ class Inspector(QWidget):
         "box": "Boxplot", "violin": "Violon", "bar": "Barres",
         "survival": "Survie", "contingency": "Contingence",
         "paired": "Avant/après", "bland_altman": "Bland-Altman",
-        "heatmap": "Chaleur",
+        "heatmap": "Chaleur", "roc": "ROC",
     }
     CARD_HEIGHT = 62
 
@@ -699,6 +704,22 @@ class Inspector(QWidget):
         self._build_contingency_rows(sec)
         self._build_agreement_rows(sec)
         self._build_heatmap_rows(sec)
+        self._build_roc_rows(sec)
+
+    def _build_roc_rows(self, sec):
+        self.cmb_roc_positive = self._bind(QComboBox(), "roc_positive")
+        self.r_roc_positive = sec.add_row(tr("Classe positive"),
+                                          self.cmb_roc_positive)
+        self.chk_roc_youden = self._bind(
+            QCheckBox(tr("Marquer le seuil optimal (Youden)")), "roc_youden")
+        self.r_roc_youden = sec.add_row(tr("Seuil"), self.chk_roc_youden)
+        self.hint_roc = hint(
+            tr("Une colonne de diagnostic à deux valeurs (malade / sain) et "
+               "une colonne par marqueur, mesurés sur les mêmes sujets : "
+               "leurs AUC sont alors comparées (test de DeLong). Ou, comme "
+               "dans Prism, deux colonnes de valeurs : les sains, puis les "
+               "malades. Le sens du marqueur est trouvé seul."))
+        sec.add_widget(self.hint_roc)
 
     def _build_heatmap_rows(self, sec):
         self.cmb_heat_values = self._bind(QComboBox(), "heat_values")
@@ -891,10 +912,27 @@ class Inspector(QWidget):
         self.cmb_control.blockSignals(True)
         self.cmb_control.clear()
         self.cmb_control.addItem("")
-        self.cmb_control.addItems(labels)
+        # a choice the render did not find stays offered: dropping it from
+        # the list would let the next click erase it unseen
+        self.cmb_control.addItems(
+            labels + ([current] if current and current not in labels
+                      else []))
         idx = self.cmb_control.findText(current)
         self.cmb_control.setCurrentIndex(max(idx, 0))
         self.cmb_control.blockSignals(False)
+
+    def set_roc_classes(self, classes: list[str]):
+        """Offer the two classes the last ROC render found."""
+        current = self.spec.roc_positive
+        self.cmb_roc_positive.blockSignals(True)
+        self.cmb_roc_positive.clear()
+        self.cmb_roc_positive.addItem("")
+        self.cmb_roc_positive.addItems(
+            classes + ([current] if current and current not in classes
+                       else []))
+        idx = self.cmb_roc_positive.findText(current)
+        self.cmb_roc_positive.setCurrentIndex(max(idx, 0))
+        self.cmb_roc_positive.blockSignals(False)
 
     # ------------------------------------------------------------------
     def _sync_enabled(self):
@@ -924,6 +962,9 @@ class Inspector(QWidget):
         for widget in (self.r_heat_values, self.r_heat_cmap,
                        self.r_heat_cluster, self.r_heat_annotate):
             self._set_row_visible(widget, t == "heatmap")
+        for widget in (self.r_roc_positive, self.r_roc_youden):
+            self._set_row_visible(widget, t == "roc")
+        self.hint_roc.setVisible(t == "roc")
         ba = t == "bland_altman"
         for picker, shown in ((self.cmb_test, not ct and not ba),
                               (self.cmb_ctest, ct)):
