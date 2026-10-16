@@ -256,6 +256,9 @@ l'appariement des autres n'est pas décalé pour autant.
 
 ### Venir de Prism
 
+La page [Passer de Prism à Plotea](docs/prism-vers-plotea.md) fait le tour
+complet : où trouver chaque analyse de Prism, et ce qui manque encore.
+
 **Fichier ▸ Importer des données** ouvre aussi les fichiers Prism `.pzfx`.
 Chaque tableau de données devient une table Plotea, accompagnée du
 graphique que Prism en aurait tiré quand Plotea sait le tracer :
@@ -485,7 +488,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 726 tests, 5 à 20 minutes selon la machine
+pytest                      # 735 tests, 5 à 20 minutes selon la machine
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -521,6 +524,7 @@ pytest -k paired            # un seul sujet (les tests appariés)
 | `test_recovery.py` | copie de secours, abandons protégés, projets récents |
 | `test_session.py` | icône, disposition mémorisée, dernier dossier |
 | `test_updates.py` | nouvelles versions : accord demandé d'abord, une fois par jour, jamais de réseau dans les tests |
+| `test_docs.py` | page Prism → Plotea : chaque libellé cité existe, liens valides, lacunes annoncées toujours vraies |
 | `test_startup.py` | démarrage de l'application, arguments, auto-test |
 | `test_window_actions.py` | actions de la fenêtre : graphiques, onglets, export, styles |
 | `test_debt.py` | clés vs libellés, journal d'erreurs, gros volumes |

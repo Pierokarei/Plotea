@@ -243,6 +243,9 @@ the pairing of the others is not shifted.
 
 ### Coming from Prism
 
+The page [Moving from Prism to Plotea](docs/from-prism.md) covers it all:
+where each Prism analysis is, and what is still missing.
+
 **File ▸ Import data** also opens Prism `.pzfx` files. Each data table
 becomes a Plotea table, together with the plot Prism would have drawn from
 it when Plotea can draw it:
@@ -469,7 +472,7 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 726 tests, 5 to 20 minutes depending on the machine
+pytest                      # 735 tests, 5 to 20 minutes depending on the machine
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -505,6 +508,7 @@ pytest -k paired            # a single topic (paired tests)
 | `test_recovery.py` | backup copy, guarded discards, recent projects |
 | `test_session.py` | icon, remembered layout, last folder |
 | `test_updates.py` | new versions: consent asked first, once a day, never the network in tests |
+| `test_docs.py` | Prism → Plotea page: every label quoted exists, links land, stated gaps still true |
 | `test_startup.py` | application startup, arguments, self-test |
 | `test_window_actions.py` | window actions: plots, tabs, export, styles |
 | `test_debt.py` | keys vs labels, error log, large volumes |

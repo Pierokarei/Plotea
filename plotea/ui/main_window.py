@@ -4,8 +4,8 @@ from __future__ import annotations
 import copy
 import os
 
-from PyQt6.QtCore import QSettings, QSize, Qt, QTimer
-from PyQt6.QtGui import QAction, QActionGroup, QKeySequence
+from PyQt6.QtCore import QSettings, QSize, Qt, QTimer, QUrl
+from PyQt6.QtGui import QAction, QActionGroup, QDesktopServices, QKeySequence
 from PyQt6.QtWidgets import (
     QAbstractButton,
     QApplication,
@@ -58,6 +58,14 @@ from .widgets import refresh_icons, set_icon_color, tag_icon
 
 APP_NAME = "Plotea"
 VERSION = __version__
+
+#: The page for people coming from Prism, in each language of the interface.
+PRISM_GUIDE = {
+    "fr": "https://github.com/Pierokarei/Plotea/blob/main/docs/"
+          "prism-vers-plotea.md",
+    "en": "https://github.com/Pierokarei/Plotea/blob/main/docs/"
+          "from-prism.md",
+}
 
 #: How often the work in progress is copied beside the configuration. Two
 #: minutes is the most a power cut may cost: often enough to go unnoticed,
@@ -317,6 +325,8 @@ class MainWindow(QMainWindow):
         self.a_log = self._act(tr("Journal des erreurs..."), self.show_log)
         self.a_about = self._act(tr("À propos"), self.show_about)
         self.a_shortcuts = self._act(tr("Raccourcis clavier"), self.show_shortcuts)
+        self.a_prism_guide = self._act(tr("Passer de Prism à Plotea"),
+                                       self.show_prism_guide)
         self.a_check_updates = self._act(
             tr("Rechercher une mise à jour..."),
             lambda: self.updates.check(manual=True))
@@ -405,6 +415,7 @@ class MainWindow(QMainWindow):
             self.language_actions[code] = action
 
         m_help = mb.addMenu(tr("&Aide"))
+        m_help.addAction(self.a_prism_guide)
         m_help.addAction(self.a_shortcuts)
         m_help.addAction(self.a_log)
         m_help.addSeparator()
@@ -1587,6 +1598,11 @@ class MainWindow(QMainWindow):
         dialog = LogDialog(self)
         dialog.exec()
         dialog.deleteLater()      # otherwise every opening leaves one behind
+
+    def show_prism_guide(self):
+        """Where each Prism analysis is, in the interface's language."""
+        QDesktopServices.openUrl(QUrl(PRISM_GUIDE.get(
+            i18n.language(), PRISM_GUIDE["en"])))
 
     def show_about(self):
         dialog = AboutDialog(VERSION, self)
