@@ -97,4 +97,7 @@ filterwarnings = [
     # itself is still reported with its R2.
     "ignore:Covariance of the parameters could not be estimated",
 ]
-markers = ["slow: tests that render six-figure tables"]
+markers = [
+    "slow: tests that render six-figure tables",
+    "gui: tests that open a Plotea window (left out of the quick run)",
+]

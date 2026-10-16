@@ -488,10 +488,15 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 735 tests, 5 à 20 minutes selon la machine
+pytest -m "not gui"         # série rapide, sans fenêtre : 481 tests, ~1 min 30
+pytest                      # 738 tests, environ 8 minutes
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
+
+La série rapide écarte les tests qui ouvrent une fenêtre de Plotea (marqués
+`gui` automatiquement) : elle sert pendant le travail, la suite complète
+avant chaque commit, et la CI lance toujours la suite complète.
 
 | Suite | Couvre |
 |---|---|
@@ -525,6 +530,7 @@ pytest -k paired            # un seul sujet (les tests appariés)
 | `test_session.py` | icône, disposition mémorisée, dernier dossier |
 | `test_updates.py` | nouvelles versions : accord demandé d'abord, une fois par jour, jamais de réseau dans les tests |
 | `test_docs.py` | page Prism → Plotea : chaque libellé cité existe, liens valides, lacunes annoncées toujours vraies |
+| `test_speed.py` | rapidité : feuille de style posée une fois, avant les widgets ; série rapide sans fenêtre |
 | `test_startup.py` | démarrage de l'application, arguments, auto-test |
 | `test_window_actions.py` | actions de la fenêtre : graphiques, onglets, export, styles |
 | `test_debt.py` | clés vs libellés, journal d'erreurs, gros volumes |

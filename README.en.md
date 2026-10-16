@@ -472,10 +472,15 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 735 tests, 5 to 20 minutes depending on the machine
+pytest -m "not gui"         # quick run, no window: 481 tests, ~1 min 30
+pytest                      # 738 tests, about 8 minutes
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
+
+The quick run leaves out the tests that open a Plotea window (marked `gui`
+automatically): it is for while working, the whole suite for before each
+commit, and the CI always runs the whole suite.
 
 | Suite | Covers |
 |---|---|
@@ -509,6 +514,7 @@ pytest -k paired            # a single topic (paired tests)
 | `test_session.py` | icon, remembered layout, last folder |
 | `test_updates.py` | new versions: consent asked first, once a day, never the network in tests |
 | `test_docs.py` | Prism → Plotea page: every label quoted exists, links land, stated gaps still true |
+| `test_speed.py` | speed: stylesheet set once, before the widgets; quick run without windows |
 | `test_startup.py` | application startup, arguments, self-test |
 | `test_window_actions.py` | window actions: plots, tabs, export, styles |
 | `test_debt.py` | keys vs labels, error log, large volumes |

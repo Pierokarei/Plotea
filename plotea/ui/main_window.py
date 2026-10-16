@@ -100,6 +100,7 @@ class MainWindow(QMainWindow):
                             | QMainWindow.DockOption.AllowTabbedDocks
                             | QMainWindow.DockOption.AnimatedDocks)
 
+        self._prepare_stylesheet()
         self._build_central()
         self.updates = UpdateNotifier(self, self.update_banner)
         self._build_docks()
@@ -1576,6 +1577,29 @@ class MainWindow(QMainWindow):
         QApplication.instance().quit()
         return True
 
+    @staticmethod
+    def _install_stylesheet(sheet: str):
+        """Set the application's stylesheet, unless it is already that one.
+
+        Setting it walks and restyles every widget of the application -
+        five to six seconds for the thousand widgets of a window, the same
+        sheet or not. The window installs its sheet before it builds its
+        widgets, so that they take it once as they are shown, and the
+        light / dark switch still restyles everything since the sheet
+        changes.
+        """
+        app = QApplication.instance()
+        if app.styleSheet() != sheet:
+            app.setStyleSheet(sheet)
+
+    def _prepare_stylesheet(self):
+        """The sheet of the theme this window starts in, before any widget."""
+        colors = palette_colors(self.dark)
+        icons = write_dock_icons(config_dir(), colors["text"],
+                                 {"close": colors["danger"],
+                                  "float": colors["accent"]})
+        self._install_stylesheet(build_qss(self.dark, icons))
+
     def apply_theme(self, dark: bool):
         colors = palette_colors(dark)
         self.dark = dark
@@ -1585,7 +1609,7 @@ class MainWindow(QMainWindow):
                                  {"close": colors["danger"],
                                   "float": colors["accent"]})
         self.dock_icons = icons        # kept for the packaged smoke test
-        QApplication.instance().setStyleSheet(build_qss(dark, icons))
+        self._install_stylesheet(build_qss(dark, icons))
         set_icon_color(colors["text"])
         refresh_icons(self)
         # Qt rebuilds the title bar when a panel is floated; re-apply the

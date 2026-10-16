@@ -148,3 +148,36 @@ def shared_window():
     win._render_now()
     yield win
     dispose(win)
+
+
+# --------------------------------------------------------------------------
+# The quick run: what needs no window
+# --------------------------------------------------------------------------
+#: Fixtures that open a Plotea window, directly or through another one.
+WINDOW_FIXTURES = {"window", "shared_window", "started"}
+
+
+def _opens_a_window(item) -> bool:
+    if WINDOW_FIXTURES & set(getattr(item, "fixturenames", ())):
+        return True
+    from PyQt6.QtWidgets import QMainWindow
+
+    module = getattr(item, "module", None)
+    if module is not None and any(isinstance(value, QMainWindow)
+                                  for value in vars(module).values()):
+        return True                       # a window built at import
+    try:
+        import inspect
+        return "MainWindow(" in inspect.getsource(item.function) or \
+            "app_mod.main(" in inspect.getsource(item.function)
+    except (OSError, TypeError):
+        return False
+
+
+def pytest_collection_modifyitems(config, items):
+    """Mark every test that opens a window "gui": `pytest -m "not gui"` is
+    the quick run while working, the whole suite runs before a commit and
+    in the CI."""
+    for item in items:
+        if _opens_a_window(item):
+            item.add_marker(pytest.mark.gui)
