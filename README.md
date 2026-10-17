@@ -489,7 +489,7 @@ Plotea.
 ```bash
 pip install -e ".[dev]"
 pytest -m "not gui"         # série rapide, sans fenêtre : 481 tests, ~1 min 30
-pytest                      # 738 tests, environ 8 minutes
+pytest                      # 745 tests, environ 8 minutes
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```

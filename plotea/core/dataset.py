@@ -52,40 +52,6 @@ class Dataset:
         return [str(c) for c in self.df.columns
                 if not pd.api.types.is_numeric_dtype(self.df[c])]
 
-    def series(self, column: str) -> pd.Series:
-        return self.df[column]
-
-    def values(self, column: str) -> np.ndarray:
-        """Numeric values of a column, NaNs dropped."""
-        s = pd.to_numeric(self.df[column], errors="coerce")
-        return s.dropna().to_numpy(dtype=float)
-
-    def summary(self) -> pd.DataFrame:
-        """Per-column descriptive statistics, used by the Stats panel."""
-        rows = []
-        for col in self.df.columns:
-            s = pd.to_numeric(self.df[col], errors="coerce").dropna()
-            if s.empty:
-                rows.append({
-                    "Colonne": str(col), "n": int(self.df[col].notna().sum()),
-                    "Moyenne": np.nan, "SD": np.nan, "SEM": np.nan,
-                    "Médiane": np.nan, "Min": np.nan, "Max": np.nan,
-                    "IC95 bas": np.nan, "IC95 haut": np.nan,
-                })
-                continue
-            n = int(s.size)
-            mean = float(s.mean())
-            sd = float(s.std(ddof=1)) if n > 1 else 0.0
-            sem = sd / np.sqrt(n) if n > 1 else 0.0
-            ci = 1.96 * sem
-            rows.append({
-                "Colonne": str(col), "n": n, "Moyenne": mean, "SD": sd,
-                "SEM": sem, "Médiane": float(s.median()),
-                "Min": float(s.min()), "Max": float(s.max()),
-                "IC95 bas": mean - ci, "IC95 haut": mean + ci,
-            })
-        return pd.DataFrame(rows)
-
     def copy(self, new_name: str | None = None) -> "Dataset":
         return Dataset(new_name or f"{self.name} (copie)", self.df.copy(),
                        self.source, self.sheet, self.notes, dict(self.meta))

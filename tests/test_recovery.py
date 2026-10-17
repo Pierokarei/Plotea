@@ -1,6 +1,8 @@
 """Losing work: the backup copy, the guarded discards, the recent list."""
 import os
 
+import pytest
+
 from plotea.core import project as project_mod
 from plotea.core.dataset import Dataset
 from plotea.core.project import Project
@@ -165,6 +167,51 @@ def test_open_asks_first(window, monkeypatch):
                         lambda self, path: called.append(path))
     window.open_project()
     assert not called, "un projet a ete ouvert malgre le refus"
+
+
+def _leave(how):
+    """QMessageBox.exec replaced by one way out of the box."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+
+    def run(box):
+        from PyQt6.QtWidgets import QApplication
+
+        box.show()                   # as exec() would: Escape needs it
+        QApplication.processEvents()
+        buttons = {b.text(): b for b in box.buttons()}
+        if how in buttons:
+            buttons[how].click()
+        elif how == "Échap":
+            QTest.keyClick(box, Qt.Key.Key_Escape)
+        elif how == "croix":
+            box.close()
+        elif how == "sans bouton":
+            box.reject()             # closed by the system, or by code
+        box.hide()
+        return 0
+    return run
+
+
+@pytest.mark.parametrize("how, saved, goes_on", [
+    ("Enregistrer", True, True),
+    ("Enregistrer", False, False),          # the save dialog called off
+    ("Continuer sans enregistrer", False, True),
+    ("Annuler", False, False),
+    ("Échap", False, False),
+    ("croix", False, False),
+    ("sans bouton", False, False),          # used to go on, losing work
+])
+def test_work_is_dropped_only_when_asked_to(window, monkeypatch, how,
+                                            saved, goes_on):
+    from PyQt6.QtWidgets import QMessageBox
+
+    files = window.files
+    monkeypatch.setattr(QMessageBox, "exec", _leave(how))
+    monkeypatch.setattr(type(files), "save", lambda self: setattr(
+        self.window.project, "dirty", not saved))
+    window.project.dirty = True
+    assert window._ask_to_keep_changes() is goes_on
 
 
 def test_a_clean_project_asks_nothing(window):

@@ -105,18 +105,19 @@ class ProjectFiles(QObject):
         box.setText(tr("Le projet a été modifié."))
         box.setInformativeText(tr(question))
         save = box.addButton(tr("Enregistrer"), QMessageBox.ButtonRole.AcceptRole)
-        box.addButton(tr(discard), QMessageBox.ButtonRole.DestructiveRole)
+        drop = box.addButton(tr(discard), QMessageBox.ButtonRole.DestructiveRole)
         cancel = box.addButton(tr("Annuler"), QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(save)
+        box.setEscapeButton(cancel)
         box.exec()
         clicked = box.clickedButton()
-        if clicked is cancel:
-            return False
         if clicked is save:
             self.save()
-            if window.project.dirty:      # the save dialog was called off
-                return False
-        return True
+            return not window.project.dirty   # the save dialog called off
+        # Work is thrown away only when "continue without saving" was
+        # clicked. A box closed without a button - by the system, or by
+        # code - gives no button at all, and used to go on as if it had.
+        return clicked is drop
 
     def restore_recovery(self, info: dict) -> bool:
         """Reopen the copy left behind by a session that ended badly."""
