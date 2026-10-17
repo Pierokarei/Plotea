@@ -90,8 +90,8 @@ class EditHistory(QObject):
                 # snapshot that history keeps for the next undo or redo
                 Dataset(name, df.copy(), notes=notes)
                 for name, df, notes in snapshot.datasets]
-            window.data_panel.set_datasets(window.project.datasets,
-                                           snapshot.current_dataset)
+            # the restored plot's own table, and no plot moved on the way
+            window.show_project_tables(snapshot.current_plot)
             window._sync_tabs(snapshot.current_plot)
             window._sync_inspector()
             window._render_now()

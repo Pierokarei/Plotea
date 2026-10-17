@@ -209,6 +209,18 @@ def _jacobian(func, x, popt, eps=1e-6):
     return J
 
 
+def _canonical(x: np.ndarray, y: np.ndarray):
+    """The points in one order whatever the table's: by X, then by Y.
+
+    Sorted by X alone, replicates of one X kept the table's order; the
+    optimiser, fed the same points in another order, stopped a hair away -
+    the 4PL parameters moved at the seventh digit when the rows were
+    shuffled. One order, the same fit to the last digit.
+    """
+    order = np.lexsort((y, x))
+    return x[order], y[order]
+
+
 def model_label(name: str) -> str:
     """The readable name of a model given by key or by label."""
     model = MODELS.get(FIT_MODEL.normalise(name))
@@ -224,9 +236,7 @@ def fit(x, y, model_name: str, n_points: int = 200,
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     mask = np.isfinite(x) & np.isfinite(y)
-    x, y = x[mask], y[mask]
-    order = np.argsort(x)
-    x, y = x[order], y[order]
+    x, y = _canonical(x[mask], y[mask])
     n_par = len(model.params)
     if x.size <= n_par:
         return FitResult(model_name, {}, {}, float("nan"), float("nan"),
@@ -425,7 +435,7 @@ def _points(x, y):
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     keep = np.isfinite(x) & np.isfinite(y)
-    return x[keep], y[keep]
+    return _canonical(x[keep], y[keep])
 
 
 def _free_fit(model: Model, x, y):

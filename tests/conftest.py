@@ -94,6 +94,10 @@ def dispose(win):
     walked them all, and building the fifteenth window of a test file took a
     minute instead of two seconds.
     """
+    from PyQt6 import sip
+
+    if sip.isdeleted(win):            # closed already, by the test itself
+        return
     win.project.dirty = False
     win.close()
     win.setParent(None)

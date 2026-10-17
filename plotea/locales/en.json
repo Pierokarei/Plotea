@@ -837,6 +837,7 @@
  "{count} valeur(s) <= 0 exclue(s) : le logarithme n'y est pas défini.": "{count} value(s) <= 0 left out: the logarithm is not defined there.",
  "{count} événement(s)": "{count} event(s)",
  "{day} à {hour}": "{day} at {hour}",
+ "{name} (introuvable)": "{name} (missing)",
  "{name} - {kind} - {count} valeurs": "{name} - {kind} - {count} values",
  "{name} : il faut au moins deux sujets dans chaque classe.": "{name}: at least two subjects are needed in each class.",
  "{name} ne contient aucun tableau de données.": "{name} contains no data table.",

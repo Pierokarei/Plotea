@@ -29,6 +29,30 @@ def _slug(name: str) -> str:
     return s or "table"
 
 
+def _kinds(df: pd.DataFrame) -> dict:
+    """Which columns hold numbers and which hold text, as written."""
+    return {str(c): ("number" if pd.api.types.is_numeric_dtype(df[c])
+                     else "text") for c in df.columns}
+
+
+def _read_table(handle, kinds: dict | None) -> pd.DataFrame:
+    """A table as it was saved, not as pandas would guess it.
+
+    Read with pandas' defaults, "NA", "None", "null" or "N/A" became
+    missing values - a group of that name vanished from the analysis on
+    reopening -, "001" became the number 1 - two subjects "01" and "001"
+    one and the same -, and a number could come back a last digit off.
+    Texts stay texts, numbers come back exactly, and only an empty cell is
+    missing - as it was in the table, where an empty group is no group.
+    Files saved before the kinds were recorded are read the same way, the
+    kinds guessed.
+    """
+    text = [name for name, kind in (kinds or {}).items() if kind == "text"]
+    return pd.read_csv(handle, keep_default_na=False, na_values=[""],
+                       float_precision="round_trip",
+                       dtype={name: str for name in text} or None)
+
+
 @dataclass
 class Project:
     name: str = "Projet sans titre"
@@ -147,10 +171,13 @@ class Project:
             "name": self.name,
             "created": self.created,
             "saved": datetime.now().isoformat(),
+            # numbered: two names with the same slug ("Essai 1",
+            # "Essai_1") would otherwise write one file over the other
             "datasets": [
-                {"name": d.name, "file": f"data/{_slug(d.name)}.csv",
-                 "source": d.source, "sheet": d.sheet, "notes": d.notes}
-                for d in self.datasets
+                {"name": d.name, "file": f"data/{i:03d}_{_slug(d.name)}.csv",
+                 "source": d.source, "sheet": d.sheet, "notes": d.notes,
+                 "columns": _kinds(d.df)}
+                for i, d in enumerate(self.datasets, start=1)
             ],
             "plots": [p.to_dict() for p in self.plots],
             "panels": [p.to_dict() for p in self.panels],
@@ -205,7 +232,7 @@ class Project:
             for entry in meta.get("datasets", []):
                 try:
                     with zf.open(entry["file"]) as fh:
-                        df = pd.read_csv(fh)
+                        df = _read_table(fh, entry.get("columns"))
                 except KeyError:
                     # listed but absent: say so rather than open a project
                     # that silently lacks a table

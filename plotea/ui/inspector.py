@@ -183,6 +183,11 @@ class Inspector(QWidget):
         self._sync_enabled()
         self.changed.emit()
 
+    @staticmethod
+    def missing(name: str) -> str:
+        """How a chosen column the table no longer has is listed."""
+        return tr("{name} (introuvable)").format(name=name)
+
     def set_spec(self, spec: PlotSpec, columns: list[str],
                  datasets: list[str]):
         """spec -> UI."""
@@ -196,6 +201,7 @@ class Inspector(QWidget):
             self.cmb_dataset.setCurrentText(spec.dataset)
         self.cmb_dataset.blockSignals(False)
 
+        bound = {id(widget): attr for widget, attr, _ in self._bindings}
         for combo, items, keep_blank in (
                 (self.cmb_x, numeric, True),
                 (self.cmb_group, numeric, True),
@@ -218,9 +224,16 @@ class Inspector(QWidget):
             if keep_blank:
                 combo.addItem("")
             combo.addItems(items)
+            # A column chosen but gone from the table stays chosen, said to
+            # be missing: dropped from the list, the next click anywhere
+            # wrote the first entry back, and the plot quietly switched to
+            # other data with nothing said.
+            value = getattr(spec, bound.get(id(combo), ""), "")
+            if isinstance(value, str) and value and value not in items:
+                combo.addItem(self.missing(value), value)
             combo.blockSignals(False)
-        self.lst_y.set_items(numeric, spec.y)
-        self.lst_err.set_items(numeric, spec.error_cols)
+        self.lst_y.set_items(numeric, spec.y, self.missing)
+        self.lst_err.set_items(numeric, spec.error_cols, self.missing)
 
         for widget, attr, _ in self._bindings:
             value = getattr(spec, attr, None)

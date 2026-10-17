@@ -462,20 +462,34 @@ class CheckList(QListWidget):
         self.itemChanged.connect(self._emit)
         self._muted = False
 
-    def set_items(self, items: list[str], checked: list[str] | None = None):
+    def set_items(self, items: list[str], checked: list[str] | None = None,
+                  missing=None):
+        """`missing(name)`, when given, lists the checked names that are
+        not among `items` - kept checked, so that the next click does not
+        drop them unseen."""
         self._muted = True
         self.clear()
-        checked = set(checked or [])
-        for text in items:
-            it = QListWidgetItem(text)
+        checked_list = list(checked or [])
+        checked = set(checked_list)
+        shown = list(items)
+        if missing is not None:
+            shown += [name for name in checked_list if name not in items]
+        for text in shown:
+            it = QListWidgetItem(text if text in items else missing(text))
+            it.setData(Qt.ItemDataRole.UserRole, text)
             it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             it.setCheckState(Qt.CheckState.Checked if text in checked
                              else Qt.CheckState.Unchecked)
             self.addItem(it)
         self._muted = False
 
+    @staticmethod
+    def _value(item) -> str:
+        value = item.data(Qt.ItemDataRole.UserRole)
+        return value if value is not None else item.text()
+
     def checked_items(self) -> list[str]:
-        return [self.item(i).text() for i in range(self.count())
+        return [self._value(self.item(i)) for i in range(self.count())
                 if self.item(i).checkState() == Qt.CheckState.Checked]
 
     def set_checked(self, values: list[str]):
@@ -483,7 +497,8 @@ class CheckList(QListWidget):
         values = set(values)
         for i in range(self.count()):
             it = self.item(i)
-            it.setCheckState(Qt.CheckState.Checked if it.text() in values
+            it.setCheckState(Qt.CheckState.Checked
+                             if self._value(it) in values
                              else Qt.CheckState.Unchecked)
         self._muted = False
 

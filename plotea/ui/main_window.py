@@ -490,7 +490,7 @@ class MainWindow(QMainWindow):
     def _reload_all(self, select_plot: int = 0):
         """Rebuild every panel around the project that is now in place."""
         self.edits.clear()
-        self.data_panel.set_datasets(self.project.datasets, 0)
+        self.show_project_tables(select_plot)
         self._sync_tabs(select_plot)
         self._sync_inspector()
         self.schedule_render()
@@ -898,7 +898,29 @@ class MainWindow(QMainWindow):
         if not self._mapping_fits(spec, ds, spec.plot_type):
             self._auto_map(spec, ds)
 
+    def show_project_tables(self, select_plot: int = 0):
+        """Fill the data panel for a project just put in place, on the
+        table of the plot about to be shown - without moving any plot.
+
+        Selecting a table moves the plot on screen to it. While a project
+        is being put in place, the plot "on screen" is still the previous
+        one's tab: the first table used to be selected, and a reopened
+        survival plot came back as bars on the first, empty table.
+        """
+        plots = self.project.plots
+        shown = plots[select_plot] if 0 <= select_plot < len(plots) else None
+        names = self.project.dataset_names()
+        row = (names.index(shown.dataset)
+               if shown is not None and shown.dataset in names else 0)
+        self._placing = True
+        try:
+            self.data_panel.set_datasets(self.project.datasets, row)
+        finally:
+            self._placing = False
+
     def _on_dataset_changed(self):
+        if getattr(self, "_placing", False):
+            return
         ds = self.data_panel.current_dataset()
         spec = self.current_spec()
         if ds and spec:

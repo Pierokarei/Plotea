@@ -488,8 +488,8 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # série rapide, sans fenêtre : 481 tests, ~1 min 30
-pytest                      # 745 tests, environ 8 minutes
+pytest -m "not gui"         # série rapide, sans fenêtre : 565 tests, ~1 min 30
+pytest                      # 841 tests, environ 8 minutes
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -531,6 +531,9 @@ avant chaque commit, et la CI lance toujours la suite complète.
 | `test_updates.py` | nouvelles versions : accord demandé d'abord, une fois par jour, jamais de réseau dans les tests |
 | `test_docs.py` | page Prism → Plotea : chaque libellé cité existe, liens valides, lacunes annoncées toujours vraies |
 | `test_speed.py` | rapidité : feuille de style posée une fois, avant les widgets ; série rapide sans fenêtre |
+| `workflows/test_workflows.py` | parcours complets par l'interface (import, colonnes, couleurs, renommage, annulation, enregistrement, réouverture, en anglais) comparés à des oracles calculés directement sur le fichier |
+| `workflows/test_invariance.py` | ordre des lignes, colonne inutile, style, enregistrement : aucun ne change un résultat, pour chaque exemple |
+| `workflows/test_project_roundtrip.py` | un projet revient de son fichier à l'identique : groupes « NA », codes « 001 », nombres au bit près, tables homonymes |
 | `test_startup.py` | démarrage de l'application, arguments, auto-test |
 | `test_window_actions.py` | actions de la fenêtre : graphiques, onglets, export, styles |
 | `test_debt.py` | clés vs libellés, journal d'erreurs, gros volumes |

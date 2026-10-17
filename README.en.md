@@ -472,8 +472,8 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # quick run, no window: 481 tests, ~1 min 30
-pytest                      # 745 tests, about 8 minutes
+pytest -m "not gui"         # quick run, no window: 565 tests, ~1 min 30
+pytest                      # 841 tests, about 8 minutes
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -515,6 +515,9 @@ commit, and the CI always runs the whole suite.
 | `test_updates.py` | new versions: consent asked first, once a day, never the network in tests |
 | `test_docs.py` | Prism → Plotea page: every label quoted exists, links land, stated gaps still true |
 | `test_speed.py` | speed: stylesheet set once, before the widgets; quick run without windows |
+| `workflows/test_workflows.py` | whole sessions through the interface (import, columns, colours, renaming, undo, saving, reopening, in English) checked against oracles computed straight from the file |
+| `workflows/test_invariance.py` | row order, an unused column, style, saving: none changes a result, for every example |
+| `workflows/test_project_roundtrip.py` | a project comes back from its file exactly: "NA" groups, "001" codes, numbers to the bit, tables of one file name |
 | `test_startup.py` | application startup, arguments, self-test |
 | `test_window_actions.py` | window actions: plots, tabs, export, styles |
 | `test_debt.py` | keys vs labels, error log, large volumes |
