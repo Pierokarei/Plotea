@@ -827,8 +827,10 @@ def interpolate_unknowns(df: pd.DataFrame, spec: PlotSpec,
         cv = (float(ys.std(ddof=1) / abs(mean) * 100)
               if ys.size > 1 and mean else float("nan"))
         result = fits.get(series)
-        found = (fitting.inverse(result, mean) if result is not None
-                 else fitting.Inverse())
+        # the interval counts the sample's own replicates: their mean
+        # scatters less than one reading
+        found = (fitting.inverse(result, mean, replicates=ys.size)
+                 if result is not None else fitting.Inverse())
         row = {"Série": series} if several else {}
         row.update({"Échantillon": label, "n": int(ys.size),
                     "Y moyen": mean, "CV (%)": cv,

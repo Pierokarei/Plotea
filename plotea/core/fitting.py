@@ -321,14 +321,25 @@ class Inverse:
     reaches that Y more than once, "none" when there is no curve. Nothing
     is extrapolated: a value outside the standards is not measured.
 
-    `low` and `high` bound the 95 % confidence interval: where the Y meets
-    the confidence band of the curve. They are NaN where the band does not
-    meet it within the standards - the interval is open on that side.
+    `low` and `high` bound the 95 % interval of the concentration: the X
+    where the sample's mean Y is within t·sqrt(Var f(x) + s²/m) of the
+    curve - the uncertainty of the curve itself, and the scatter of a
+    measurement, s² the residual variance of the fit, averaged over the m
+    replicates of the sample. For a straight line this is the textbook
+    calibration interval (Draper & Smith; ISO 11843-2). They are NaN where
+    that band does not meet the Y within the standards - the interval is
+    open on that side.
+
+    `budget` says where the uncertainty comes from at X: the standard
+    deviation each part gives on the X scale (through the slope of the
+    curve) and its share of the variance. Kept for whoever wants to look,
+    not shown as a second interval.
     """
     x: float = float("nan")
     low: float = float("nan")
     high: float = float("nan")
     status: str = "none"
+    budget: dict = field(default_factory=dict)
 
 
 def _crossings(xs: np.ndarray, gap: np.ndarray, func) -> list[float]:
@@ -345,8 +356,10 @@ def _crossings(xs: np.ndarray, gap: np.ndarray, func) -> list[float]:
     return sorted(roots)
 
 
-def inverse(result: FitResult, y: float, grid: int = 2001) -> Inverse:
-    """X of the curve at `y`, with its 95 % confidence interval."""
+def inverse(result: FitResult, y: float, replicates: float = 1,
+            grid: int = 2001) -> Inverse:
+    """X of the curve at `y`, the mean of `replicates` measurements, with
+    the 95 % interval of that X (see Inverse)."""
     if result is None or not result.ok or not result.x_range \
             or not np.isfinite(y):
         return Inverse()
@@ -376,12 +389,30 @@ def inverse(result: FitResult, y: float, grid: int = 2001) -> Inverse:
     if result.pcov is None or result.dof < 1:
         return found
     t = float(sps.t.ppf(0.975, result.dof))
+    # a measurement scatters as the standards did about the curve: the
+    # residual variance of the fit, divided over the sample's replicates
+    measure = float(result.rmse) ** 2 / max(float(replicates), 1e-300)
 
-    def half(x):
+    def curve_var(x):
         x = np.atleast_1d(np.asarray(x, dtype=float))
         J = _jacobian(model.func, x, popt)
-        var = np.einsum("ij,jk,ik->i", J, result.pcov, J)
-        return t * np.sqrt(np.clip(var, 0, None))
+        return np.clip(np.einsum("ij,jk,ik->i", J, result.pcov, J), 0, None)
+
+    def half(x):
+        return t * np.sqrt(curve_var(x) + measure)
+
+    step = 1e-6 * max(abs(x), 1.0)
+    slope = abs(float(curve(x + step) - curve(x - step))) / (2 * step)
+    if slope > 0:
+        own = float(curve_var(x)[0])
+        total = own + measure
+        found.budget = {
+            "sd_curve": np.sqrt(own) / slope,
+            "sd_measurement": np.sqrt(measure) / slope,
+            "sd_total": np.sqrt(total) / slope,
+            "share_curve": own / total if total else float("nan"),
+            "share_measurement": measure / total if total else float("nan"),
+            "replicates": float(replicates)}
 
     width = half(xs)
     bounds = []

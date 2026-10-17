@@ -344,8 +344,10 @@ comme dans Prism — la concentration des étalons en X, **la colonne X des
 Ajustement de courbe et cochez **Doser les inconnues** ; deux colonnes
 facultatives donnent le nom des échantillons et leur facteur de dilution.
 Les réplicats d'un échantillon sont moyennés, la concentration lue sur la
-courbe puis multipliée par la dilution, avec son IC 95 % (là où le signal
-rencontre la bande de confiance de la courbe). Rien n'est extrapolé : un
+courbe puis multipliée par la dilution, avec son IC 95 %, qui combine
+l'incertitude de la courbe et la dispersion des mesures répétées de
+l'échantillon (variance supposée constante sur la gamme ; plus il y a de
+réplicats, plus il se resserre). Rien n'est extrapolé : un
 échantillon au-delà des étalons est rapporté « Au-dessus de la gamme
 (> 1000) » ou « Sous la gamme (< 7.8) ». Résultats dans l'onglet **Dosage** ;
 exemple « Dosage ELISA (gamme étalon) ».
@@ -488,8 +490,8 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # série rapide, sans fenêtre : 565 tests, ~1 min 30
-pytest                      # 841 tests, environ 8 minutes
+pytest -m "not gui"         # série rapide, sans fenêtre : 569 tests, ~1 min 30
+pytest                      # 845 tests, environ 8 minutes
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```

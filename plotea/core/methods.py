@@ -84,10 +84,11 @@ PHRASES = {
         "assay": ("Unknown samples were quantified on the standard curve: "
                   "their concentration was read off the fitted curve from "
                   "the mean signal of their replicates{dilution}, with a "
-                  "95% confidence interval "
-                  "where that signal meets the confidence band of the curve;"
-                  " samples outside the range of the standards were "
-                  "reported as such, without extrapolation."),
+                  "95% interval combining the uncertainty of the curve and "
+                  "the scatter of the replicate measurements (residual "
+                  "variance of the fit, assumed constant); samples outside "
+                  "the range of the standards were reported as such, "
+                  "without extrapolation."),
         "assay_dilution": ", then multiplied by the dilution factor",
         "roc": ("The ability of {markers} to distinguish “{positive}” "
                 "({n_pos}) from “{negative}” ({n_neg}) subjects was assessed "
@@ -231,10 +232,11 @@ PHRASES = {
         "assay": ("Les échantillons inconnus ont été dosés sur la gamme "
                   "étalon : leur concentration a été lue sur la courbe "
                   "ajustée à partir du signal moyen de leurs "
-                  "réplicats{dilution}, avec un intervalle de "
-                  "confiance à 95 % là où ce signal rencontre la bande de "
-                  "confiance de la courbe ; les échantillons hors de la "
-                  "gamme des étalons ont été signalés comme tels, sans "
+                  "réplicats{dilution}, avec un intervalle à 95 % qui "
+                  "combine l'incertitude de la courbe et la dispersion des "
+                  "mesures répétées (variance résiduelle de l'ajustement, "
+                  "supposée constante) ; les échantillons hors de la gamme "
+                  "des étalons ont été signalés comme tels, sans "
                   "extrapolation."),
         "assay_dilution": ", puis multipliée par le facteur de dilution",
         "roc": ("La capacité de {markers} à distinguer les sujets "

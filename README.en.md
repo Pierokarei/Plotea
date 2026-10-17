@@ -324,8 +324,10 @@ Prism — the standards' concentration in X, **the samples' X left empty**.
 Choose a model (4PL, straight line…) under Curve fit and tick **Quantify
 unknowns**; two optional columns give the sample names and their dilution
 factor. Replicates of a sample are averaged, the concentration read off the
-curve, then multiplied by the dilution, with its 95 % CI (where the signal
-meets the confidence band of the curve). Nothing is extrapolated: a sample
+curve, then multiplied by the dilution, with its 95 % CI, which combines
+the uncertainty of the curve and the scatter of the sample's repeated
+measurements (variance assumed constant over the range; the more
+replicates, the narrower it gets). Nothing is extrapolated: a sample
 beyond the standards is reported "Above the range (> 1000)" or "Below the
 range (< 7.8)". Results in the **Assay** tab; example "ELISA assay
 (standard curve)".
@@ -472,8 +474,8 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # quick run, no window: 565 tests, ~1 min 30
-pytest                      # 841 tests, about 8 minutes
+pytest -m "not gui"         # quick run, no window: 569 tests, ~1 min 30
+pytest                      # 845 tests, about 8 minutes
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```

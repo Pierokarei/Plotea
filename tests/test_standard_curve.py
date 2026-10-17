@@ -34,16 +34,18 @@ def fitted(x, y, model):
 # --------------------------------------------------------------------------
 # Reading the curve backwards
 # --------------------------------------------------------------------------
-def test_a_straight_line_gives_the_textbook_calibration_interval():
-    """The 95 % interval where y0 meets the confidence band of the line:
-    (y0 - a X - b)^2 = t^2 s^2 (1/n + (X - mean x)^2 / Sxx), solved for X
-    (Draper & Smith, inverse prediction from the regression line)."""
+@pytest.mark.parametrize("m", [1, 3])
+def test_a_straight_line_gives_the_textbook_calibration_interval(m):
+    """The 95 % interval of a sample read m times, mean y0:
+    (y0 - a X - b)^2 = t^2 s^2 (1/m + 1/n + (X - mean x)^2 / Sxx), solved
+    for X (Draper & Smith; ISO 11843-2) - the curve's uncertainty and the
+    scatter of the sample's own measurements."""
     x = np.repeat([0, 2, 4, 6, 8, 10.0], 3)
     y = 0.12 * x + 0.05 + RNG.normal(0, 0.02, x.size)
     result = fitted(x, y, "linear")
     a, b = result.params["a"], result.params["b"]
     y0 = 0.7
-    found = fitting.inverse(result, y0)
+    found = fitting.inverse(result, y0, replicates=m)
 
     n = x.size
     s2 = np.sum((y - (a * x + b)) ** 2) / (n - 2)
@@ -52,10 +54,60 @@ def test_a_straight_line_gives_the_textbook_calibration_interval():
     roots = sorted(np.roots([
         a * a - t * t * s2 / sxx,
         -2 * a * (y0 - b) + 2 * t * t * s2 * x.mean() / sxx,
-        (y0 - b) ** 2 - t * t * s2 * (1 / n + x.mean() ** 2 / sxx)]).real)
+        (y0 - b) ** 2 - t * t * s2 * (1 / m + 1 / n
+                                      + x.mean() ** 2 / sxx)]).real)
     assert found.status == "ok"
     assert found.x == pytest.approx((y0 - b) / a, rel=1e-9)
     assert (found.low, found.high) == pytest.approx(roots, rel=1e-7)
+
+
+def test_where_the_uncertainty_comes_from():
+    """On a line, each part has its closed form: the curve's,
+    s sqrt(1/n + (x0 - mean x)^2 / Sxx) / a, and the measurement's,
+    s / sqrt(m) / a; their variances add up to the whole."""
+    x = np.repeat([0, 2, 4, 6, 8, 10.0], 3)
+    y = 0.12 * x + 0.05 + RNG.normal(0, 0.02, x.size)
+    result = fitted(x, y, "linear")
+    a, b = result.params["a"], result.params["b"]
+    y0, m = 0.7, 3
+    budget = fitting.inverse(result, y0, replicates=m).budget
+
+    n, x0 = x.size, (y0 - b) / a
+    s2 = np.sum((y - (a * x + b)) ** 2) / (n - 2)
+    sxx = np.sum((x - x.mean()) ** 2)
+    assert budget["sd_curve"] == pytest.approx(
+        np.sqrt(s2 * (1 / n + (x0 - x.mean()) ** 2 / sxx)) / a, rel=1e-6)
+    assert budget["sd_measurement"] == pytest.approx(np.sqrt(s2 / m) / a,
+                                                     rel=1e-6)
+    assert budget["sd_total"] ** 2 == pytest.approx(
+        budget["sd_curve"] ** 2 + budget["sd_measurement"] ** 2)
+    assert budget["share_curve"] + budget["share_measurement"] == \
+        pytest.approx(1.0)
+    # more replicates of the sample: less of the measurement's share
+    more = fitting.inverse(result, y0, replicates=12).budget
+    assert more["share_measurement"] < budget["share_measurement"]
+
+
+def test_the_interval_covers_the_true_concentration():
+    """A sample of known concentration, read twice, on curves refitted to
+    fresh standards each time: the interval holds it about 95 times in 100.
+    The curve's band alone - what Plotea 1.2 gave - held it far less often:
+    a sample's own scatter is most of the uncertainty."""
+    rng = np.random.default_rng(12)
+    truth, runs, held, band_only = 150.0, 0, 0, 0
+    for _ in range(300):
+        curve = fitting.fit(STANDARDS, four_pl(STANDARDS)
+                            + rng.normal(0, 0.04, STANDARDS.size), "hill4")
+        if not curve.ok:
+            continue
+        mean = float(np.mean(four_pl(truth) + rng.normal(0, 0.04, 2)))
+        whole = fitting.inverse(curve, mean, replicates=2)
+        alone = fitting.inverse(curve, mean, replicates=np.inf)
+        runs += 1
+        held += whole.low <= truth <= whole.high
+        band_only += alone.low <= truth <= alone.high
+    assert 0.92 <= held / runs <= 0.98, held / runs
+    assert band_only / runs < 0.85, band_only / runs
 
 
 @pytest.mark.parametrize("y0", [0.3, 1.0, 2.0])
@@ -287,3 +339,15 @@ def test_the_controls_wake_with_a_curve(window):
     labels = [inspector.cmb_interp_label.itemText(i)
               for i in range(inspector.cmb_interp_label.count())]
     assert "Traitement" in labels
+
+
+def test_the_table_counts_each_samples_own_replicates(plate):
+    """The interval of a sample read twice is that of a mean of two."""
+    ds, spec, info, _ = plate
+    standards = ds.df[ds.df[spec.x].notna()]
+    curve = fitting.fit(standards[spec.x], standards["DO 450 nm"], "hill4")
+    row = rows_by_name(info)["Sérum 2"]
+    found = fitting.inverse(curve, row["Y moyen"], replicates=row["n"])
+    assert row["n"] == 2
+    assert (row["IC 95 % bas"], row["IC 95 % haut"]) == pytest.approx(
+        (found.low, found.high), rel=1e-9)
