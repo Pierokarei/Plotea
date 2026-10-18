@@ -6,7 +6,9 @@ a script. Only numpy/scipy are required.
 from __future__ import annotations
 
 import itertools
+import math
 from dataclasses import dataclass
+from functools import lru_cache
 
 import numpy as np
 
@@ -106,27 +108,6 @@ def normality_p(x: np.ndarray) -> float:
         return float("nan")
 
 
-def is_normal(x: np.ndarray, alpha: float = 0.05) -> bool:
-    p = normality_p(x)
-    return True if np.isnan(p) else p > alpha
-
-
-def equal_variance(groups: list[np.ndarray], alpha: float = 0.05) -> bool:
-    clean = [np.asarray(g, float)[~np.isnan(np.asarray(g, float))]
-             for g in groups]
-    clean = [g for g in clean if g.size > 1]
-    if not HAVE_SCIPY or len(clean) < 2:
-        return True
-    try:
-        # groups without any spread give no p-value (0/0): read as unequal,
-        # which sends them to Welch, without the warning
-        with np.errstate(divide="ignore", invalid="ignore"):
-            p = float(sps.levene(*clean, center="median").pvalue)
-        return p > alpha
-    except Exception:
-        return True
-
-
 def cohens_d(a: np.ndarray, b: np.ndarray) -> float:
     a, b = np.asarray(a, float), np.asarray(b, float)
     a, b = a[~np.isnan(a)], b[~np.isnan(b)]
@@ -174,19 +155,19 @@ def omnibus(groups: dict[str, np.ndarray], test: str = "auto"
 
     A test chosen by name brings its own global test - "ANOVA + Tukey" an
     ANOVA, "Kruskal-Wallis + Dunn" a Kruskal-Wallis - whatever normality
-    says; only the other choices let the assumptions decide.
+    says; the recommended one, for independent groups, is Welch's ANOVA.
     """
     data = [np.asarray(v, float)[~np.isnan(np.asarray(v, float))]
             for v in groups.values()]
     data = [d for d in data if d.size > 1]
     if not HAVE_SCIPY or len(data) < 2:
         return ("", float("nan"), float("nan"))
-    if test == "anova_tukey":
-        parametric = True
-    elif test == "kruskal_dunn":
-        parametric = False
-    else:
-        parametric = all(is_normal(d) for d in data) and equal_variance(data)
+    if test in ("auto", "welch_anova"):
+        f, _df1, _df2, p = welch_anova(data)
+        return ("ANOVA de Welch", f, p)
+    # each test brings its own global test: rank-based tests a
+    # Kruskal-Wallis, the others an ANOVA - never chosen on a normality test
+    parametric = test not in ("kruskal_dunn", "mannwhitney", "wilcoxon")
     try:
         if parametric:
             res = sps.f_oneway(*data)
@@ -198,49 +179,137 @@ def omnibus(groups: dict[str, np.ndarray], test: str = "auto"
         return ("", float("nan"), float("nan"))
 
 
-def _pick_test(a: np.ndarray, b: np.ndarray) -> str:
-    if is_normal(a) and is_normal(b):
-        return "welch" if not equal_variance([a, b]) else "student"
-    return "mannwhitney"
+# --------------------------------------------------------------------------
+# Means compared without assuming equal variances
+# --------------------------------------------------------------------------
+def welch_anova(groups: list) -> tuple[float, float, float, float]:
+    """Welch's one-way ANOVA (Welch 1951): (F, df1, df2, p).
 
-
-def pick_family_test(groups: dict[str, np.ndarray]) -> str:
-    """Choose one test for the whole figure, not one per pair.
-
-    Reporting a mix of Student and Mann-Whitney across the same set of bars is
-    hard to justify in a legend, so the assumptions are checked once on every
-    group involved and the verdict applies to all comparisons.
+    Group means weighted by n / s², so that a group measured precisely
+    counts more, and the denominator degrees of freedom shrink as the
+    variances differ. With two groups F is the square of Welch's t.
     """
-    data = [np.asarray(v, float) for v in groups.values()]
-    data = [d[~np.isnan(d)] for d in data]
-    data = [d for d in data if d.size >= 2]
-    if len(data) < 2:
-        return "welch"
-    if not all(is_normal(d) for d in data):
-        return "mannwhitney"
-    return "student" if equal_variance(data) else "welch"
+    data = [np.asarray(g, float) for g in groups]
+    k = len(data)
+    n = np.array([g.size for g in data], float)
+    means = np.array([g.mean() for g in data])
+    variances = np.array([g.var(ddof=1) for g in data])
+    if k < 2 or np.any(n < 2) or np.any(variances <= 0):
+        return (float("nan"),) * 4
+    w = n / variances
+    centre = (w * means).sum() / w.sum()
+    a = (w * (means - centre) ** 2).sum() / (k - 1)
+    spread = ((1 - w / w.sum()) ** 2 / (n - 1)).sum()
+    b = 1 + 2 * (k - 2) / (k * k - 1) * spread
+    f = a / b
+    df2 = (k * k - 1) / (3 * spread)
+    return (float(f), float(k - 1), float(df2),
+            float(sps.f.sf(f, k - 1, df2)))
 
 
-def pick_paired_test(paired: dict, labels: list[str]) -> str:
-    """The paired test "auto" means on a before-after plot.
+def _welch_pair(a: np.ndarray, b: np.ndarray) -> tuple[float, float]:
+    """Welch's t of two groups and its Satterthwaite degrees of freedom."""
+    va, vb = a.var(ddof=1) / a.size, b.var(ddof=1) / b.size
+    t = (a.mean() - b.mean()) / np.sqrt(va + vb)
+    df = (va + vb) ** 2 / (va ** 2 / (a.size - 1) + vb ** 2 / (b.size - 1))
+    return float(t), float(df)
 
-    More than two conditions: a repeated-measures ANOVA. Two: a paired t
-    test if the differences look normal - their normality is what the t
-    test assumes, not that of each condition - and Wilcoxon's signed-rank
-    test otherwise.
+
+@lru_cache(maxsize=4096)
+def _range_sf(q: float, k: int, df: float) -> float:
+    """P(studentized range of k means > q): scipy integrates it, some
+    tens of milliseconds a call - cached, a plot re-drawn for a colour
+    does not compute it again."""
+    return float(sps.studentized_range.sf(q, k, df))
+
+
+@lru_cache(maxsize=4096)
+def max_modulus_sf(t: float, c: int, df: float) -> float:
+    """P(studentized maximum modulus of c comparisons > t), with df degrees
+    of freedom: the largest of c independent |Z| over sqrt(chi2_df / df).
+
+    Integrated as such over the chi distribution - not as 1 - its
+    probability, which loses every digit of a small p-value.
     """
-    if len(labels) > 2:
-        return "rm_anova"
-    a, b = matched(paired, labels[0], labels[1])
-    if a.size < 3:
-        return "paired_t"
-    return "paired_t" if is_normal(b - a) else "wilcoxon"
+    from scipy import integrate, special
+
+    if t <= 0:
+        return 1.0
+
+    # scalar special functions, not distribution objects: quad calls the
+    # integrand a few hundred times, and scipy.stats costs ~50 µs a call
+    def tail(z):
+        # 1 - (1 - 2 Q(z))^c, exact even when Q(z) is tiny
+        return -math.expm1(c * math.log1p(-2 * special.ndtr(-z)))
+
+    if not np.isfinite(df) or df > 1e5:
+        return float(tail(t))
+    # density of s = chi_df / sqrt(df), on the log scale
+    const = (math.log(2.0) * (1 - df / 2) - special.gammaln(df / 2)
+             + 0.5 * df * math.log(df))
+
+    def integrand(s):
+        if s <= 0:
+            return 0.0
+        return tail(t * s) * math.exp(const + (df - 1) * math.log(s)
+                                      - df * s * s / 2)
+
+    value, _ = integrate.quad(integrand, 0, np.inf, limit=200,
+                              epsabs=0.0, epsrel=1e-10)
+    return float(min(max(value, 0.0), 1.0))
+
+
+def games_howell(clean: dict, pairs: list) -> list[Comparison]:
+    """Games-Howell: every pair, Welch's t referred to the studentized range
+    of all the groups with that pair's degrees of freedom. It holds the
+    error rate of the whole family without assuming equal variances."""
+    k = len(clean)
+    out = []
+    for a, b in pairs:
+        t, df = _welch_pair(clean[a], clean[b])
+        p = _range_sf(round(abs(t) * np.sqrt(2), 12), k, round(df, 9))
+        out.append(Comparison(a, b, t, p, p, "Games-Howell", clean[a].size,
+                              clean[b].size, cohens_d(clean[a], clean[b])))
+    return out
+
+
+def dunnett_t3(clean: dict, pairs: list) -> list[Comparison]:
+    """Dunnett's T3: Welch's t referred to the studentized maximum modulus
+    of the number of comparisons actually made - a smaller family than
+    every pair when only the control is compared."""
+    c = len(pairs)
+    out = []
+    for a, b in pairs:
+        t, df = _welch_pair(clean[a], clean[b])
+        p = max_modulus_sf(round(abs(t), 12), c, round(df, 9))
+        out.append(Comparison(a, b, t, p, p, "Dunnett T3", clean[a].size,
+                              clean[b].size, cohens_d(clean[a], clean[b])))
+    return out
+
+
+def assumption_checks(groups: dict) -> dict:
+    """What can be looked at, never what decides: Shapiro-Wilk per group,
+    Levene across them, and the smallest group - with few values, not
+    finding a departure from normality proves nothing."""
+    clean = [np.asarray(g, float)[~np.isnan(np.asarray(g, float))]
+             for g in groups.values()]
+    clean = [g for g in clean if g.size > 0]
+    smallest = min((g.size for g in clean), default=0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        try:
+            levene = float(sps.levene(*[g for g in clean if g.size > 1],
+                                      center="median").pvalue)
+        except Exception:
+            levene = float("nan")
+    return {"normality": {str(k): normality_p(v)
+                          for k, v in groups.items()},
+            "levene": levene, "smallest": int(smallest)}
 
 
 def _run_pair(a: np.ndarray, b: np.ndarray, test: str):
     """Run one test. Paired tests receive arrays already matched element-wise."""
     if test == "auto":
-        test = _pick_test(a, b)
+        test = "welch"
     if test == "student":
         r = sps.ttest_ind(a, b, equal_var=True)
     elif test == "welch":
@@ -282,7 +351,8 @@ def matched(paired: dict, a: str, b: str) -> tuple[np.ndarray, np.ndarray]:
 def pairwise(groups: dict[str, np.ndarray], test: str = "auto",
              correction: str = "holm", mode: str = "all_pairs",
              control: str = "", pairs: list | None = None,
-             paired: dict | None = None) -> list[Comparison]:
+             paired: dict | None = None,
+             posthoc: str = "games_howell") -> list[Comparison]:
     """Every requested pairwise comparison, corrected for multiplicity.
 
     `pairs` restricts which comparisons are made (used by two-factor plots).
@@ -306,7 +376,10 @@ def pairwise(groups: dict[str, np.ndarray], test: str = "auto",
         return []
 
     if test == "auto":
-        test = pick_family_test(clean)
+        # the recommendation is made from the design, before this call;
+        # called directly, "auto" compares means without assuming equal
+        # variances
+        test = "welch" if len(keys) == 2 else "welch_anova"
 
     if pairs is not None:
         pairs = [(a, b) for a, b in pairs if a in clean and b in clean]
@@ -341,6 +414,14 @@ def pairwise(groups: dict[str, np.ndarray], test: str = "auto",
                                   clean[name].size,
                                   cohens_d(clean[control], clean[name])))
         return out
+
+    if test == "welch_anova":
+        # all pairs: Games-Howell; against the control, Dunnett's T3, whose
+        # family is the comparisons made
+        against_control = mode == "vs_control" and control in clean
+        if posthoc == "dunnett_t3" or against_control:
+            return dunnett_t3(clean, pairs)
+        return games_howell(clean, pairs)
 
     if test == "kruskal_dunn":
         out = dunn(clean, pairs)
@@ -1075,6 +1156,8 @@ TEST_LABELS = {
     "paired_t": "t apparié", "mannwhitney": "Mann-Whitney",
     "wilcoxon": "Wilcoxon apparié", "tukey": "Tukey HSD",
     "dunnett": "Dunnett", "rm_anova": "ANOVA à mesures répétées",
+    "welch_anova": "ANOVA de Welch", "games_howell": "Games-Howell",
+    "dunnett_t3": "Dunnett T3",
 }
 
 

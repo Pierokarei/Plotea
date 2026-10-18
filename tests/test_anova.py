@@ -97,21 +97,24 @@ def test_anova_surfaces_in_render():
 
 
 def test_one_test_for_every_pair():
-    """A skewed group must switch the whole figure to a rank test."""
+    """A skewed group no longer switches the figure to a rank test: the
+    recommended test follows the design, and every pair gets the same."""
     rng = np.random.default_rng(8)
     groups = {"A": rng.normal(10, 1, 40), "B": rng.normal(12, 1, 40),
               "C": rng.lognormal(2.2, 0.9, 40)}   # clearly not normal
     comps = stats.pairwise(groups, "Auto", "Holm")
     used = {c.test for c in comps}
-    assert used == {"Mann-Whitney"}, used
+    assert used == {"Games-Howell"}, used
 
     normal = {"A": rng.normal(10, 1, 40), "B": rng.normal(12, 1, 40),
               "C": rng.normal(14, 1, 40)}
     comps = stats.pairwise(normal, "Auto", "Holm")
-    assert len({c.test for c in comps}) == 1, {c.test for c in comps}
+    assert {c.test for c in comps} == {"Games-Howell"}
 
 
-def test_family_choice_reported():
-    groups = {"A": np.array([1.0, 2, 3, 4, 5, 6, 7, 8]),
-              "B": np.array([2.0, 3, 4, 5, 6, 7, 8, 9])}
-    assert stats.pick_family_test(groups) in {"student", "welch"}
+def test_two_groups_get_welch_whatever_their_shape():
+    rng = np.random.default_rng(3)
+    for b in (rng.normal(12, 1, 30), rng.lognormal(2.2, 0.9, 30)):
+        comps = stats.pairwise({"A": rng.normal(10, 1, 30), "B": b}, "auto",
+                               "Holm")
+        assert [c.test for c in comps] == ["t de Welch"]

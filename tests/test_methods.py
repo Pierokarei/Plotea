@@ -27,7 +27,7 @@ def paragraph(df, language="en", **fields):
 
 def viability(language="en", **fields):
     fields = {"plot_type": "bar", "group": "Traitement", "y": ["Viabilité"],
-              "stats_enabled": True, **fields}
+              "stats_enabled": True, "design": "independent", **fields}
     return paragraph(demo.viability().df, language, **fields)
 
 
@@ -70,13 +70,15 @@ def test_the_test_named_is_the_test_that_ran():
     ran = info.comparisons[0].test
     assert methods.TESTS["en"][ran] in text
     assert methods.TESTS["en"][info.omnibus[0]].lower() in text.lower()
-    assert "Shapiro-Wilk" in text                 # auto says why
+    # the recommended test says why: the design, not a normality test
+    assert "chosen a priori from the experimental design" in text
+    assert "Shapiro-Wilk" not in text
 
 
 def test_a_test_chosen_by_name_is_not_said_to_be_automatic():
     text, _info = viability(stats_test="kruskal_dunn")
     assert "Kruskal-Wallis test followed by Dunn's test" in text
-    assert "Shapiro-Wilk" not in text
+    assert "a priori" not in text
 
 
 def test_tests_that_correct_themselves_get_no_correction_sentence():
@@ -87,13 +89,20 @@ def test_tests_that_correct_themselves_get_no_correction_sentence():
                             stats_control="Contrôle")
     assert "Dunnett's test" in text and "compared with Contrôle" in text
     assert "adjusted" not in text
+    # the pairs after a Welch ANOVA hold their family-wise error rate too
+    for posthoc, words in (("games_howell", "the Games-Howell test"),
+                           ("dunnett_t3", "Dunnett's T3 test")):
+        text, info = viability(posthoc=posthoc)
+        assert info.omnibus[0] == "ANOVA de Welch"
+        assert "Welch ANOVA followed by " + words in text
+        assert "adjusted" not in text
 
 
 @pytest.mark.parametrize("correction, words", [
     ("holm", "Holm method"), ("bonferroni", "Bonferroni method"),
     ("fdr_bh", "Benjamini-Hochberg"), ("none", None)])
 def test_the_correction_named_is_the_one_applied(correction, words):
-    text, _info = viability(stats_correction=correction)
+    text, _info = viability(stats_test="welch", stats_correction=correction)
     if words:
         assert words in text
     else:

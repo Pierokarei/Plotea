@@ -206,6 +206,9 @@ class PlotSpec:
     stats_mode: str = "all_pairs"
     stats_control: str = ""
     stats_pair_by: str = ""          # subject column for paired tests
+    # what the recommended test is chosen from: declared, not guessed
+    design: str = "unknown"          # unknown / independent / paired
+    posthoc: str = "games_howell"    # after an ANOVA of Welch
     stats_format: str = "stars"
     stats_correction: str = "holm"
     stats_hide_ns: bool = True

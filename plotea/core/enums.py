@@ -180,16 +180,31 @@ EQUATION_LOC = Enum("fit_equation_loc", [
 ])
 
 STATS_TEST = Enum("stats_test", [
-    ("auto", "Auto"),
+    # chosen from the declared design, never from a normality test
+    ("auto", "Test recommandé"),
     ("student", "t de Student"),
     ("welch", "t de Welch"),
     ("paired_t", "t apparié"),
     ("mannwhitney", "Mann-Whitney"),
     ("wilcoxon", "Wilcoxon apparié"),
+    ("welch_anova", "ANOVA de Welch"),
     ("anova_tukey", "ANOVA + Tukey"),
     ("kruskal_dunn", "Kruskal-Wallis + Dunn"),
     ("dunnett", "Dunnett (vs contrôle)"),
     ("rm_anova", "ANOVA à mesures répétées"),
+], legacy={"Auto": "auto"})
+
+#: How the groups relate - declared, since the data cannot say it.
+DESIGN = Enum("design", [
+    ("unknown", "Non précisé"),
+    ("independent", "Groupes indépendants"),
+    ("paired", "Mêmes sujets (apparié)"),
+])
+
+#: Pairs after an ANOVA of Welch: all pairs, or a family of chosen ones.
+POSTHOC = Enum("posthoc", [
+    ("games_howell", "Games-Howell"),
+    ("dunnett_t3", "Dunnett T3"),
 ])
 
 #: Tests of independence on a table of counts. Fisher is exact but defined
@@ -312,6 +327,8 @@ SPEC_FIELDS = {
     "fit_model": FIT_MODEL,
     "fit_equation_loc": EQUATION_LOC,
     "stats_test": STATS_TEST,
+    "design": DESIGN,
+    "posthoc": POSTHOC,
     "contingency_test": CONTINGENCY_TEST,
     "contingency_view": CONTINGENCY_VIEW,
     "ba_view": BA_VIEW,

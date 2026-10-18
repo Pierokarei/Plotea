@@ -1152,6 +1152,7 @@ class MainWindow(QMainWindow):
             plot_type="bar", dataset=table.name, group=group,
             y=[tr("Aire nette")], xlabel=group,
             ylabel=tr("Aire sous la courbe"), stats_enabled=True,
+            design="independent",           # one area per distinct subject
             theme=spec.theme))
         self.data_panel.set_datasets(
             self.project.datasets,

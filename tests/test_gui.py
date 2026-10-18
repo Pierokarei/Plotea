@@ -181,6 +181,10 @@ def test_grouped_bar_stats_through_ui():
     spec.stats_test = "Auto"
     win._sync_inspector()
     win._render_now()
+    # two crossed factors: no test is picked for you
+    assert win.canvas.last_info.comparisons == []
+    spec.stats_test = "welch"
+    win._render_now()
     info = win.canvas.last_info
     assert len(info.comparisons) == 3, info.comparisons
 
@@ -190,7 +194,7 @@ def test_grouped_bar_stats_through_ui():
     assert win.canvas.last_info.comparisons == []
     assert any("groupées" in w for w in win.canvas.last_info.warnings), \
         win.canvas.last_info.warnings
-    spec.stats_test = "Auto"
+    spec.stats_test = "welch"
     win._render_now()
     info = win.canvas.last_info
     assert win.stats_panel.tests.rowCount() == 3

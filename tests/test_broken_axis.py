@@ -27,7 +27,8 @@ DATA = pd.DataFrame([{"Groupe": g, "Valeur": float(v)}
 def render(**fields):
     fields = {"plot_type": "bar", "group": "Groupe", "y": ["Valeur"],
               "ylabel": "Concentration", "y_break": True,
-              "y_break_from": 30.0, "y_break_to": 180.0, **fields}
+              "y_break_from": 30.0, "y_break_to": 180.0,
+              "design": "independent", **fields}
     figure = Figure(figsize=(3.5, 2.8))
     info = plotting.render(figure, PlotSpec(**fields), DATA)
     return figure, info
@@ -156,7 +157,8 @@ def composite(cut=None, **panel_fields):
     heat = demo.heatmap()
     cut = {"name": "Coupé", "plot_type": "bar", "dataset": "D",
            "group": "Groupe", "y": ["Valeur"], "ylabel": "Concentration",
-           "title": "Dosage", "stats_enabled": True, "y_break": True,
+           "title": "Dosage", "stats_enabled": True,
+           "design": "independent", "y_break": True,
            "y_break_from": 30.0, "y_break_to": 180.0, "y_break_top": 0.35,
            **(cut or {})}
     specs = {

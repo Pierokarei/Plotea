@@ -13,7 +13,6 @@ from matplotlib.figure import Figure
 from scipy import stats as sps
 
 from plotea.core import demo, plotting
-from plotea.core import stats as st
 from plotea.core.methods import methods_text
 from plotea.core.plotspec import PlotSpec
 
@@ -121,27 +120,40 @@ def test_auto_means_a_paired_t_test_on_normal_differences():
     assert info.comparisons[0].p == pytest.approx(expected)
 
 
-def test_auto_means_wilcoxon_when_the_differences_are_skewed():
+def test_skewed_differences_do_not_switch_to_wilcoxon():
+    """The recommended test follows the design: a normality test on a few
+    differences proves nothing either way, so it decides nothing."""
     df = wide(n=20, skew=True)
-    assert not st.is_normal((df["Avant"] - df["Après"]).to_numpy())
     _ax, info = render(df, y=["Avant", "Après"])
-    assert info.test_used == "wilcoxon"
-    expected = sps.wilcoxon(df["Avant"], df["Après"]).pvalue
+    assert info.test_used == "paired_t"
+    expected = sps.ttest_rel(df["Avant"], df["Après"]).pvalue
     assert info.comparisons[0].p == pytest.approx(expected)
+    # Wilcoxon stays one click away
+    _ax, info = render(df, y=["Avant", "Après"], stats_test="wilcoxon")
+    assert info.test_used == "wilcoxon"
 
 
-def test_auto_means_a_repeated_measures_anova_beyond_two_conditions():
+def test_beyond_two_conditions_no_test_is_picked_for_you():
     _ax, info = render(long(), group="Jour", y=["Score"],
                        stats_pair_by="Patient")
+    assert info.test_used == "" and not info.comparisons
+    assert info.recommendation["test"] is None
+    assert "Aucun test recommandé automatiquement" in info.warnings
+    _ax, info = render(long(), group="Jour", y=["Score"],
+                       stats_pair_by="Patient", stats_test="rm_anova")
     assert info.test_used == "rm_anova"
     assert info.omnibus[0] == "ANOVA à mesures répétées"
     assert {c.test for c in info.comparisons} == {"t apparié"}
 
 
-def test_auto_stays_unpaired_on_other_plots():
-    info = plotting.render(Figure(), PlotSpec(
-        plot_type="bar", y=["Avant", "Après"], stats_enabled=True), wide())
-    assert info.test_used in ("student", "welch", "mannwhitney")
+def test_other_plots_ask_for_the_design():
+    spec = PlotSpec(plot_type="bar", y=["Avant", "Après"], stats_enabled=True)
+    info = plotting.render(Figure(), spec, wide())
+    assert info.test_used == "" and not info.comparisons
+    assert "Précisez le plan expérimental" in info.warnings
+    spec.design = "independent"
+    info = plotting.render(Figure(), spec, wide())
+    assert info.test_used == "welch"
 
 
 def test_a_test_chosen_by_name_is_respected():
@@ -159,7 +171,8 @@ def test_the_methods_paragraph_describes_the_pairing():
     text = methods_text(spec, info, "en")
     assert "Each line joins the values of one subject (n = 12 subjects)" \
         in text
-    assert "Normality of the paired differences" in text
+    assert ("chosen a priori from the experimental design (the same "
+            "subjects in both conditions)") in text
     assert "two-tailed paired t tests" in text
     assert "each row of the table being one subject" in text
     assert "Chaque ligne relie" in methods_text(spec, info, "fr")
@@ -208,17 +221,3 @@ def test_the_example_reads_as_a_drop():
     df = demo.paired().df
     assert list(df.columns) == ["Patient", "Avant", "Après"]
     assert (df["Avant"] > df["Après"]).mean() > 0.7
-
-
-def test_auto_judges_the_differences_not_each_condition():
-    """Skewed conditions, normal differences: the paired t test assumes
-    the second, so it is the right choice - judging each condition would
-    wrongly fall back to Wilcoxon."""
-    rng = np.random.default_rng(11)
-    before = rng.lognormal(3, 0.9, 30)
-    df = pd.DataFrame({"Avant": before,
-                       "Après": before - rng.normal(5, 1, 30)})
-    assert not st.is_normal(df["Avant"].to_numpy())
-    assert st.is_normal((df["Avant"] - df["Après"]).to_numpy())
-    _ax, info = render(df, y=["Avant", "Après"])
-    assert info.test_used == "paired_t"

@@ -887,9 +887,16 @@ class Inspector(QWidget):
         self.chk_stats = self._bind(
             QCheckBox(tr("Comparaisons et annotations")), "stats_enabled")
         sec.add_widget(self.chk_stats)
+        # what the recommended test is chosen from: said, not guessed
+        self.cmb_design = self._bind(QComboBox(), "design")
+        self.fill(self.cmb_design, enums.DESIGN)
+        sec.add_row(tr("Plan expérimental"), self.cmb_design)
         self.cmb_test = self._bind(QComboBox(), "stats_test")
         self.fill(self.cmb_test, enums.STATS_TEST)
         sec.add_row(tr("Test"), self.cmb_test)
+        self.cmb_posthoc = self._bind(QComboBox(), "posthoc")
+        self.fill(self.cmb_posthoc, enums.POSTHOC)
+        sec.add_row(tr("Paires après Welch"), self.cmb_posthoc)
         # a table of counts has its own tests: one picker or the other shows
         self.cmb_ctest = self._bind(QComboBox(), "contingency_test")
         self.fill(self.cmb_ctest, enums.CONTINGENCY_TEST)
@@ -919,10 +926,12 @@ class Inspector(QWidget):
                                   "stats_bracket_gap")
         sec.add_row(tr("Écart des barres"), self.spn_gap)
         sec.add_widget(hint(
-            tr("Auto choisit t de Student / Welch / Mann-Whitney selon la "
-            "normalité (Shapiro) et l'égalité des variances (Levene). "
-            "Dunnett exige un groupe contrôle ; l'ANOVA à mesures répétées "
-            "exige une colonne d'appariement.")))
+            tr("Le test recommandé se déduit du plan expérimental déclaré, "
+            "jamais d'un test de normalité : Welch pour des groupes "
+            "indépendants, t apparié pour deux conditions sur les mêmes "
+            "sujets. Les tests non paramétriques se choisissent "
+            "explicitement. Dunnett exige un groupe contrôle ; l'ANOVA à "
+            "mesures répétées exige une colonne d'appariement.")))
 
     def set_group_labels(self, labels: list[str]):
         """Feed the control-group combo after each render."""
@@ -1029,6 +1038,23 @@ class Inspector(QWidget):
         for widget in (self.cmb_test, self.cmb_mode, self.cmb_control,
                        self.cmb_format, self.chk_hide_ns, self.spn_gap):
             widget.setEnabled(not surv)
+        # the design matters to groups compared; a before-after plot says it
+        # by itself
+        for widget, shown in (
+                (self.cmb_design, cat),
+                (self.cmb_posthoc, cat and self.spec.stats_test in (
+                    "auto", "welch_anova"))):
+            widget.setVisible(shown)
+            label = self.sec_stats.form.labelForField(widget)
+            if label is not None:
+                label.setVisible(shown)
+        before_after = t == "paired"
+        self.cmb_design.setEnabled(not before_after)
+        if before_after:
+            self.cmb_design.blockSignals(True)
+            self.cmb_design.setCurrentIndex(
+                self.cmb_design.findData("paired"))
+            self.cmb_design.blockSignals(False)
 
         for w in (self.r_bins_auto, self.r_bins, self.r_hstat, self.r_kde,
                   self.r_cum):

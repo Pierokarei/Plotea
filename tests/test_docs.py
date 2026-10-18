@@ -104,7 +104,7 @@ def test_what_it_says_is_missing_is_still_missing():
     tests = {choice.key for choice in enums.STATS_TEST}
     corrections = {choice.key for choice in enums.CORRECTION}
     models = {choice.key for choice in enums.FIT_MODEL}
-    assert not {"friedman", "welch_anova", "brown_forsythe"} & tests
+    assert not {"friedman", "brown_forsythe"} & tests
     assert "sidak" not in corrections
     assert not {"hill5", "hill5_log"} & models
 

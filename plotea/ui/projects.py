@@ -45,6 +45,7 @@ class ProjectFiles(QObject):
                 dataset=window.project.datasets[0].name,
                 group=tr("Traitement"), y=[tr("Viabilité")],
                 ylabel=tr("Viabilité (%)"), stats_enabled=True,
+                design="independent",
                 title=tr("Effet des traitements")))
         else:
             window.project.add_dataset(empty_dataset())

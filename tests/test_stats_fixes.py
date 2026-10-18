@@ -155,7 +155,8 @@ def test_unpaired_path_untouched():
     """The ordinary tests must be exactly what they were."""
     viab = demo.viability()
     spec = PlotSpec(plot_type="bar", group="Traitement", y=["Viabilité"],
-                    stats_enabled=True, stats_test="Auto")
+                    stats_enabled=True, stats_test="Auto",
+                    design="independent")
     info = render(spec, viab.df)
     assert len(info.comparisons) == 6, len(info.comparisons)
-    assert info.omnibus[0] == "ANOVA à un facteur", info.omnibus
+    assert info.omnibus[0] == "ANOVA de Welch", info.omnibus

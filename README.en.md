@@ -38,7 +38,7 @@ any interface text that has no translation.
 | **Plot types** | line, scatter, histogram, box plot, violin plot, bars with error bars (simple, and grouped with two factors), **Kaplan-Meier survival curves**, **contingency tables** (bars stacked in percentages or counts), **paired before-after** (one line per subject), **Bland-Altman** (agreement of two measurement methods), **heat maps** (values, z-scores, correlation matrix, hierarchical clustering), **ROC curves** (DeLong's area under the curve, optimal cut-off, markers compared) |
 | **Themes** | Nature, Science, Cell, PNAS, Minimal, Grayscale: typography, column width and palette that follow each journal's author guidelines |
 | **Export** | SVG, PDF, EPS (vector, editable text) · PNG, TIFF, JPEG up to 1200 dpi (600 dpi by default) |
-| **Statistics** | Student's / Welch's / paired t-test, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs control**, **repeated-measures ANOVA** (with Greenhouse-Geisser correction), **log-rank** on survival curves, **Fisher's exact test and chi-square** (with or without Yates' correction) on contingency tables, with odds ratio, relative risk and Cramér's V; Bonferroni / Holm / FDR corrections; **outlier detection (Grubbs)**; automatic significance bars, including on bars grouped by two factors |
+| **Statistics** | Student's / Welch's / paired t-test, Mann-Whitney, Wilcoxon, **Welch ANOVA + Games-Howell or Dunnett T3**, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs control**, **repeated-measures ANOVA** (with Greenhouse-Geisser correction), **log-rank** on survival curves, **Fisher's exact test and chi-square** (with or without Yates' correction) on contingency tables, with odds ratio, relative risk and Cramér's V; Bonferroni / Holm / FDR corrections; **outlier detection (Grubbs)**; automatic significance bars, including on bars grouped by two factors |
 | **Fits** | linear, polynomial, exponential, logarithmic, power, Michaelis-Menten, Hill 4PL (dose-response), Gaussian, sigmoid, fitted to every replicate as Prism does, with R², standard errors and a 95 % confidence band; **curve comparison** with Prism's F test ("does A's EC50 differ from B's?", or one curve for all series); **standard curve assays** (ELISA, Bradford, qPCR): concentration of unknown samples with a 95 % CI, replicates averaged, dilution factor, no extrapolation beyond the standards; **area under the curve** (trapezoidal rule, baseline Y = 0, first value or a fixed value, Bailer's standard error) with one area per subject and groups compared in one click |
 | **Composite figures** | several plots on one figure, grid of your choice, automatic A/B/C lettering, shared axes |
 | **Transforms** | percent of control, 0-100 normalization, log10 / ln / log2, z-score, baseline subtraction, ratio to a column, mean of replicates |
@@ -52,8 +52,9 @@ any interface text that has no translation.
   bars and sample sizes, the test actually run, the correction, the star
   thresholds, the fit model, the software versions. It describes what
   Plotea computed, never what it did not do.
-- **Automatic test choice**: Shapiro for normality and Levene for equal
-  variances, with the option to force a given test.
+- **Recommended test from the declared experimental design** (Welch for
+  independent groups, paired t for the same subjects), never from a
+  normality test, with its explanation; the test can still be changed.
 - **95 % confidence band** on nonlinear fits, computed with the delta
   method.
 - **Preview at true physical size**: the figure is shown in millimetres, at
@@ -225,9 +226,9 @@ columns under **Error columns**, in the same order as the Y series.
 
 The **Before-after** plot shows what a bar chart of two means hides: a
 line joins each subject's measurements, and you see whether all of them
-moved the same way. In Auto mode it compares the conditions with a paired
-test: paired t if the differences are normal, Wilcoxon otherwise, a
-repeated-measures ANOVA beyond two conditions.
+moved the same way. The recommended test there is the paired t; Wilcoxon
+and the repeated-measures ANOVA (beyond two conditions) are chosen
+explicitly.
 
 A paired test compares two measurements of the **same** subject, so Plotea
 needs to know which is which:
@@ -474,8 +475,8 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # quick run, no window: 569 tests, ~1 min 30
-pytest                      # 845 tests, about 8 minutes
+pytest -m "not gui"         # quick run, no window: 591 tests, ~1 min 30
+pytest                      # 870 tests, about 8 minutes
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -493,7 +494,8 @@ commit, and the CI always runs the whole suite.
 | `test_layout.py` | group names that never overlap, the journal's font and editable text in exported files |
 | `test_fit_compare.py` | curve comparison, checked against the analysis of covariance and on its false-alarm rate |
 | `test_methods.py` | Methods paragraph: the test named is the one that ran, both languages match |
-| `test_paired.py` | before-after: one line per subject, paired test chosen on the differences |
+| `test_paired.py` | before-after: one line per subject, paired t recommended, Wilcoxon on request |
+| `test_recommended.py` | recommended test from the declared design; Welch ANOVA, Games-Howell and Dunnett T3 checked by their identities and by simulation under unequal variances |
 | `test_bland_altman.py` | Bland-Altman: the bias and limits of the 1986 paper recovered |
 | `test_heatmap.py` | heat maps: z-scores, correlation, clustering, colour scales |
 | `test_standard_curve.py` | standard curve assays: 4PL solved by hand, the textbook inverse prediction interval, dilutions, out of range |
@@ -503,7 +505,7 @@ commit, and the CI always runs the whole suite.
 | `test_table_switch.py` | each table gets its plot back, table on screen and data the same |
 | `test_broken_axis.py` | broken axis: two parts, one legend, impossible breaks refused, composite figures |
 | `test_stats_fixes.py` | grouped bars, paired tests, missing values |
-| `test_anova.py` | two-way ANOVA, test choice per family |
+| `test_anova.py` | two-way ANOVA, one test for every pair |
 | `test_advanced_stats.py` | Dunnett, repeated-measures ANOVA, outliers |
 | `test_survival.py` | Kaplan-Meier and log-rank, checked against a published trial |
 | `test_transforms.py` | the nine transforms and their dialog |

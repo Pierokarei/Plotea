@@ -60,6 +60,7 @@ and **“Export CSV”** take out the table on screen.
 | t test (unpaired, Welch), Mann-Whitney | **“Statistics”** section, **“Test”**: “Student's t”, “Welch's t”, “Mann-Whitney” |
 | Paired t test, Wilcoxon | “Paired t”, “Paired Wilcoxon”, with the **“Pairing”** column (long format) or in wide format |
 | One-way ANOVA + Tukey | “ANOVA + Tukey” |
+| Welch ANOVA + Games-Howell or Dunnett T3 | “Welch ANOVA”, then **“Pairs after Welch”** |
 | Kruskal-Wallis + Dunn | “Kruskal-Wallis + Dunn” |
 | Comparison with a control (Dunnett) | “Dunnett (vs control)”, then **“Control”** |
 | Repeated-measures ANOVA | “Repeated-measures ANOVA” (Greenhouse-Geisser correction) |
@@ -79,9 +80,13 @@ and **“Export CSV”** take out the table on screen.
 | Before-after graph | “Paired before-after” type |
 | Heat map | “Heat map” type |
 
-In **“Auto”** mode, Plotea chooses the test from normality (Shapiro-Wilk)
-and equality of variances (Levene), and says which one it ran. If your
-protocol sets the test in advance, choose it explicitly.
+The **“Recommended test”** choice follows from the
+**“Experimental design”** you declare, never from a normality test: Welch's t for two
+independent groups, a Welch ANOVA followed by Games-Howell beyond that,
+paired t for two conditions on the same subjects. Until the design is
+specified, or when it has several factors or several times, no test is
+run: Plotea asks for it. The “Comparisons” tab explains the choice;
+nonparametric tests are chosen explicitly.
 
 What Prism does not have: the **“Methods”** tab writes the paragraph to
 paste into the paper, in English or French, from what was actually
@@ -107,8 +112,7 @@ So that you do not find out halfway through an analysis:
   imported but not plotted yet;
 - Column or Grouped tables **entered as mean / SD / N** give bars without
   error bars (only curves draw them from summaries);
-- no **Welch ANOVA** or **Brown-Forsythe**, no **Friedman** test, no
-  **Šidák** correction;
+- no **Brown-Forsythe**, no **Friedman** test, no **Šidák** correction;
 - no **mixed model** for incomplete repeated measures;
 - no **ROUT** method for outliers (Grubbs only);
 - no **Cox regression**;

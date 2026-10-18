@@ -33,7 +33,8 @@ def viability(seed: int = 7) -> Dataset:
     return _shown_as(Dataset(tr("Viabilité cellulaire"), pd.DataFrame(rows)),
                      plot_type="bar", group=tr("Traitement"),
                      y=[tr("Viabilité")], xlabel=tr("Traitement"),
-                     ylabel=tr("Viabilité (%)"), stats_enabled=True)
+                     ylabel=tr("Viabilité (%)"), stats_enabled=True,
+                     design="independent")
 
 
 def growth(seed: int = 3) -> Dataset:
@@ -83,7 +84,8 @@ def expression(seed: int = 21) -> Dataset:
         tissues[0]: np.round(rng.lognormal(1.8, 0.45, n), 3),
         tissues[1]: np.round(rng.lognormal(2.4, 0.55, n), 3),
         tissues[2]: np.round(rng.lognormal(2.75, 0.62, n), 3),
-    })), plot_type="violin", y=tissues, ylabel=tr("Expression génique"))
+    })), plot_type="violin", y=tissues, ylabel=tr("Expression génique"),
+        design="independent")
 
 
 def correlation(seed: int = 5) -> Dataset:
@@ -119,7 +121,8 @@ def two_factor(seed: int = 15) -> Dataset:
     return _shown_as(Dataset(tr("Plan à deux facteurs"), pd.DataFrame(rows)),
                      plot_type="bar", group=tr("Temps"),
                      subgroup=tr("Génotype"), y=[tr("Activité")],
-                     xlabel=tr("Temps"), ylabel=tr("Activité"))
+                     xlabel=tr("Temps"), ylabel=tr("Activité"),
+                     design="independent")
 
 
 def survival(seed: int = 21) -> Dataset:
@@ -173,7 +176,7 @@ def paired() -> Dataset:
         tr("Patient"): [f"P{i:02d}" for i in range(1, 13)],
         tr("Avant"): before.round(1), tr("Après"): after.round(1)})),
         plot_type="paired", y=[tr("Avant"), tr("Après")],
-        stats_pair_by=tr("Patient"), stats_enabled=True,
+        stats_pair_by=tr("Patient"), stats_enabled=True, design="paired",
         ylabel=tr("Pression artérielle") + " (mmHg)")
 
 

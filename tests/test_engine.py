@@ -35,14 +35,14 @@ def render(spec: PlotSpec, table, out_dir: str, filename: str | None = None):
 PLOTS = {
     "bar": (PlotSpec(plot_type="bar", group="Traitement", y=["Viabilité"],
                      theme="Nature", ylabel="Viabilite (%)",
-                     stats_enabled=True, show_points=True, title="Viabilité"),
+                     stats_enabled=True, design="independent", show_points=True, title="Viabilité"),
             "viability"),
     "box": (PlotSpec(plot_type="box", group="Traitement", y=["Viabilité"],
-                     theme="Science", stats_enabled=True), "viability"),
+                     theme="Science", stats_enabled=True, design="independent"), "viability"),
     "violin": (PlotSpec(plot_type="violin",
                         y=["Sain", "Tumeur", "Métastase"], theme="Cell",
                         violin_inner="Boxplot", show_points=False,
-                        stats_enabled=True), "expression"),
+                        stats_enabled=True, design="independent"), "expression"),
     "histogram": (PlotSpec(plot_type="histogram", y=["Sain", "Tumeur"],
                            theme="PNAS", hist_kde=True, bins_auto=False,
                            bins=30, alpha=0.6), "expression"),
@@ -79,7 +79,7 @@ def test_plot_type_renders(name, out_dir):
 @pytest.mark.parametrize("theme", list(THEMES))
 def test_every_theme_renders(theme, out_dir):
     spec = PlotSpec(plot_type="bar", group="Traitement", y=["Viabilité"],
-                    theme=theme, stats_enabled=True, title=theme)
+                    theme=theme, stats_enabled=True, design="independent", title=theme)
     info = render(spec, DATA["viability"], out_dir, f"theme_{theme}.png")
     assert not info.warnings, info.warnings
     assert len(info.comparisons) == 6
@@ -104,7 +104,7 @@ def test_pairwise_holm(groups):
 
 def test_omnibus(groups):
     name, stat, p = stats.omnibus(groups)
-    assert name == "ANOVA à un facteur"
+    assert name == "ANOVA de Welch"
     assert p < 1e-10 and stat > 0
 
 
@@ -162,7 +162,7 @@ def rendered_figure():
     theme = get_theme("Nature")
     fig = Figure(figsize=theme.figsize("single"))
     plotting.render(fig, PlotSpec(plot_type="bar", group="Traitement",
-                                  y=["Viabilité"], stats_enabled=True),
+                                  y=["Viabilité"], stats_enabled=True, design="independent"),
                     DATA["viability"].df)
     return fig
 

@@ -31,8 +31,9 @@ PHRASES = {
         "n_range": " (n = {low}-{high} per group).",
         "sem": "SEM", "sd": "SD", "ci95": "95% confidence interval",
         "minmax": "range (minimum to maximum)",
-        "auto": ("Normality was assessed with the Shapiro-Wilk test and "
-                 "equality of variances with Levene's test; on that basis, "),
+        "auto": ("The test was chosen a priori from the experimental "
+                 "design (independent groups), without assuming equal "
+                 "variances; "),
         "auto_lead": "groups were compared with ",
         "chosen_lead": "Groups were compared with ",
         "omnibus_then": "{omnibus} followed by {followed}",
@@ -125,8 +126,9 @@ PHRASES = {
         "paired_lines": ("Each line joins the values of one subject "
                          "(n = {n} subjects)"),
         "paired_mean": "; the marks beside show the mean ± {error}",
-        "auto_paired": ("Normality of the paired differences was assessed "
-                        "with the Shapiro-Wilk test; on that basis, "),
+        "auto_paired": ("The test was chosen a priori from the "
+                        "experimental design (the same subjects in both "
+                        "conditions); "),
         "paired_rows": ", each row of the table being one subject",
         "rows": "the rows of the table",
         "ba": ("Agreement between {a} and {b} was assessed with the "
@@ -171,9 +173,9 @@ PHRASES = {
         "n_range": " (n = {low} à {high} par groupe).",
         "sem": "SEM", "sd": "SD", "ci95": "intervalle de confiance à 95 %",
         "minmax": "étendue (minimum à maximum)",
-        "auto": ("La normalité a été évaluée par le test de Shapiro-Wilk et "
-                 "l'égalité des variances par le test de Levene ; en "
-                 "conséquence, "),
+        "auto": ("Le test a été choisi a priori d'après le plan "
+                 "expérimental (groupes indépendants), sans supposer "
+                 "l'égalité des variances ; "),
         "auto_lead": "les groupes ont été comparés par ",
         "chosen_lead": "Les groupes ont été comparés par ",
         "omnibus_then": "{omnibus} {followed} ",
@@ -281,9 +283,9 @@ PHRASES = {
         "paired_lines": ("Chaque ligne relie les valeurs d'un même sujet "
                          "(n = {n} sujets)"),
         "paired_mean": " ; les marques à côté montrent la moyenne ± {error}",
-        "auto_paired": ("La normalité des différences appariées a été "
-                        "évaluée par le test de Shapiro-Wilk ; en "
-                        "conséquence, "),
+        "auto_paired": ("Le test a été choisi a priori d'après le plan "
+                        "expérimental (mêmes sujets dans les deux "
+                        "conditions) ; "),
         "paired_rows": ", chaque ligne du tableau étant un sujet",
         "rows": "les lignes du tableau",
         "ba": ("La concordance entre {a} et {b} a été évaluée par la "
@@ -329,7 +331,10 @@ TESTS = {
         "Tukey HSD": "Tukey's HSD test",
         "Dunnett": "Dunnett's test",
         "Dunn": "Dunn's test",
+        "Games-Howell": "the Games-Howell test",
+        "Dunnett T3": "Dunnett's T3 test",
         "ANOVA à un facteur": "One-way ANOVA",
+        "ANOVA de Welch": "A one-way Welch ANOVA",
         "Kruskal-Wallis": "The Kruskal-Wallis test",
     },
     "fr": {
@@ -341,7 +346,10 @@ TESTS = {
         "Tukey HSD": "le test HSD de Tukey",
         "Dunnett": "le test de Dunnett",
         "Dunn": "le test de Dunn",
+        "Games-Howell": "le test de Games-Howell",
+        "Dunnett T3": "le test T3 de Dunnett",
         "ANOVA à un facteur": "Une ANOVA à un facteur",
+        "ANOVA de Welch": "Une ANOVA de Welch à un facteur",
         "Kruskal-Wallis": "Le test de Kruskal-Wallis",
     },
 }
@@ -383,10 +391,10 @@ MODELS = {
 }
 
 #: Tests that correct their own family-wise error rate.
-SELF_CORRECTING = {"Tukey HSD", "Dunnett"}
+SELF_CORRECTING = {"Tukey HSD", "Dunnett", "Games-Howell", "Dunnett T3"}
 
 #: Global tests whose French name is feminine: "une ANOVA ... suivie de".
-FEMININE = {"ANOVA à un facteur"}
+FEMININE = {"ANOVA à un facteur", "ANOVA de Welch"}
 
 
 def _de(text: str) -> str:
@@ -472,7 +480,7 @@ def _categorical(spec, info, say, tests, language) -> list[str]:
     else:
         if spec.stats_test != "auto":
             lead = say["chosen_lead"]
-        elif paired_plot:
+        elif paired_plot or spec.design == "paired":
             lead = say["auto_paired"] + say["auto_lead"]
         else:
             lead = say["auto"] + say["auto_lead"]

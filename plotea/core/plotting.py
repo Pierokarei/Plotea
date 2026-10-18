@@ -47,6 +47,8 @@ class RenderInfo:
     rocs: list = field(default_factory=list)        # ROC table
     roc_classes: list = field(default_factory=list)  # negative, positive
     test_used: str = ""          # the test that ran ("auto" resolved)
+    recommendation: dict = field(default_factory=dict)  # why, in words
+    diagnostics: dict = field(default_factory=dict)     # never deciding
     subjects: int = 0            # before-after: subjects drawn as lines
     agreement: list = field(default_factory=list)   # Bland-Altman rows
     bland_altman: dict = field(default_factory=dict)
@@ -2134,29 +2136,76 @@ def draw_into(ax, spec: PlotSpec, df: pd.DataFrame,
     return info
 
 
-def effective_test(spec: PlotSpec, groups: dict, df: pd.DataFrame) -> str:
-    """The test that will run: "auto" on a before-after plot means paired.
+def recommend(spec: PlotSpec, groups: dict, two_factor: bool) -> dict:
+    """The recommended test, from the design declared - and why, in words.
 
-    Everywhere else "auto" picks among unpaired tests; on a plot drawn to
-    show the same subjects twice, comparing them as strangers would throw
-    the pairing away - and with it most of the power.
+    Never from Shapiro-Wilk or Levene: with few values, not finding a
+    departure proves nothing, and a test chosen on the data it then tests
+    is not the test it claims to be. The design is said by the user; a
+    before-after plot says it by itself. Where the design does not settle
+    the question - unknown, several factors, several times - nothing is
+    run and the reason is given.
+
+    Returns {"test": key or None, "title", "body", "footer"}.
     """
-    if spec.plot_type != "paired" or spec.stats_test != "auto":
-        return spec.stats_test
-    paired = extract_paired(df, spec)
-    if paired is None:
-        return "paired_t"            # _run_statistics says what is missing
-    return st.pick_paired_test(paired, list(groups))
+    k = len(groups)
+    design = "paired" if spec.plot_type == "paired" else spec.design
+    footer = tr("Les diagnostics de normalité, les effectifs et les valeurs "
+                "atypiques restent consultables (onglets Descriptives et "
+                "Aberrantes). Le choix du test peut être modifié dans la "
+                "section Statistiques.")
+
+    def advice(test, title, body):
+        return {"test": test, "title": title, "body": body, "footer": footer}
+
+    if two_factor:
+        return advice(None, tr("Aucun test recommandé automatiquement"), tr(
+            "Deux facteurs croisés : le test dépend de la question posée. "
+            "Choisissez-le dans la section Statistiques ; l'onglet ANOVA 2 "
+            "facteurs donne l'effet de chaque facteur."))
+    if design not in ("independent", "paired"):
+        return advice(None, tr("Précisez le plan expérimental"), tr(
+            "Les groupes sont-ils indépendants, ou s'agit-il des mêmes "
+            "sujets mesurés plusieurs fois ? Indiquez-le dans « Plan "
+            "expérimental », section Statistiques : le test en dépend."))
+    if design == "paired":
+        if k == 2:
+            return advice("paired_t", tr("Test recommandé : t apparié"), tr(
+                "Deux conditions mesurées sur les mêmes sujets ont été "
+                "identifiées. Le test t apparié compare la moyenne de leurs "
+                "différences à zéro."))
+        return advice(None, tr("Aucun test recommandé automatiquement"), tr(
+            "Plusieurs temps ou conditions mesurés sur les mêmes sujets : "
+            "le test dépend de la question posée. Choisissez-le dans la "
+            "section Statistiques, par exemple l'ANOVA à mesures "
+            "répétées."))
+    if k == 2:
+        return advice("welch", tr("Test recommandé : Welch"), tr(
+            "Deux groupes indépendants ont été identifiés. Le test de Welch "
+            "compare leurs moyennes sans supposer des variances égales."))
+    t3 = spec.posthoc == "dunnett_t3" or spec.stats_mode == "vs_control"
+    posthoc = "Dunnett T3" if t3 else "Games-Howell"
+    return advice("welch_anova", tr(
+        "Test recommandé : ANOVA de Welch, puis {posthoc}").format(
+            posthoc=posthoc), tr(
+        "{count} groupes indépendants ont été identifiés. L'ANOVA de Welch "
+        "compare leurs moyennes sans supposer des variances égales ; les "
+        "paires sont comparées par {posthoc}, qui tient compte des "
+        "comparaisons multiples.").format(count=k, posthoc=posthoc))
 
 
 def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
                     df: pd.DataFrame, info: RenderInfo):
     """Compare the groups and draw the brackets, or explain why it cannot."""
-    test = effective_test(spec, groups, df)
-    # "auto" resolved once, here, the way pairwise() would: the comparisons
-    # and the record then name the same test
-    if test == "auto" and len(groups) >= 2:
-        test = st.pick_family_test(groups)
+    test = spec.stats_test
+    info.diagnostics = st.assumption_checks(groups)
+    if test == "auto":
+        info.recommendation = recommend(spec, groups,
+                                        info.stat_pairs is not None)
+        test = info.recommendation["test"]
+        if test is None:                  # the design does not settle it
+            info.warnings.append(info.recommendation["title"])
+            return
     info.test_used = test
     if test in st.CONTROL_TESTS:
         if spec.stats_mode != "vs_control" or spec.stats_control not in groups:
@@ -2198,7 +2247,8 @@ def _run_statistics(ax, groups, positions, tops, spec: PlotSpec, theme: Theme,
         info.omnibus = st.omnibus(groups, test)
     comps = st.pairwise(groups, test, spec.stats_correction,
                         spec.stats_mode, spec.stats_control,
-                        pairs=info.stat_pairs, paired=paired)
+                        pairs=info.stat_pairs, paired=paired,
+                        posthoc=spec.posthoc)
     info.comparisons = comps
     if not comps and paired is not None:
         info.warnings.append(

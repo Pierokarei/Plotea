@@ -1,6 +1,7 @@
 """Bottom dock: descriptive statistics, pairwise tests and fit reports."""
 from __future__ import annotations
 
+import html
 import math
 
 import pandas as pd
@@ -141,7 +142,7 @@ class StatsPanel(QWidget):
         self.areas = _table()
         self.roc = _table()
         self.tabs.addTab(self.desc, tr("Descriptives"))
-        self.tabs.addTab(self.tests, tr("Comparaisons"))
+        self.tabs.addTab(self._build_tests(), tr("Comparaisons"))
         self.tabs.addTab(self.anova, tr("ANOVA 2 facteurs"))
         self.tabs.addTab(self.fits, tr("Ajustements"))
         self.tabs.addTab(self.assay, tr("Dosage"))
@@ -194,6 +195,52 @@ class StatsPanel(QWidget):
         self.tabs.setTabVisible(self.tabs.indexOf(self.roc), False)
 
     # ------------------------------------------------------------------
+    def _build_tests(self) -> QWidget:
+        """The comparisons, under the account of why this test was run."""
+        page = QWidget()
+        self.tests_page = page
+        self.advice = QLabel()
+        self.advice.setWordWrap(True)
+        self.advice.setTextFormat(Qt.TextFormat.RichText)
+        self.advice.setContentsMargins(8, 4, 8, 4)
+        # the table gives way when the dock is low, not the explanation
+        self.advice.setSizePolicy(QSizePolicy.Policy.Preferred,
+                                  QSizePolicy.Policy.Minimum)
+        self.advice.setVisible(False)
+        lay = QVBoxLayout(page)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self.advice)
+        lay.addWidget(self.tests, 1)
+        return page
+
+    def _show_advice(self, info):
+        """The recommended test, why, and what can still be looked at."""
+        advice = getattr(info, "recommendation", None) or {}
+        if not advice:
+            self.advice.setVisible(False)
+            self.advice.clear()
+            return
+        parts = [f"<b>{html.escape(advice['title'])}</b>",
+                 html.escape(advice["body"])]
+        diagnostics = getattr(info, "diagnostics", None) or {}
+        notes = []
+        levene = diagnostics.get("levene")
+        if isinstance(levene, float) and not math.isnan(levene):
+            notes.append(tr("Levene : p = {p:.3g}").format(p=levene))
+        smallest = diagnostics.get("smallest", 0)
+        if smallest:
+            notes.append(tr("plus petit groupe : n = {n}").format(n=smallest))
+            if smallest < 10:
+                notes.append(tr("peu de puissance : ne pas détecter d'écart "
+                                "à la normalité ne la prouve pas"))
+        last = f"<i>{html.escape(advice['footer'])}</i>"
+        if notes:
+            last = html.escape(tr("Diagnostics, à titre indicatif : ")
+                               + " ; ".join(notes) + ".") + " " + last
+        parts.append(last)
+        self.advice.setText("<br>".join(parts))
+        self.advice.setVisible(True)
+
     def _build_methods(self) -> QWidget:
         """The Methods paragraph, in the language the article is written in,
         which need not be the interface's."""
@@ -252,6 +299,7 @@ class StatsPanel(QWidget):
             })
         self._test_rows = rows
         _fill(self.tests, rows, highlight="p ajusté")
+        self._show_advice(info)
 
         _fill(self.anova, info.anova, highlight="p")
         self._anova_rows = list(info.anova)
@@ -371,7 +419,7 @@ class StatsPanel(QWidget):
     def _current_rows(self) -> list[dict]:
         """Rows of the tab on screen, found by widget: tabs get inserted."""
         return {id(self.desc): self._desc_rows,
-                id(self.tests): self._test_rows,
+                id(self.tests_page): self._test_rows,
                 id(self.anova): self._anova_rows,
                 id(self.outliers): self._outlier_rows,
                 id(self.effects): self._effect_rows,

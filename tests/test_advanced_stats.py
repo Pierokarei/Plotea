@@ -301,11 +301,12 @@ def test_a_test_chosen_by_name_brings_its_own_global_test():
     # normal by construction: the quantiles of a normal distribution
     shape = sps.norm.ppf(np.linspace(0.02, 0.98, 30))
     normal = {k: shape + m for k, m in (("A", 0.0), ("B", 0.5), ("C", 1.0))}
-    assert st.omnibus(normal)[0] == "ANOVA à un facteur"
+    assert st.omnibus(normal)[0] == "ANOVA de Welch"
     assert st.omnibus(normal, "kruskal_dunn")[0] == "Kruskal-Wallis"
     assert st.omnibus(normal, "anova_tukey")[0] == "ANOVA à un facteur"
-    # skewed by construction: there, only the choice can bring an ANOVA
+    # skewed by construction: the shape of the data never decides
     skew = sps.expon.ppf(np.linspace(0.02, 0.98, 30)) ** 2
     skewed = {k: skew + m for k, m in (("A", 0.0), ("B", 0.5), ("C", 1.0))}
-    assert st.omnibus(skewed)[0] == "Kruskal-Wallis"
+    assert st.omnibus(skewed)[0] == "ANOVA de Welch"
+    assert st.omnibus(skewed, "kruskal_dunn")[0] == "Kruskal-Wallis"
     assert st.omnibus(skewed, "anova_tukey")[0] == "ANOVA à un facteur"

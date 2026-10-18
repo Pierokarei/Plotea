@@ -65,6 +65,7 @@ affiché.
 | Test t (non apparié, Welch), Mann-Whitney | section **« Statistiques »**, **« Test »** : « t de Student », « t de Welch », « Mann-Whitney » |
 | Test t apparié, Wilcoxon | « t apparié », « Wilcoxon apparié », avec la colonne **« Appariement »** (format long) ou en format large |
 | ANOVA à un facteur + Tukey | « ANOVA + Tukey » |
+| ANOVA de Welch + Games-Howell ou Dunnett T3 | « ANOVA de Welch », puis **« Paires après Welch »** |
 | Kruskal-Wallis + Dunn | « Kruskal-Wallis + Dunn » |
 | Comparaison à un témoin (Dunnett) | « Dunnett (vs contrôle) », puis **« Contrôle »** |
 | ANOVA à mesures répétées | « ANOVA à mesures répétées » (correction de Greenhouse-Geisser) |
@@ -84,10 +85,13 @@ affiché.
 | Graphique avant/après | type « Avant/après apparié » |
 | Carte de chaleur | type « Carte de chaleur » |
 
-En mode **« Auto »**, Plotea choisit le test d'après la normalité
-(Shapiro-Wilk) et l'égalité des variances (Levene), et dit lequel il a
-utilisé. Si votre protocole fixe le test à l'avance, choisissez-le
-explicitement.
+Le choix **« Test recommandé »** se déduit du **« Plan expérimental »**
+que vous déclarez, jamais d'un test de normalité : t de Welch pour deux
+groupes indépendants, ANOVA de Welch suivie de Games-Howell au-delà, t
+apparié pour deux conditions sur les mêmes sujets. Tant que le plan n'est
+pas précisé, ou s'il compte plusieurs facteurs ou plusieurs temps, aucun
+test n'est lancé : Plotea le demande. L'onglet « Comparaisons » explique le
+choix ; les tests non paramétriques se choisissent explicitement.
 
 Ce que Prism n'a pas : l'onglet **« Méthodes »** rédige le paragraphe à
 coller dans l'article, en français ou en anglais, à partir de ce qui a
@@ -117,8 +121,8 @@ Pour ne pas le découvrir au milieu d'une analyse :
 - les tableaux Colonnes ou Groupés **saisis en moyenne / SD / N** donnent
   des barres sans barres d'erreur (seules les courbes en tracent à partir
   de résumés) ;
-- pas d'**ANOVA de Welch** ni de **Brown-Forsythe**, pas de test de
-  **Friedman**, pas de correction de **Šidák** ;
+- pas de **Brown-Forsythe**, pas de test de **Friedman**, pas de
+  correction de **Šidák** ;
 - pas de **modèle mixte** pour des mesures répétées incomplètes ;
 - pas de méthode **ROUT** pour les valeurs aberrantes (Grubbs seulement) ;
 - pas de **régression de Cox** ;

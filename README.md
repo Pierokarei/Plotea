@@ -43,7 +43,7 @@ tout texte d'interface sans traduction.
 | **Types de graphiques** | courbes, nuages de points, histogrammes, boxplots, violin plots, barres avec erreurs (simples et groupées à deux facteurs), **courbes de survie Kaplan-Meier**, **tableaux de contingence** (barres empilées en pourcentages ou en effectifs), **avant/après apparié** (une ligne par sujet), **Bland-Altman** (concordance de deux méthodes de mesure), **cartes de chaleur** (valeurs, scores z, matrice de corrélation, classification hiérarchique), **courbes ROC** (aire sous la courbe de DeLong, seuil optimal, comparaison de marqueurs) |
 | **Thématiques** | Nature, Science, Cell, PNAS, Minimal, Grayscale — typographie, largeur de colonne et palette conformes aux instructions aux auteurs |
 | **Export** | SVG, PDF, EPS (vectoriels, texte éditable) · PNG, TIFF, JPEG jusqu'à 1200 dpi (600 dpi par défaut) |
-| **Statistiques** | t de Student / Welch / apparié, Mann-Whitney, Wilcoxon, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs contrôle**, **ANOVA à mesures répétées** (avec correction de Greenhouse-Geisser), **log-rank** sur les courbes de survie, **test exact de Fisher et khi²** (avec ou sans correction de Yates) sur les tableaux de contingence, avec odds ratio, risque relatif et V de Cramér ; corrections Bonferroni / Holm / FDR ; **détection de valeurs aberrantes (Grubbs)** ; barres de significativité automatiques, y compris sur les barres groupées à deux facteurs |
+| **Statistiques** | t de Student / Welch / apparié, Mann-Whitney, Wilcoxon, **ANOVA de Welch + Games-Howell ou Dunnett T3**, ANOVA + Tukey, Kruskal-Wallis, **Dunnett vs contrôle**, **ANOVA à mesures répétées** (avec correction de Greenhouse-Geisser), **log-rank** sur les courbes de survie, **test exact de Fisher et khi²** (avec ou sans correction de Yates) sur les tableaux de contingence, avec odds ratio, risque relatif et V de Cramér ; corrections Bonferroni / Holm / FDR ; **détection de valeurs aberrantes (Grubbs)** ; barres de significativité automatiques, y compris sur les barres groupées à deux facteurs |
 | **Ajustements** | linéaire, polynomial, exponentiel, logarithmique, puissance, Michaelis-Menten, Hill 4PL (dose-réponse), gaussienne, sigmoïde — ajustés sur chaque réplicat comme Prism, avec R², erreurs types et bande de confiance 95 % ; **comparaison de courbes** par le test F de Prism (« l'EC50 de A diffère-t-elle de celle de B ? », ou une seule courbe pour toutes les séries) ; **dosage sur gamme étalon** (ELISA, Bradford, qPCR) : concentration des échantillons inconnus avec IC 95 %, réplicats moyennés, facteur de dilution, sans extrapolation hors des étalons ; **aire sous la courbe** (méthode des trapèzes, ligne de base Y = 0, première valeur ou valeur fixée, erreur type de Bailer) avec une aire par sujet et comparaison des groupes en un clic |
 | **Figures composites** | plusieurs graphiques sur une même figure, grille au choix, lettres A/B/C automatiques, axes partageables |
 | **Transformations** | % du contrôle, normalisation 0-100, log10 / ln / log2, score z, soustraction de la ligne de base, rapport à une colonne, moyenne des réplicats |
@@ -58,8 +58,9 @@ tout texte d'interface sans traduction.
   correction, seuil des étoiles, modèle d'ajustement, versions des
   logiciels. Il décrit ce que Plotea a calculé, jamais ce qu'il n'a pas
   fait.
-- **Choix automatique du test** (Shapiro pour la normalité, Levene pour
-  l'égalité des variances) avec possibilité de forcer le test.
+- **Test recommandé d'après le plan expérimental déclaré** (Welch pour des
+  groupes indépendants, t apparié pour les mêmes sujets), jamais d'après un
+  test de normalité, avec son explication ; le test reste modifiable.
 - **Bande de confiance 95 %** sur les ajustements non linéaires, calculée par
   la méthode delta.
 - **Aperçu à la taille physique réelle** : la figure est affichée en
@@ -238,9 +239,9 @@ séries Y.
 
 Le graphique **Avant/après** montre ce qu'un graphique en barres de deux
 moyennes cache : une ligne relie les mesures de chaque sujet, et l'on voit si
-tous ont évolué dans le même sens. En mode Auto, il compare les conditions par
-un test apparié : t apparié si les différences suivent une loi normale,
-Wilcoxon sinon, ANOVA à mesures répétées au-delà de deux conditions.
+tous ont évolué dans le même sens. Le test recommandé y est le t apparié ;
+Wilcoxon et l'ANOVA à mesures répétées (au-delà de deux conditions) se
+choisissent explicitement.
 
 Un test apparié compare deux mesures du **même** sujet. Plotea a donc besoin
 de savoir qui est qui :
@@ -490,8 +491,8 @@ Plotea.
 
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # série rapide, sans fenêtre : 569 tests, ~1 min 30
-pytest                      # 845 tests, environ 8 minutes
+pytest -m "not gui"         # série rapide, sans fenêtre : 591 tests, ~1 min 30
+pytest                      # 870 tests, environ 8 minutes
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -509,7 +510,8 @@ avant chaque commit, et la CI lance toujours la suite complète.
 | `test_layout.py` | noms de groupes sans chevauchement, police du journal et texte éditable dans les fichiers exportés |
 | `test_fit_compare.py` | comparaison de courbes, vérifiée contre l'analyse de covariance et sur son taux de fausses alertes |
 | `test_methods.py` | paragraphe Méthodes : le test nommé est celui qui a tourné, les deux langues se correspondent |
-| `test_paired.py` | avant/après : une ligne par sujet, test apparié choisi sur les différences |
+| `test_paired.py` | avant/après : une ligne par sujet, t apparié recommandé, Wilcoxon au choix |
+| `test_recommended.py` | test recommandé d'après le plan déclaré ; ANOVA de Welch, Games-Howell et Dunnett T3 vérifiés par leurs identités et par simulation sous variances inégales |
 | `test_bland_altman.py` | Bland-Altman : biais et limites de l'article de 1986 retrouvés |
 | `test_heatmap.py` | cartes de chaleur : scores z, corrélation, regroupement, échelles |
 | `test_standard_curve.py` | dosage sur gamme étalon : 4PL résolu à la main, intervalle de prédiction inverse classique, dilutions, hors gamme |
@@ -519,7 +521,7 @@ avant chaque commit, et la CI lance toujours la suite complète.
 | `test_table_switch.py` | chaque table retrouve son graphique, tableau affiché et données identiques |
 | `test_broken_axis.py` | axe interrompu : deux parties, une seule légende, coupures impossibles refusées, figures composites |
 | `test_stats_fixes.py` | barres groupées, tests appariés, valeurs manquantes |
-| `test_anova.py` | ANOVA à deux facteurs, choix de test par famille |
+| `test_anova.py` | ANOVA à deux facteurs, un même test pour toutes les paires |
 | `test_advanced_stats.py` | Dunnett, ANOVA à mesures répétées, valeurs aberrantes |
 | `test_survival.py` | Kaplan-Meier et log-rank, vérifiés sur un essai publié |
 | `test_transforms.py` | les neuf transformations et leur dialogue |
