@@ -67,6 +67,14 @@ PRISM_GUIDE = {
           "from-prism.md",
 }
 
+#: How each analysis is checked: method, reference, the test that holds it.
+VALIDATION_PAGE = {
+    "fr": "https://github.com/Pierokarei/Plotea/blob/main/docs/"
+          "validation-statistique.md",
+    "en": "https://github.com/Pierokarei/Plotea/blob/main/docs/"
+          "statistical-validation.md",
+}
+
 #: How often the work in progress is copied beside the configuration. Two
 #: minutes is the most a power cut may cost: often enough to go unnoticed,
 #: rare enough that a large project is not written all day long.
@@ -328,6 +336,8 @@ class MainWindow(QMainWindow):
         self.a_shortcuts = self._act(tr("Raccourcis clavier"), self.show_shortcuts)
         self.a_prism_guide = self._act(tr("Passer de Prism à Plotea"),
                                        self.show_prism_guide)
+        self.a_validation = self._act(tr("Validation statistique"),
+                                      self.show_validation)
         self.a_check_updates = self._act(
             tr("Rechercher une mise à jour..."),
             lambda: self.updates.check(manual=True))
@@ -417,6 +427,7 @@ class MainWindow(QMainWindow):
 
         m_help = mb.addMenu(tr("&Aide"))
         m_help.addAction(self.a_prism_guide)
+        m_help.addAction(self.a_validation)
         m_help.addAction(self.a_shortcuts)
         m_help.addAction(self.a_log)
         m_help.addSeparator()
@@ -1650,6 +1661,11 @@ class MainWindow(QMainWindow):
         """Where each Prism analysis is, in the interface's language."""
         QDesktopServices.openUrl(QUrl(PRISM_GUIDE.get(
             i18n.language(), PRISM_GUIDE["en"])))
+
+    def show_validation(self):
+        """How each result is checked, in the interface's language."""
+        QDesktopServices.openUrl(QUrl(VALIDATION_PAGE.get(
+            i18n.language(), VALIDATION_PAGE["en"])))
 
     def show_about(self):
         dialog = AboutDialog(VERSION, self)

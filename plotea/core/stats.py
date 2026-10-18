@@ -1127,6 +1127,15 @@ def outliers(groups: dict, alpha: float = 0.05) -> list[dict]:
     return rows
 
 
+def t975(n: int) -> float:
+    """Half-width of a 95 % interval of a mean, in SEMs: Student's t on
+    n - 1 degrees of freedom - 2.20 for twelve values, not 1.96, which
+    holds only for large samples."""
+    if HAVE_SCIPY and n > 1:
+        return float(sps.t.ppf(0.975, n - 1))
+    return 1.96
+
+
 def describe(groups: dict[str, np.ndarray]) -> list[dict]:
     """Descriptive table used by the Stats panel."""
     rows = []
@@ -1143,8 +1152,8 @@ def describe(groups: dict[str, np.ndarray]) -> list[dict]:
             "Q1": float(np.percentile(arr, 25)),
             "Q3": float(np.percentile(arr, 75)),
             "Min": float(arr.min()), "Max": float(arr.max()),
-            "IC95 bas": float(arr.mean() - 1.96 * sem),
-            "IC95 haut": float(arr.mean() + 1.96 * sem),
+            "IC95 bas": float(arr.mean() - t975(arr.size) * sem),
+            "IC95 haut": float(arr.mean() + t975(arr.size) * sem),
             "Normalité (p)": normality_p(arr),
         })
     return rows
@@ -1176,10 +1185,7 @@ def error_value(arr: np.ndarray, kind: str) -> tuple[float, float]:
     if kind == "sem":
         return (sem, sem)
     if kind == "ci95":
-        if HAVE_SCIPY and arr.size > 1:
-            t = float(sps.t.ppf(0.975, arr.size - 1))
-        else:
-            t = 1.96
+        t = t975(arr.size)
         return (t * sem, t * sem)
     if kind == "minmax":
         return (mean - float(arr.min()), float(arr.max()) - mean)

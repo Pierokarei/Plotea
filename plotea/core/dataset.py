@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from .stats import t975
+
 CSV_EXT = {".csv", ".txt", ".tsv", ".tab", ".dat"}
 EXCEL_EXT = {".xlsx", ".xlsm", ".xls"}
 
@@ -174,6 +176,6 @@ def aggregate(df: pd.DataFrame, group: str, value: str,
                               "std": "SD", "median": "Médiane"})
     out["SD"] = out["SD"].fillna(0.0)
     out["SEM"] = out["SD"] / np.sqrt(out["n"].clip(lower=1))
-    out["IC95"] = 1.96 * out["SEM"]
+    out["IC95"] = out["n"].map(t975) * out["SEM"]
     out["Erreur"] = out[error if error in out.columns else "SEM"]
     return out

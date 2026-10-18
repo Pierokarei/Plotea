@@ -489,10 +489,14 @@ Plotea.
 
 ## Tests
 
+La page [Validation statistique](docs/validation-statistique.md) dit, pour
+chaque analyse, la méthode employée, sa référence (article, jeu de données
+publié) et le test qui vérifie que Plotea la calcule correctement.
+
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # série rapide, sans fenêtre : 591 tests, ~1 min 30
-pytest                      # 870 tests, environ 8 minutes
+pytest -m "not gui"         # série rapide, sans fenêtre : 607 tests, ~1 min 30
+pytest                      # 887 tests, environ 8 minutes
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -523,6 +527,8 @@ avant chaque commit, et la CI lance toujours la suite complète.
 | `test_stats_fixes.py` | barres groupées, tests appariés, valeurs manquantes |
 | `test_anova.py` | ANOVA à deux facteurs, un même test pour toutes les paires |
 | `test_advanced_stats.py` | Dunnett, ANOVA à mesures répétées, valeurs aberrantes |
+| `test_validation.py` | descriptives, ANOVA et Tukey, corrections de Holm et de Benjamini-Hochberg contre leurs définitions et l'exemple publié de 1995 |
+| `test_validation_page.py` | la page Validation statistique ne cite que des tests qui existent |
 | `test_survival.py` | Kaplan-Meier et log-rank, vérifiés sur un essai publié |
 | `test_transforms.py` | les neuf transformations et leur dialogue |
 | `test_history.py` | annuler / rétablir |

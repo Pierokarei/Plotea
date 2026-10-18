@@ -473,10 +473,14 @@ Plotea.
 
 ## Tests
 
+The [Statistical validation](docs/statistical-validation.md) page gives,
+for each analysis, the method used, its reference (paper, published
+dataset) and the test that checks Plotea computes it correctly.
+
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # quick run, no window: 591 tests, ~1 min 30
-pytest                      # 870 tests, about 8 minutes
+pytest -m "not gui"         # quick run, no window: 607 tests, ~1 min 30
+pytest                      # 887 tests, about 8 minutes
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -507,6 +511,8 @@ commit, and the CI always runs the whole suite.
 | `test_stats_fixes.py` | grouped bars, paired tests, missing values |
 | `test_anova.py` | two-way ANOVA, one test for every pair |
 | `test_advanced_stats.py` | Dunnett, repeated-measures ANOVA, outliers |
+| `test_validation.py` | descriptives, ANOVA and Tukey, Holm and Benjamini-Hochberg corrections against their definitions and the published 1995 example |
+| `test_validation_page.py` | the Statistical validation page cites only tests that exist |
 | `test_survival.py` | Kaplan-Meier and log-rank, checked against a published trial |
 | `test_transforms.py` | the nine transforms and their dialog |
 | `test_history.py` | undo / redo |

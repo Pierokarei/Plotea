@@ -3,8 +3,8 @@
 The point of the plot is the pairing, so it is checked everywhere it could
 be lost: every subject gets its line, a missing measurement neither hides a
 subject nor invents a value, the points sit exactly on their condition for
-the lines to reach them, and "auto" means a paired test here - chosen on the
-differences, as the t test assumes - while staying unpaired elsewhere.
+the lines to reach them, and the recommended test is the paired t here -
+the plot declares the same subjects - while other plots ask for the design.
 """
 import numpy as np
 import pandas as pd
