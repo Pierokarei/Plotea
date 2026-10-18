@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import uuid
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -16,12 +17,16 @@ from datetime import datetime
 import pandas as pd
 
 from ..i18n import tr
+from . import diagnostics, safefile, versions
 from .dataset import Dataset
 from .panel import Panel
 from .plotspec import STYLE_FIELDS, PlotSpec
 
 FORMAT_VERSION = 1
 EXTENSION = ".plotea"
+#: Up to this many values, a save reads every table back before it
+#: replaces the previous file.
+CHECK_CELLS = 250_000
 
 
 def _slug(name: str) -> str:
@@ -48,9 +53,14 @@ def _read_table(handle, kinds: dict | None) -> pd.DataFrame:
     kinds guessed.
     """
     text = [name for name, kind in (kinds or {}).items() if kind == "text"]
-    return pd.read_csv(handle, keep_default_na=False, na_values=[""],
-                       float_precision="round_trip",
-                       dtype={name: str for name in text} or None)
+    try:
+        return pd.read_csv(handle, keep_default_na=False, na_values=[""],
+                           float_precision="round_trip",
+                           dtype={name: str for name in text} or None)
+    except pd.errors.EmptyDataError:
+        # a table whose every column was deleted is written as an empty
+        # file; it used to make the whole project impossible to reopen
+        return pd.DataFrame()
 
 
 @dataclass
@@ -64,6 +74,9 @@ class Project:
     #: what load() could not read back, for the window to say out loud
     load_warnings: list = field(default_factory=list)
     created: str = field(default_factory=lambda: datetime.now().isoformat())
+    #: carried by the file, so that its earlier versions follow it when it
+    #: is renamed or moved
+    uid: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     # -- dataset helpers ---------------------------------------------------
     def dataset_names(self) -> list[str]:
@@ -169,6 +182,7 @@ class Project:
             "format": FORMAT_VERSION,
             "app": "Plotea",
             "name": self.name,
+            "id": self.uid,
             "created": self.created,
             "saved": datetime.now().isoformat(),
             # numbered: two names with the same slug ("Essai 1",
@@ -201,27 +215,64 @@ class Project:
     def save(self, path: str) -> str:
         """Write the project, never at the expense of the previous file.
 
-        A zip opened for writing is truncated on the spot, so a save that
-        failed half-way - a full disk, a table that would not serialise -
-        used to leave the old file emptied and the new one unfinished. The
-        archive is now written beside it and moved into place only once
-        complete, as the backup copy already was.
+        All or nothing (safefile): written beside the target, forced to
+        the disk, read back and checked, and only then moved into place, so
+        a full disk, a crash or a power cut leaves the previous file whole.
+        The file being replaced is first set aside among the project's
+        earlier versions.
         """
         if not path.lower().endswith(EXTENSION):
             path += EXTENSION
-        partial = path + ".part"
-        try:
-            self.write_to(partial)
-            os.replace(partial, path)
-        except BaseException:
+
+        def keep_previous():
             try:
-                os.remove(partial)
-            except OSError:
-                pass
-            raise
+                versions.archive(path, self.uid)
+            except Exception as exc:
+                # the save is what was asked for: a version that could not
+                # be kept is reported, not allowed to stop it
+                diagnostics.exception("Version précédente non conservée",
+                                      exc)
+
+        safefile.write_atomic(path, self.write_to,
+                              verify=lambda partial: self.check(partial),
+                              before_replace=keep_previous)
         self.path = path
         self.dirty = False
         return path
+
+    def check(self, path: str):
+        """Read an archive back and make sure it holds this project.
+
+        Every member's checksum, the description and every table present;
+        then, up to CHECK_CELLS values - nearly every project -, each table
+        read back with its number of rows and columns: a file that would
+        not reopen as it was saved must not replace one that does. Beyond,
+        reading everything again would add half the time of the save.
+        """
+        with zipfile.ZipFile(path) as archive:
+            broken = archive.testzip()
+            if broken is not None:
+                raise OSError(tr("Archive endommagée à l'écriture : {name}"
+                                 ).format(name=broken))
+            meta = json.loads(archive.read("project.json").decode("utf-8"))
+            members = set(archive.namelist())
+        absent = [entry["name"] for entry in meta.get("datasets", [])
+                  if entry.get("file") not in members]
+        if absent or len(meta.get("datasets", [])) != len(self.datasets):
+            raise OSError(tr("Table absente du fichier : {name}").format(
+                name=", ".join(absent) or "?"))
+        if sum(d.df.size for d in self.datasets) > CHECK_CELLS:
+            return
+        reopened = Project.load(path)
+
+        def shape(df):
+            # a table without columns keeps no rows either
+            return df.shape if df.shape[1] else (0, 0)
+        wrote = [(d.name, shape(d.df)) for d in reopened.datasets]
+        meant = [(d.name, shape(d.df)) for d in self.datasets]
+        if wrote != meant or len(reopened.plots) != len(self.plots)                 or len(reopened.panels) != len(self.panels):
+            raise OSError(tr("Le fichier écrit ne relit pas le projet tel "
+                             "qu'il est : enregistrement annulé."))
 
     @classmethod
     def load(cls, path: str) -> "Project":
@@ -247,6 +298,8 @@ class Project:
                    panels=[Panel.from_dict(p)
                            for p in meta.get("panels", [])],
                    path=path, created=meta.get("created", ""))
+        if meta.get("id"):
+            proj.uid = str(meta["id"])
         proj.dirty = False
         proj.load_warnings = [
             tr("Table absente du fichier : {name}").format(name=name)
@@ -302,15 +355,11 @@ def write_recovery(project: Project) -> str:
     safety net, not a save.
     """
     target = recovery_path()
-    partial = target + ".part"
-    project.write_to(partial)
-    os.replace(partial, target)
-    with open(os.path.join(config_dir(), RECOVERY_INFO), "w",
-              encoding="utf-8") as fh:
-        json.dump({"name": project.name,
-                   "origin": project.path,
-                   "saved": datetime.now().isoformat(timespec="seconds")},
-                  fh, ensure_ascii=False, indent=2)
+    safefile.write_atomic(target, project.write_to)
+    safefile.write_text(os.path.join(config_dir(), RECOVERY_INFO), json.dumps(
+        {"name": project.name, "origin": project.path,
+         "saved": datetime.now().isoformat(timespec="seconds")},
+        ensure_ascii=False, indent=2))
     return target
 
 
@@ -340,14 +389,15 @@ def clear_recovery():
             os.remove(os.path.join(config_dir(), name))
         except OSError:
             pass
+    safefile.clear_stale(recovery_path(), older_than=0)
 
 
 def save_preset(name: str, style: dict):
     path = os.path.join(config_dir(), "presets.json")
     presets = load_presets()
     presets[name] = style
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(presets, fh, indent=2, ensure_ascii=False)
+    safefile.write_text(path, json.dumps(presets, indent=2,
+                                         ensure_ascii=False))
 
 
 def load_presets() -> dict:

@@ -287,6 +287,20 @@ the whole figure.
 plots, transforms and composite figures. A burst of quick edits counts as a
 single step, as in a text editor.
 
+### Safe saving and earlier versions
+
+A save is written beside the file, forced to the disk, read back, and only
+replaces the old one once complete: a full disk, a crash or a power cut
+leave the previous file whole. A file held for a moment by an antivirus or
+OneDrive is waited for rather than lost.
+
+Each save keeps the version it replaces, in Plotea's own folder rather than
+beside the project: the last 20, then one a day for 30 days. **File ▸
+Earlier versions** lists them and opens one without touching the file;
+saving it restores it, and the state it replaces is kept in turn. A
+project renamed or moved keeps its history, and a file that no longer
+opens offers its last version.
+
 ### Agreement of two methods (Bland-Altman)
 
 Two columns, one per method, one row per subject: the **Bland-Altman**
@@ -479,8 +493,8 @@ dataset) and the test that checks Plotea computes it correctly.
 
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # quick run, no window: 607 tests, ~1 min 30
-pytest                      # 887 tests, about 8 minutes
+pytest -m "not gui"         # quick run, no window: 631 tests, ~1 min 30
+pytest                      # 914 tests, about 8 minutes
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```
@@ -521,6 +535,7 @@ commit, and the CI always runs the whole suite.
 | `test_dialogs.py` | import, export and transform dialogs |
 | `test_project_files.py` | opening and saving projects |
 | `test_recovery.py` | backup copy, guarded discards, recent projects |
+| `test_safe_saving.py` | all-or-nothing saving (process killed mid-write), earlier versions and how long they are kept |
 | `test_session.py` | icon, remembered layout, last folder |
 | `test_updates.py` | new versions: consent asked first, once a day, never the network in tests |
 | `test_docs.py` | Prism → Plotea page: every label quoted exists, links land, stated gaps still true |

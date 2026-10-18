@@ -303,6 +303,20 @@ création et la suppression de graphiques, les transformations et les figures
 composites. Une série de retouches rapprochées compte pour une seule étape,
 comme dans un éditeur de texte.
 
+### Enregistrement sûr et versions précédentes
+
+Un enregistrement est écrit à côté du fichier, forcé sur le disque, relu,
+et ne remplace l'ancien qu'une fois complet : un disque plein, un plantage
+ou une coupure de courant laissent le fichier précédent intact. Un fichier
+tenu un instant par un antivirus ou OneDrive est attendu plutôt que perdu.
+
+Chaque enregistrement conserve la version qu'il remplace, dans le dossier de
+Plotea et non à côté du projet : les 20 dernières, puis une par jour pendant
+30 jours. **Fichier ▸ Versions précédentes** les liste et en ouvre une sans
+toucher au fichier ; l'enregistrer la rétablit, et l'état qu'elle remplace
+est conservé à son tour. Un projet renommé ou déplacé garde son historique,
+et un fichier qui ne s'ouvre plus propose sa dernière version.
+
 ### Concordance de deux méthodes (Bland-Altman)
 
 Deux colonnes, une par méthode, une ligne par sujet : le graphique
@@ -495,8 +509,8 @@ publié) et le test qui vérifie que Plotea la calcule correctement.
 
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # série rapide, sans fenêtre : 607 tests, ~1 min 30
-pytest                      # 887 tests, environ 8 minutes
+pytest -m "not gui"         # série rapide, sans fenêtre : 631 tests, ~1 min 30
+pytest                      # 914 tests, environ 8 minutes
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```
@@ -537,6 +551,7 @@ avant chaque commit, et la CI lance toujours la suite complète.
 | `test_dialogs.py` | dialogues d'import, d'export et de transformation |
 | `test_project_files.py` | ouverture et enregistrement des projets |
 | `test_recovery.py` | copie de secours, abandons protégés, projets récents |
+| `test_safe_saving.py` | enregistrement tout ou rien (processus tué en pleine écriture), versions précédentes et leur conservation |
 | `test_session.py` | icône, disposition mémorisée, dernier dossier |
 | `test_updates.py` | nouvelles versions : accord demandé d'abord, une fois par jour, jamais de réseau dans les tests |
 | `test_docs.py` | page Prism → Plotea : chaque libellé cité existe, liens valides, lacunes annoncées toujours vraies |

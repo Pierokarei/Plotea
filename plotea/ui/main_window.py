@@ -284,6 +284,9 @@ class MainWindow(QMainWindow):
                                 "save")
         self.a_save_as = self._act(tr("Enregistrer sous..."), self.save_project_as,
                                    "Ctrl+Shift+S")
+        self.a_versions = self._act(
+            tr("Versions précédentes..."), lambda: self.files.show_versions(),
+            tip=tr("Retrouver un état enregistré auparavant"))
         self.a_export = self._act(tr("Exporter la figure..."), self.export_figure,
                                   "Ctrl+E", "export",
                                   tr("SVG, PDF, PNG 600 dpi..."))
@@ -365,6 +368,7 @@ class MainWindow(QMainWindow):
         m_file.addSeparator()
         m_file.addAction(self.a_save)
         m_file.addAction(self.a_save_as)
+        m_file.addAction(self.a_versions)
         m_file.addSeparator()
         m_file.addAction(self.a_export)
         m_file.addAction(self.a_export_all)

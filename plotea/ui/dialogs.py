@@ -551,3 +551,76 @@ class LogDialog(QDialog):
     def _clear(self):
         self.diagnostics.LOG.clear()
         self.refresh()
+
+
+class VersionsDialog(QDialog):
+    """The earlier versions of a project, to open one of them.
+
+    Opening a version changes no file: it becomes the project on screen,
+    still belonging to its file, and saving it puts it back - the state it
+    replaces being set aside in turn, so nothing is ever lost by trying.
+    """
+
+    def __init__(self, entries: list[dict], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Versions précédentes"))
+        self.resize(720, 420)
+        self.entries = list(entries)
+        self.chosen = None
+
+        info = QLabel(tr(
+            "Chaque enregistrement conserve la version qu'il remplace : les "
+            "20 dernières, puis une par jour pendant 30 jours. Ouvrir une "
+            "version ne modifie aucun fichier ; l'enregistrer remplace le "
+            "fichier, dont l'état actuel est conservé à son tour.")
+            if self.entries else tr(
+            "Aucune version antérieure pour ce projet : elles apparaissent à "
+            "partir du deuxième enregistrement."))
+        info.setWordWrap(True)
+        info.setProperty("hint", True)
+
+        self.table = QTableWidget(len(self.entries), 5)
+        self.table.setHorizontalHeaderLabels(
+            [tr("Enregistré le"), tr("Fichier"), tr("Tables"),
+             tr("Graphiques"), tr("Taille")])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(
+            QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        for row, entry in enumerate(self.entries):
+            cells = [entry["saved"].strftime(tr("%d/%m/%Y %H:%M:%S")),
+                     os.path.basename(entry.get("origin", "")),
+                     str(entry.get("tables", "")), str(entry.get("plots", "")),
+                     tr("{size} Ko").format(
+                         size=max(1, round(entry.get("size", 0) / 1024)))]
+            for col, text in enumerate(cells):
+                self.table.setItem(row, col, QTableWidgetItem(text))
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        if self.entries:
+            self.table.selectRow(0)
+        self.table.doubleClicked.connect(lambda *_: self._open())
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.button(QDialogButtonBox.StandardButton.Close).setText(
+            tr("Fermer"))
+        buttons.rejected.connect(self.reject)
+        self.btn_open = QPushButton(tr("Ouvrir cette version"))
+        buttons.addButton(self.btn_open,
+                          QDialogButtonBox.ButtonRole.ActionRole)
+        self.btn_open.clicked.connect(self._open)
+        self.btn_open.setEnabled(bool(self.entries))
+
+        lay = QVBoxLayout(self)
+        lay.addWidget(info)
+        lay.addWidget(self.table, 1)
+        lay.addWidget(buttons)
+
+    def _open(self):
+        rows = self.table.selectionModel().selectedRows()
+        if not rows:
+            return
+        self.chosen = self.entries[rows[0].row()]
+        self.accept()

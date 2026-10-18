@@ -252,6 +252,20 @@ compare the results with a computation made directly on the original file.
 | Saving and reopening does not change the results | identity | `workflows/test_invariance.py::test_a_trip_to_the_disk` |
 | Numbers come back from the file to the last bit | identity | `workflows/test_project_roundtrip.py::test_numbers_come_back_to_the_last_bit` |
 
+## Saving projects
+
+A correct result is of no use if the file holding it is lost. Saving is all
+or nothing: written beside, forced to the disk, read back, then put in place
+in one step; the version it replaces is kept.
+
+| What is checked | How | Test |
+|---|---|---|
+| A process killed mid-write always leaves a file that opens, whole | simulation | `test_safe_saving.py::test_killed_in_the_middle_of_a_save_the_file_still_opens` |
+| A write that fails leaves the previous file intact | behaviour | `test_safe_saving.py::test_a_write_that_fails_leaves_the_previous_file` |
+| A damaged archive is caught by its checksums | behaviour | `test_safe_saving.py::test_a_damaged_archive_is_caught_by_its_checksums` |
+| Each save keeps the version it replaces | behaviour | `test_safe_saving.py::test_each_save_keeps_the_version_it_replaces` |
+| A file that no longer opens keeps its versions | behaviour | `test_safe_saving.py::test_versions_of_a_file_that_no_longer_opens` |
+
 ## Known limits
 
 - Several probability distributions come from SciPy (Student, F,

@@ -11,7 +11,7 @@ import os
 from PyQt6.QtCore import QObject
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
-from ..core import demo, diagnostics
+from ..core import demo, diagnostics, versions
 from ..core import project as project_mod
 from ..core.dataset import empty_dataset
 from ..core.plotspec import PlotSpec
@@ -160,8 +160,12 @@ class ProjectFiles(QObject):
         try:
             window.project = Project.load(path)
         except Exception as exc:
-            QMessageBox.critical(window, self.app_name,
-                                 tr("Ouverture impossible :\n{error}").format(error=exc))
+            earlier = versions.versions_of_file(path)
+            if earlier and self._offer_version(path, exc, earlier[0]):
+                return True
+            if not earlier:
+                QMessageBox.critical(window, self.app_name, tr(
+                    "Ouverture impossible :\n{error}").format(error=exc))
             window.memory.forget_project(path)
             return False
         if not window.project.plots:
@@ -179,6 +183,68 @@ class ProjectFiles(QObject):
                                       window.project.load_warnings)), 12000)
         else:
             window.statusBar().showMessage(tr("Projet ouvert : {path}").format(path=path), 4000)
+        return True
+
+    def _offer_version(self, path: str, error, latest: dict) -> bool:
+        """A file that no longer opens: offer the last version kept of it."""
+        box = QMessageBox(self.window)
+        box.setWindowTitle(self.app_name)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setText(tr("Ouverture impossible :\n{error}").format(error=error))
+        box.setInformativeText(tr(
+            "Plotea a conservé une version antérieure de ce fichier, "
+            "enregistrée le {date}. L'ouvrir ?").format(
+                date=latest["saved"].strftime(tr("%d/%m/%Y à %H:%M"))))
+        reopen = box.addButton(tr("Ouvrir cette version"),
+                               QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(tr("Fermer"), QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(reopen)
+        box.exec()
+        if box.clickedButton() is not reopen:
+            return False
+        return self.open_version(latest, path, ask=False)
+
+    def show_versions(self):
+        """Fichier > Versions précédentes: the project's earlier states."""
+        from .dialogs import VersionsDialog
+
+        window = self.window
+        dialog = VersionsDialog(versions.versions(window.project.uid), window)
+        try:
+            if dialog.exec() and dialog.chosen is not None:
+                self.open_version(dialog.chosen, window.project.path)
+        finally:
+            dialog.deleteLater()
+
+    def open_version(self, entry: dict, belongs_to: str = "",
+                     ask: bool = True) -> bool:
+        """Put an earlier version on screen, still belonging to its file.
+
+        Nothing is written: saving it is what puts it back, and the state
+        it then replaces is kept in turn.
+        """
+        window = self.window
+        if ask and not self.ask_to_keep_changes():
+            return False
+        try:
+            project = Project.load(entry["path"])
+        except Exception as exc:
+            QMessageBox.critical(window, self.app_name, tr(
+                "Ouverture impossible :\n{error}").format(error=exc))
+            return False
+        project.path = belongs_to or entry.get("origin", "")
+        if project.path:
+            project.name = os.path.splitext(os.path.basename(project.path))[0]
+        project.dirty = True
+        window.project = project
+        if not window.project.plots:
+            window.project.add_plot(PlotSpec())
+        window._reload_all(0)
+        self.update_title()
+        window.statusBar().showMessage(tr(
+            "Version du {date} ouverte - enregistrez pour la rétablir ; "
+            "l'état actuel du fichier sera conservé").format(
+                date=entry["saved"].strftime(tr("%d/%m/%Y à %H:%M"))), 12000)
         return True
 
     def save(self) -> bool:

@@ -256,6 +256,20 @@ directement sur le fichier d'origine.
 | Enregistrer puis rouvrir ne change pas les résultats | identité | `workflows/test_invariance.py::test_a_trip_to_the_disk` |
 | Les nombres reviennent du fichier au dernier bit près | identité | `workflows/test_project_roundtrip.py::test_numbers_come_back_to_the_last_bit` |
 
+## Enregistrement des projets
+
+Un résultat juste ne sert à rien si le fichier qui le porte se perd.
+L'enregistrement est tout ou rien : écrit à côté, forcé sur le disque, relu,
+puis mis en place d'un seul coup ; la version remplacée est conservée.
+
+| Ce qui est vérifié | Comment | Test |
+|---|---|---|
+| Un processus tué en pleine écriture laisse toujours un fichier qui s'ouvre, entier | simulation | `test_safe_saving.py::test_killed_in_the_middle_of_a_save_the_file_still_opens` |
+| Une écriture qui échoue laisse le fichier précédent intact | comportement | `test_safe_saving.py::test_a_write_that_fails_leaves_the_previous_file` |
+| Une archive endommagée est repérée par ses sommes de contrôle | comportement | `test_safe_saving.py::test_a_damaged_archive_is_caught_by_its_checksums` |
+| Chaque enregistrement conserve la version qu'il remplace | comportement | `test_safe_saving.py::test_each_save_keeps_the_version_it_replaces` |
+| Un fichier qui ne s'ouvre plus garde ses versions | comportement | `test_safe_saving.py::test_versions_of_a_file_that_no_longer_opens` |
+
 ## Limites connues
 
 - Plusieurs lois de probabilité viennent de SciPy (Student, F, khi², étendue
