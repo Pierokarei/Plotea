@@ -509,8 +509,8 @@ publié) et le test qui vérifie que Plotea la calcule correctement.
 
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # série rapide, sans fenêtre : 631 tests, ~1 min 30
-pytest                      # 914 tests, environ 8 minutes
+pytest -m "not gui"         # série rapide, sans fenêtre : 632 tests, ~1 min 30
+pytest                      # 915 tests, environ 8 minutes
 pytest tests/test_anova.py  # une seule suite
 pytest -k paired            # un seul sujet (les tests appariés)
 ```

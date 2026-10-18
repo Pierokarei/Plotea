@@ -140,6 +140,30 @@ def test_a_file_held_by_another_program_is_waited_for(tmp_path, monkeypatch):
     assert value_in(path) == 2.0 and len(waits) == 2
 
 
+def test_a_file_held_just_after_its_save_still_opens(tmp_path, monkeypatch):
+    """An antivirus scanning the file it just saw written: Windows refuses
+    to open it for a moment. Opening waits, as saving does."""
+    path = str(tmp_path / "p.plotea")
+    a_project(1.0).save(path)
+    real_open, refusals, waits = safefile._open, [3], []
+
+    def held(name, mode="r", *args, **kwargs):
+        if name == path and refusals[0]:
+            refusals[0] -= 1
+            raise PermissionError("utilisé par un autre processus")
+        return real_open(name, mode, *args, **kwargs)
+    monkeypatch.setattr(safefile, "_open", held)
+    monkeypatch.setattr(safefile.time, "sleep", waits.append)
+    assert value_in(path) == 1.0 and len(waits) == 3
+    # and a version is still set aside when the file is held
+    refusals[0] = 2
+    project = Project.load(path)
+    project.datasets[0].df["Valeur"] = 2.0
+    project.save(path)
+    kept = versions.versions(project.uid)
+    assert [value_in(v["path"]) for v in kept] == [1.0]
+
+
 def test_a_read_only_file_is_refused_at_once(tmp_path, monkeypatch):
     path = str(tmp_path / "p.plotea")
     a_project(1.0).save(path)

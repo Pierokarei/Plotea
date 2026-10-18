@@ -4,7 +4,7 @@
 
 Cette page s'adresse à celles et ceux qui connaissent GraphPad Prism et
 veulent faire la même chose dans Plotea : récupérer leurs fichiers, retrouver
-chaque analyse, et savoir ce qui manque encore. Elle décrit Plotea 1.2.0.
+chaque analyse, et savoir ce qui manque encore. Elle décrit Plotea 1.3.0.
 
 Plotea est gratuit et libre. Il ne cherche pas à copier Prism écran par
 écran : la plupart des analyses s'y trouvent, mais rangées autrement.

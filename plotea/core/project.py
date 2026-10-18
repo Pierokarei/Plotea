@@ -276,7 +276,8 @@ class Project:
 
     @classmethod
     def load(cls, path: str) -> "Project":
-        with zipfile.ZipFile(path) as zf:
+        with safefile.open_read(path) as handle, \
+                zipfile.ZipFile(handle) as zf:
             meta = json.loads(zf.read("project.json").decode("utf-8"))
             datasets = []
             missing = []

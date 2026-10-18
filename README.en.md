@@ -493,8 +493,8 @@ dataset) and the test that checks Plotea computes it correctly.
 
 ```bash
 pip install -e ".[dev]"
-pytest -m "not gui"         # quick run, no window: 631 tests, ~1 min 30
-pytest                      # 914 tests, about 8 minutes
+pytest -m "not gui"         # quick run, no window: 632 tests, ~1 min 30
+pytest                      # 915 tests, about 8 minutes
 pytest tests/test_anova.py  # a single suite
 pytest -k paired            # a single topic (paired tests)
 ```

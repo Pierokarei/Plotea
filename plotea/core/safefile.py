@@ -25,6 +25,8 @@ REPLACE_TRIES = 8
 #: A temporary file older than this was left by a session that crashed.
 STALE_SECONDS = 600
 
+_open = open        # replaced in the tests by a program holding the file
+
 
 def _partial_pattern(target: str) -> str:
     folder, name = os.path.split(os.path.abspath(target))
@@ -74,6 +76,23 @@ def _give_mode(partial: str, target: str):
             os.chmod(partial, 0o666 & ~mask)
     except OSError:
         pass
+
+
+def open_read(path: str):
+    """Open a file for reading, waiting while another program holds it.
+
+    Just written, a file is often opened at once by an antivirus or a
+    synchronisation client, and Windows then refuses it for a moment:
+    opening a project right after it was saved failed with "permission
+    denied" although nothing was wrong with it.
+    """
+    for attempt in range(REPLACE_TRIES):
+        try:
+            return _open(path, "rb")
+        except PermissionError:
+            if attempt == REPLACE_TRIES - 1:
+                raise
+            time.sleep(0.05 * 2 ** attempt)
 
 
 def replace(partial: str, target: str):
@@ -147,4 +166,7 @@ def write_text(target: str, text: str) -> str:
 
 def copy(source: str, target: str) -> str:
     """Copy a file, all or nothing."""
-    return write_atomic(target, lambda path: shutil.copyfile(source, path))
+    def write(path):
+        with open_read(source) as src, open(path, "wb") as dst:
+            shutil.copyfileobj(src, dst)
+    return write_atomic(target, write)

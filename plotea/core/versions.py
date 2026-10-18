@@ -44,7 +44,7 @@ def _safe(project_id: str) -> str:
 
 def _digest(path: str) -> str:
     sha = hashlib.sha256()
-    with open(path, "rb") as handle:
+    with safefile.open_read(path) as handle:
         for block in iter(lambda: handle.read(1 << 20), b""):
             sha.update(block)
     return sha.hexdigest()
@@ -53,7 +53,8 @@ def _digest(path: str) -> str:
 def _meta(path: str) -> dict:
     """project.json of an archive, or {} when it cannot be read."""
     try:
-        with zipfile.ZipFile(path) as archive:
+        with safefile.open_read(path) as handle, \
+                zipfile.ZipFile(handle) as archive:
             return json.loads(archive.read("project.json").decode("utf-8"))
     except Exception:
         return {}
