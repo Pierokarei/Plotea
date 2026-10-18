@@ -5,18 +5,20 @@ import html
 import math
 
 import pandas as pd
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QComboBox,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
@@ -123,6 +125,42 @@ def comparison_block(comparison) -> str:
     return "\n".join(lines)
 
 
+class _AdviceArea(QScrollArea):
+    """The explanation above the comparisons, scrolling when space is short.
+
+    A word-wrapped label alone would demand, as its minimum, its height at
+    the narrowest width it can imagine - several hundred pixels - and the
+    Analyses dock could no longer be made smaller than that. Here it asks
+    for its full height at the width it actually has, and gives way, with a
+    scroll bar, when the dock is made low: the dock's minimum is the one it
+    had before the explanation existed.
+    """
+
+    def __init__(self, label: QLabel):
+        super().__init__()
+        self.label = label
+        self.setWidget(label)
+        self.setWidgetResizable(True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred,
+                           QSizePolicy.Policy.Preferred)
+        self.viewport().setAutoFillBackground(False)
+        label.setAutoFillBackground(False)
+
+    def sizeHint(self) -> QSize:
+        width = max(self.viewport().width(), 200)
+        return QSize(width, self.label.heightForWidth(width))
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(0, 0)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if event.oldSize().width() != event.size().width():
+            self.updateGeometry()      # the wrapped height follows the width
+
+
 class StatsPanel(QWidget):
     """Three tabs: descriptive stats, tests, fits."""
 
@@ -203,13 +241,15 @@ class StatsPanel(QWidget):
         self.advice.setWordWrap(True)
         self.advice.setTextFormat(Qt.TextFormat.RichText)
         self.advice.setContentsMargins(8, 4, 8, 4)
-        # the table gives way when the dock is low, not the explanation
-        self.advice.setSizePolicy(QSizePolicy.Policy.Preferred,
-                                  QSizePolicy.Policy.Minimum)
         self.advice.setVisible(False)
+        # in a scrolling strip that asks for no height of its own: the dock
+        # stays as free to shrink and grow as before the explanation existed
+        self.advice_area = _AdviceArea(self.advice)
+        self.advice_area.setVisible(False)
         lay = QVBoxLayout(page)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(self.advice)
+        lay.setSpacing(0)
+        lay.addWidget(self.advice_area)
         lay.addWidget(self.tests, 1)
         return page
 
@@ -218,6 +258,7 @@ class StatsPanel(QWidget):
         advice = getattr(info, "recommendation", None) or {}
         if not advice:
             self.advice.setVisible(False)
+            self.advice_area.setVisible(False)
             self.advice.clear()
             return
         parts = [f"<b>{html.escape(advice['title'])}</b>",
@@ -240,6 +281,8 @@ class StatsPanel(QWidget):
         parts.append(last)
         self.advice.setText("<br>".join(parts))
         self.advice.setVisible(True)
+        self.advice_area.setVisible(True)
+        self.advice_area.updateGeometry()
 
     def _build_methods(self) -> QWidget:
         """The Methods paragraph, in the language the article is written in,

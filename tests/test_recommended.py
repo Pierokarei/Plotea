@@ -375,3 +375,28 @@ def test_a_before_after_plot_declares_the_same_subjects(window):
             button.click()
     assert inspector.cmb_design.currentData() == "paired"
     assert not inspector.cmb_design.isEnabled()
+
+
+def test_the_explanation_does_not_hold_the_panel_open(window):
+    """A word-wrapped label once set the Analyses panel's minimum to its
+    height at the narrowest width - over 400 pixels - and the panel could
+    no longer be made smaller. Shown or not, it must change nothing."""
+    from conftest import app
+    from PyQt6.QtCore import Qt
+
+    dock = window.dock_stats
+    window.resize(1500, 950)
+    window.load_example("Essai de survie (Kaplan-Meier)")
+    window._render_now()
+    app.processEvents()
+    assert window.stats_panel.advice.isHidden()
+    without = dock.minimumSizeHint().height()
+    window.load_example("Viabilité cellulaire (barres, stats)")
+    window._render_now()
+    app.processEvents()
+    assert not window.stats_panel.advice.isHidden()
+    assert dock.minimumSizeHint().height() == without
+    for height in (without, 260, 420, 520):
+        window.resizeDocks([dock], [height], Qt.Orientation.Vertical)
+        app.processEvents()
+        assert abs(dock.height() - height) <= 30, (height, dock.height())

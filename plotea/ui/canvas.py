@@ -74,7 +74,9 @@ class PlotCanvas(QWidget):
                                   QSizePolicy.Policy.Expanding)
         # A constant floor, unrelated to the figure: the preview keeps a
         # usable width and the panels never have to give theirs back.
-        self.scroll.setMinimumSize(420, 260)
+        # The height floor stays low - the preview scrolls - so that the
+        # Analyses panel can be pulled up over half the window.
+        self.scroll.setMinimumSize(420, 120)
         self.set_desk_color("#EDEFF2")
 
         self.size_label = QLabel()
